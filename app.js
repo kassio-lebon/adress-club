@@ -52,7 +52,7 @@ async function chargerProfil() {
   const { data: { session } } = await sb.auth.getSession();
   state.session = session;
   if (!session) { state.profil = null; return; }
-  const { data } = await sb.from('profiles').select('*, residence:residences(nom)').eq('id', session.user.id).maybeSingle();
+  const { data } = await sb.from('profiles').select('*, residence:residences(nom,photo_path)').eq('id', session.user.id).maybeSingle();
   state.profil = data;
   if (data?.statut === 'actif') {
     const { data: p } = await sb.from('parametres').select('cle,valeur');
@@ -170,24 +170,32 @@ const ICO = {
   market: svg('M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0'),
   residences: svg('M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M9 9h.01M15 9h.01M9 13h.01M15 13h.01'),
   flip: svg('M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z'),
-  news: svg('M12 3l2.1 5.4L20 9.5l-4.5 3.8L17 19l-5-3-5 3 1.5-5.7L4 9.5l5.9-1.1z'),
+  news: svg('M4 5h13v14H6a2 2 0 0 1-2-2zM17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5'),
+  camera: svg('M4 8h3l2-3h6l2 3h3v11H4zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7'),
+  chev: svg('m9 6 6 6-6 6'),
   arrow: svg('M5 12h14M13 6l6 6-6 6')
 };
 async function accueil() {
   await majCompteurs();
   const nl = state.compteurs.demandes_non_lues || 0;
-  app.innerHTML = `
-  <div class="hero"><span class="kicker">ADRESS CLUB</span><h1>Bonjour ${esc(state.profil.nom_affichage || '')}</h1><p>${esc(state.profil.residence?.nom || 'ADRESS IMMOBILIER')}</p></div>
-  <div class="grid2 home-tiles">
-    <a class="card entry" href="#/market"><span class="ico">${ICO.market}</span>${nl ? `<span class="badge">${nl}</span>` : ''}<b>Le Market</b><span>Vendre, donner, trouver</span></a>
-    <a class="card entry" href="#/residences"><span class="ico">${ICO.residences}</span><b>Nos résidences</b><span>Photos et contact</span></a>
-    <a class="card entry" href="#/flip-immo"><span class="ico">${ICO.flip}</span><b>Le Flip Immo</b><span>Le magazine ADRESS</span></a>
-    <a class="card entry" href="#/nouveautes"><span class="ico">${ICO.news}</span><b>Les nouveautés</b><span>Actualités et programmes</span></a>
-  </div>
-  <a class="card banner" href="#/bonnes-adresses"><span><b>Nos bonnes adresses</b><br><span class="muted">Partenaires et boutiques recommandés par ADRESS</span></span><span class="arrow">${ICO.arrow}</span></a>
-  <div style="margin-top:12px"><a class="btn ghost block" href="#/mes-annonces">Mes annonces et demandes${nl ? ` · ${nl} nouvelle${nl > 1 ? 's' : ''}` : ''}</a></div>
-  ${state.profil.is_admin ? `<div style="margin-top:10px"><a class="btn soft block" href="#/admin">Espace ADRESS (gestion)</a></div>` : ''}
-  <p class="center" style="margin-top:14px"><a class="muted" href="#/avis">Donner mon avis</a></p>`;
+  const { data: recents } = await sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8);
+  const urls = await photosUrls((recents || []).map(a => a.photos[0]));
+  const res = state.profil.residence || {}, ph = res.photo_path;
+  const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
+  app.innerHTML = '<div class="home">'
+    + '<section class="hero' + (ph ? ' has-ph' : '') + '"' + (ph ? ' style="background-image:url(\'' + esc(publicUrl(ph)) + '\')"' : '') + '>'
+    + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>Bonjour ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
+    + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
+    + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'
+    + ((recents || []).length ? '<div class="strip">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
+      : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
+    + '</section><section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
+    + lien('#/residences', ICO.residences, 'Nos résidences', 'Photos et contact')
+    + lien('#/flip-immo', ICO.flip, 'Le Flip Immo', 'Le magazine ADRESS')
+    + lien('#/nouveautes', ICO.news, 'Les nouveautés', 'Programmes et actualités')
+    + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Nos bonnes adresses</b><small>Partenaires et boutiques recommandés par ADRESS</small></span>' + ICO.arrow + '</a>'
+    + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
+    + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
 }
 
 // ---------- Le Market (§3, §4) ----------
@@ -279,7 +287,7 @@ function publier() {
   <form id="f" class="narrow" novalidate>
   <div class="chips" id="typ"><a class="chip on" data-v="vente">Je vends</a><a class="chip" data-v="don">Je donne</a></div>
   <label>Photos (1 à ${max}) *</label>
-  <label class="btn ghost block" for="ph" style="margin:0">📷 Prendre ou choisir des photos</label>
+  <label class="drop" for="ph">${ICO.camera}Prendre ou choisir des photos<small>Jusqu’à ${max} photos, compressées automatiquement</small></label>
   <input id="ph" type="file" accept="image/*" multiple class="sr">
   <div class="thumbs" id="th"></div>
   <label for="ti">Titre *</label><input id="ti" type="text" maxlength="80" placeholder="Canapé 3 places">
@@ -497,7 +505,6 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) majC
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });
-document.addEventListener('pointerdown', (e) => { const b = e.target.closest('.btn'); if (!b || b.disabled) return; const r = b.getBoundingClientRect(), s = Math.max(r.width, r.height), x = document.createElement('span'); x.className = 'ripple'; x.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`; b.appendChild(x); setTimeout(() => x.remove(), 650); });
 await chargerProfil();
 router();
 setInterval(majCompteurs, 60000);
