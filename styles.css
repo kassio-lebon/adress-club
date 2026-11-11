@@ -87,3 +87,4 @@ table.adm th,table.adm td{border-bottom:1px solid var(--line);padding:8px;text-a
 .notif.unread{border-left:4px solid var(--brand)}
 details>summary{cursor:pointer;font-weight:600}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+[hidden]{display:none!important}
