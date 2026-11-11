@@ -417,3 +417,17 @@ html.vt .page-in>*,html.vt .page-in .home>*{animation:none}
 }
 
 @media (prefers-reduced-motion:reduce){.ph,.gal img{filter:none!important;transform:none!important}.intro{display:none}}
+
+/* ---------- anneaux en orbite (rappel du logo) ---------- */
+.hero .orb{position:absolute;border-radius:50%;pointer-events:none;z-index:2}
+.hero .o1{right:-70px;top:-60px;width:260px;height:160px;border:2px solid rgba(255,255,255,.2);animation:orbit1 16s linear infinite}
+.hero .o2{right:-30px;top:-44px;width:210px;height:130px;border:2px solid rgba(212,16,29,.85);animation:orbit2 22s linear infinite}
+@keyframes orbit1{from{transform:rotate(-28deg)}to{transform:rotate(332deg)}}
+@keyframes orbit2{from{transform:rotate(-38deg)}to{transform:rotate(-398deg)}}
+.hero>p,.hero>h1{z-index:3}
+.hero .orb{opacity:0;animation-delay:0s;transition:opacity 1s .3s}
+.hero .orb.on{opacity:1}
+@media (min-width:960px){.hero .o1{width:420px;height:260px;right:-60px;top:-80px}.hero .o2{width:340px;height:210px;right:10px;top:-60px}}
+.intro-in{position:relative}
+.intro-in::before{content:"";position:absolute;left:50%;top:34px;width:230px;height:120px;margin:-60px 0 0 -115px;border:2px solid rgba(212,16,29,.7);border-radius:50%;opacity:0;animation:introorb 1.6s .2s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes introorb{from{opacity:0;transform:rotate(-90deg) scale(.6)}to{opacity:1;transform:rotate(-20deg) scale(1)}}

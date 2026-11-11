@@ -47,6 +47,8 @@ const io = 'IntersectionObserver' in window ? new IntersectionObserver((list) =>
 
 function decorate() {
   if (shared) { const g = app.querySelector('.gal img'); if (g) g.style.viewTransitionName = 'photo'; }
+  const hero = app.querySelector('.hero');
+  if (hero && !hero.querySelector('.orb')) { hero.insertAdjacentHTML('beforeend', '<i class="orb o1"></i><i class="orb o2"></i>'); requestAnimationFrame(() => hero.querySelectorAll('.orb').forEach(o => o.classList.add('on'))); }
   // chargement progressif des photos (flou → net)
   app.querySelectorAll('.ph').forEach(el => {
     const m = /url\(["']?(.*?)["']?\)/.exec(el.style.backgroundImage || ''); if (!m || !m[1]) { el.classList.add('ld'); return; }
