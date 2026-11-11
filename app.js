@@ -23,6 +23,8 @@ export const errMsg = (e) => (e && (e.message || e.error_description)) ? String(
 export const publicUrl = (path) => path ? sb.storage.from('contenus').getPublicUrl(path).data.publicUrl : '';
 function prix(a) { return a.type === 'don' ? 'GRATUIT' : fcfa(a.prix_fcfa); }
 const qs = () => new URLSearchParams((location.hash.split('?')[1]) || '');
+const estFlip = (u) => /^https:\/\/([a-z0-9-]+\.)?heyzine\.com\//i.test(u || '');
+const lienFlip = (u, t) => estFlip(u) ? '#/lire?' + new URLSearchParams({ u, t: t || '' }).toString() : u;
 const track = (type, ref_id) => sb.from('evenements').insert({ type, ref_id: ref_id || null }).then(() => {});
 
 const signedCache = new Map();
@@ -71,13 +73,13 @@ const actif = () => state.profil?.statut === 'actif';
 const routes = {
   '': accueil, 'market': market, 'annonce': annonce, 'publier': publier, 'mes-annonces': mesAnnonces,
   'residences': residences, 'nouveautes': nouveautes, 'flip-immo': flip, 'bonnes-adresses': bonnesAdresses,
-  'notifications': notifications, 'profil': profil, 'avis': avis, 'admin': (p) => renderAdmin(app, p)
+  'notifications': notifications, 'profil': profil, 'avis': avis, 'lire': lire, 'admin': (p) => renderAdmin(app, p)
 };
 async function router() {
   const [path] = location.hash.replace(/^#\/?/, '').split('?');
   const [name, param] = path.split('/');
   document.getElementById('top').hidden = !actif();
-  document.getElementById('fab').hidden = !actif() || ['publier','admin','avis'].includes(name);
+  document.getElementById('fab').hidden = !actif() || ['publier','admin','avis','lire'].includes(name);
   window.scrollTo(0, 0);
   if (!state.session) return connexion();
   if (!actif()) return activation();
@@ -388,7 +390,7 @@ async function flip() {
   const f = data?.[0];
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Le Flip Immo</h1><p class="muted">Le magazine ADRESS IMMOBILIER</p>
   ${f ? `<div class="card center" style="margin-top:12px">${f.image_path ? `<img src="${esc(publicUrl(f.image_path))}" alt="Couverture du Flip Immo" style="margin:0 auto;max-height:520px;border-radius:10px">` : ''}
-    <h2>${esc(f.titre)}${f.numero ? ' – n° ' + esc(f.numero) : ''}</h2>${f.lien ? `<a class="btn block" id="lire" href="${esc(f.lien)}" target="_blank" rel="noopener">Lire le magazine</a>` : ''}</div>`
+    <h2>${esc(f.titre)}${f.numero ? ' – n° ' + esc(f.numero) : ''}</h2>${f.lien ? `<a class="btn block" id="lire" href="${esc(lienFlip(f.lien, f.titre))}" ${estFlip(f.lien) ? '' : 'target="_blank" rel="noopener"'}>Lire le magazine</a>` : ''}</div>`
   : '<div class="card center pad" style="margin-top:12px">Le prochain numéro arrive bientôt.</div>'}`;
   const l = app.querySelector('#lire'); if (l) l.addEventListener('click', () => track('clic_flip', f.id));
 }
@@ -402,9 +404,18 @@ async function bonnesAdresses() {
   <div class="list">${(data || []).map(p => `<div class="card" style="display:flex;gap:12px;align-items:center">
     <div style="width:76px;height:76px;flex:none;border-radius:10px;background:#f1f3f5 center/contain no-repeat ${p.logo_path ? `url('${esc(publicUrl(p.logo_path))}')` : ''}"></div>
     <div style="flex:1;min-width:0"><b>${esc(p.nom)}</b><div class="muted small">${esc(p.categorie)}</div>${p.description ? `<div style="font-size:14px;margin:4px 0">${esc(p.description)}</div>` : ''}
-    ${p.lien ? `<a class="btn sm" data-p="${p.id}" href="${esc(p.lien)}" target="_blank" rel="noopener">Découvrir</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune adresse dans cette catégorie pour le moment.</div>'}</div>
+    ${p.lien ? `<a class="btn sm" data-p="${p.id}" href="${esc(lienFlip(p.lien, p.nom))}" ${estFlip(p.lien) ? '' : 'target="_blank" rel="noopener"'}>${estFlip(p.lien) ? 'Feuilleter' : 'Découvrir'}</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune adresse dans cette catégorie pour le moment.</div>'}</div>
   <p class="muted small center" style="margin-top:14px">Recommandations éditoriales d'ADRESS : pas de paiement intégré ni de commission.</p>`;
   app.querySelectorAll('[data-p]').forEach(a => a.addEventListener('click', () => track('clic_partenaire', a.dataset.p)));
+}
+
+// ---------- Lecteur de flipbook Heyzine (Flip Immo, catalogues partenaires) ----------
+function lire() {
+  const p = qs(), u = p.get('u') || '', t = p.get('t') || 'Flipbook';
+  if (!estFlip(u)) { location.hash = '#/'; return; }
+  app.innerHTML = `<a class="back" href="javascript:history.back()">‹ Retour</a><h1>${esc(t)}</h1>
+  <div class="flip"><iframe src="${esc(u)}" title="${esc(t)}" allow="fullscreen" allowfullscreen loading="lazy"></iframe></div>
+  <a class="btn ghost block" style="margin-top:10px" href="${esc(u)}" target="_blank" rel="noopener">Ouvrir en plein écran</a>`;
 }
 
 // ---------- Notifications (§6) ----------
