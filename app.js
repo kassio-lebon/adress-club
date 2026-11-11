@@ -183,7 +183,7 @@ async function accueil() {
   const res = state.profil.residence || {}, ph = res.photo_path;
   const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
   app.innerHTML = '<div class="home">'
-    + '<section class="hero' + (ph ? ' has-ph' : '') + '"' + (ph ? ' style="background-image:url(\'' + esc(publicUrl(ph)) + '\')"' : '') + '>'
+    + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz" style="background-image:url(\'' + esc(publicUrl(ph)) + '\')"></div>' : '')
     + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>Bonjour ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
     + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
     + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'

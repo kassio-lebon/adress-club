@@ -270,3 +270,102 @@ a:focus-visible,.btn:focus-visible,.chip:focus-visible,.icon-btn:focus-visible{o
 @media (min-width:1280px){.grid3{grid-template-columns:repeat(5,minmax(0,1fr))}}
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* ---------- animations et effets ---------- */
+/* entrée des pages et apparition en cascade */
+.page-in>*,.page-in .home>*{animation:rise .5s var(--ease) both}
+.page-in>*:nth-child(2),.page-in .home>*:nth-child(2){animation-delay:.05s}
+.page-in>*:nth-child(3),.page-in .home>*:nth-child(3){animation-delay:.1s}
+.page-in>*:nth-child(4),.page-in .home>*:nth-child(4){animation-delay:.15s}
+.page-in>*:nth-child(n+5),.page-in .home>*:nth-child(n+5){animation-delay:.2s}
+.page-in .grid2>*,.page-in .list>*,.page-in .strip>*,.page-in .menu>a{animation:rise .55s var(--ease) both}
+.page-in .grid2>*:nth-child(1),.page-in .list>*:nth-child(1),.page-in .strip>*:nth-child(1),.page-in .menu>a:nth-child(1){animation-delay:.12s}
+.page-in .grid2>*:nth-child(2),.page-in .list>*:nth-child(2),.page-in .strip>*:nth-child(2),.page-in .menu>a:nth-child(2){animation-delay:.18s}
+.page-in .grid2>*:nth-child(3),.page-in .list>*:nth-child(3),.page-in .strip>*:nth-child(3),.page-in .menu>a:nth-child(3){animation-delay:.24s}
+.page-in .grid2>*:nth-child(4),.page-in .list>*:nth-child(4),.page-in .strip>*:nth-child(4){animation-delay:.3s}
+.page-in .grid2>*:nth-child(5),.page-in .list>*:nth-child(5),.page-in .strip>*:nth-child(5){animation-delay:.36s}
+.page-in .grid2>*:nth-child(n+6),.page-in .list>*:nth-child(n+6),.page-in .strip>*:nth-child(n+6){animation-delay:.42s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* bandeau d'accueil : photo en lent zoom, texte qui se dévoile */
+.hero.has-ph{background-image:none!important}
+.hero .bgz{position:absolute;inset:0;background:center/cover no-repeat;animation:kenburns 18s ease-out both}
+@keyframes kenburns{from{transform:scale(1.12)}to{transform:scale(1)}}
+.hero.has-ph::before{z-index:1}
+.hero>p,.hero>h1{z-index:2}
+.hero>p{animation:reveal .7s .15s var(--ease) both}
+.hero>h1{animation:reveal .8s .25s var(--ease) both}
+@keyframes reveal{from{opacity:0;transform:translateY(16px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+.hero::after{content:"";position:absolute;left:20px;bottom:16px;height:2px;width:0;background:var(--red);z-index:2;animation:line .9s .55s var(--ease) forwards}
+@keyframes line{to{width:56px}}
+
+/* cartes et photos : légère élévation, zoom de la photo */
+.item,.mini{transition:transform .35s var(--ease)}
+.item .ph,.mini .ph{transition:box-shadow .35s var(--ease)}
+.item .ph::after,.mini .ph::after{content:"";position:absolute;inset:0;background:inherit;background-size:cover;background-position:center;transition:transform .7s var(--ease)}
+@media (hover:hover){
+  .item:hover,.mini:hover{transform:translateY(-4px)}
+  .item:hover .ph,.mini:hover .ph{box-shadow:0 14px 30px -12px rgba(22,23,26,.35)}
+  .item:hover .ph::after,.mini:hover .ph::after{transform:scale(1.06)}
+  .menu a:hover>svg:last-child{transform:translateX(4px);color:var(--red)}
+  .menu a:hover>svg:first-child{transform:scale(1.12)}
+  .feature:hover svg{transform:translateX(5px)}
+  .feature:hover{transform:translateY(-2px);box-shadow:0 16px 30px -14px rgba(22,23,26,.5)}
+  .card.notif:hover{transform:translateX(4px)}
+  .btn:hover{transform:translateY(-1px)}
+}
+.item:active,.mini:active{transform:scale(.98)}
+.menu a>svg{transition:transform .3s var(--ease),color .2s}
+.feature{transition:transform .3s var(--ease),box-shadow .3s var(--ease)}
+.feature svg{transition:transform .3s var(--ease)}
+.card.notif{transition:transform .25s var(--ease)}
+
+/* favori : cœur qui bat */
+.fav.pop{animation:heart .5s var(--ease)}
+@keyframes heart{0%{transform:scale(1)}25%{transform:scale(1.4)}50%{transform:scale(.9)}75%{transform:scale(1.12)}100%{transform:scale(1)}}
+
+/* boutons : onde au toucher */
+.btn{position:relative;overflow:hidden}
+.btn::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;background:currentColor;opacity:0;transform:translate(-50%,-50%) scale(1);pointer-events:none}
+.btn:active::after{animation:tap .5s ease-out}
+@keyframes tap{from{opacity:.22;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(40)}}
+
+/* navigation : repère qui glisse, icône qui rebondit */
+.tabbar a svg{transition:transform .3s var(--ease)}
+.tabbar a.on svg{animation:bounce .45s var(--ease)}
+.tabbar a.on::before{animation:grow .35s var(--ease) both}
+@keyframes bounce{40%{transform:translateY(-4px)}100%{transform:none}}
+@keyframes grow{from{width:0}to{width:22px}}
+.top-nav a.on:not(.btn)::after{animation:grow2 .35s var(--ease) both;transform-origin:left}
+@keyframes grow2{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.nav-badge,.notice b,.dot{animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(212,16,29,.45)}50%{box-shadow:0 0 0 6px rgba(212,16,29,0)}}
+
+/* en-tête qui se pose au défilement */
+.top{transition:border-color .25s,box-shadow .25s,padding .25s}
+.top.scrolled{box-shadow:0 8px 24px -16px rgba(22,23,26,.35)}
+
+/* écran de démarrage et connexion */
+.splash img{animation:breathe 1.8s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.5;transform:scale(.97)}}
+.login-logo{animation:reveal .8s var(--ease) both}
+.login-brand h1{animation:reveal .8s .12s var(--ease) both}
+.login-brand p{animation:reveal .8s .2s var(--ease) both}
+
+/* formulaires : secousse sur erreur, vignettes qui apparaissent */
+.err:not([hidden]){animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.thumbs .th{animation:pop .35s var(--ease) both}
+@keyframes pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+.drop svg{transition:transform .35s var(--ease)}
+.drop:hover svg{transform:translateY(-3px) scale(1.08)}
+#typ .chip{transition:background .25s,color .25s,box-shadow .25s}
+
+/* détails : ouverture en douceur */
+details[open] .dem{animation:rise .4s var(--ease) both}
+
+/* message bas d'écran */
+.toast{animation:toast .4s var(--ease) both}
+@keyframes toast{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
