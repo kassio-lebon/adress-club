@@ -89,3 +89,56 @@ addEventListener('scroll', () => {
   if (reduce || ticking) return; ticking = true;
   requestAnimationFrame(() => { const z = app.querySelector('.hero .bgz'); if (z) z.style.translate = `0 ${Math.min(scrollY, 400) * 0.3}px`; ticking = false; });
 }, { passive: true });
+
+// ---------- mobile : vibrations, points de galerie, tirer pour actualiser, glisser pour revenir ----------
+const touch = matchMedia('(pointer: coarse)').matches;
+const buzz = (ms = 8) => { try { if (touch && navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
+document.addEventListener('click', (e) => { if (e.target.closest('.tabbar a, .fav, #int, .chip, [data-act], .btn')) buzz(); }, true);
+
+new MutationObserver(() => {
+  const gal = app.querySelector('.gal');
+  if (!gal || gal.children.length < 2 || gal.dataset.dots) return;
+  gal.dataset.dots = '1';
+  const d = document.createElement('div'); d.className = 'dots';
+  d.innerHTML = [...gal.children].map((_, i) => '<i' + (i ? '' : ' class="on"') + '></i>').join('');
+  gal.after(d);
+  let last = 0;
+  gal.addEventListener('scroll', () => { const i = Math.round(gal.scrollLeft / gal.clientWidth); if (i !== last) { last = i; buzz(5); d.querySelectorAll('i').forEach((x, k) => x.classList.toggle('on', k === i)); } }, { passive: true });
+}).observe(app, { childList: true });
+
+if (touch && !reduce) {
+  const ptr = document.createElement('div'); ptr.className = 'ptr'; ptr.innerHTML = '<i></i>'; document.body.appendChild(ptr);
+  let y0 = null, pulled = 0, sx = null, sy = 0;
+  const iosBrowser = /iP(hone|ad|od)/.test(navigator.userAgent) && !navigator.standalone;
+  addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    y0 = scrollY <= 0 && !e.target.closest('.gal, .strip, .flip, input, textarea, select, .tabs') ? t.clientY : null;
+    sx = !iosBrowser && t.clientX < 24 ? t.clientX : null; sy = t.clientY;
+  }, { passive: true });
+  addEventListener('touchmove', (e) => {
+    if (y0 === null) return;
+    pulled = Math.max(0, Math.min(110, (e.touches[0].clientY - y0) * 0.5));
+    if (pulled > 4) { ptr.classList.add('drag'); ptr.style.opacity = Math.min(1, pulled / 60); ptr.style.transform = `translate(-50%, ${pulled - 50}px) rotate(${pulled * 3}deg)`; }
+  }, { passive: true });
+  addEventListener('touchend', (e) => {
+    ptr.classList.remove('drag');
+    if (y0 !== null && pulled > 70) {
+      buzz(12); ptr.style.opacity = ''; ptr.style.transform = ''; ptr.classList.add('spin');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      setTimeout(() => ptr.classList.remove('spin'), 900);
+    } else if (y0 !== null) { ptr.style.opacity = ''; ptr.style.transform = ''; }
+    y0 = null; pulled = 0;
+    if (sx !== null) {
+      const t = e.changedTouches[0];
+      if (t.clientX - sx > 80 && Math.abs(t.clientY - sy) < 70 && location.hash && location.hash !== '#/') {
+        buzz(); root.dataset.dir = 'back';
+        if (document.startViewTransition) {
+          root.classList.add('vt');
+          const v = document.startViewTransition(() => new Promise((res) => { pending = res; setTimeout(() => { if (pending === res) { pending = null; res(); } }, 1600); history.back(); }));
+          v.finished.finally(() => root.classList.remove('vt'));
+        } else history.back();
+      }
+      sx = null;
+    }
+  }, { passive: true });
+}
