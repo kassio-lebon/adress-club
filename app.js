@@ -65,6 +65,7 @@ export async function majCompteurs() {
   if (data) state.compteurs = data;
   const n = (state.compteurs.demandes_non_lues || 0) + (state.compteurs.notifications_non_lues || 0);
   document.getElementById('notifDot').hidden = !(state.compteurs.notifications_non_lues > 0);
+  const nb = document.getElementById('navBadge'); nb.textContent = state.compteurs.demandes_non_lues || ''; nb.hidden = !(state.compteurs.demandes_non_lues > 0);
   try { if ('setAppBadge' in navigator) n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch (_) {}
 }
 const actif = () => state.profil?.statut === 'actif';
@@ -79,19 +80,24 @@ async function router() {
   const [path] = location.hash.replace(/^#\/?/, '').split('?');
   const [name, param] = path.split('/');
   document.getElementById('top').hidden = !actif();
-  document.getElementById('fab').hidden = !actif() || ['publier','admin','avis','lire'].includes(name);
+  document.getElementById('nav').hidden = !actif();
+  const sect = ({ '': 'accueil', annonce: 'market' })[name] ?? name;
+  document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === sect));
   window.scrollTo(0, 0);
   if (!state.session) return connexion();
   if (!actif()) return activation();
   const view = routes[name] || accueil;
+  app.classList.remove('page-in');
+  if (view.constructor.name === 'AsyncFunction') app.innerHTML = '<div class="skel"><i></i><i></i><i></i></div>';
   try { await view(param); } catch (e) { console.error(e); app.innerHTML = `<div class="card">${esc(errMsg(e))}</div>`; }
+  void app.offsetWidth; app.classList.add('page-in');
   majCompteurs();
 }
 
 // ---------- connexion / activation (§2) ----------
 function connexion() {
   app.innerHTML = `
-  <div class="hero"><h1>ADRESS CLUB</h1><p>L'espace privé des résidents ADRESS IMMOBILIER</p></div>
+  <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>L'espace privé des résidents ADRESS IMMOBILIER</p></div>
   <div class="chips" role="tablist"><a class="chip on" data-m="login">Se connecter</a><a class="chip" data-m="signup">J'ai un code d'invitation</a></div>
   <form id="f" class="card" novalidate>
     <div id="sign" hidden>
@@ -104,7 +110,7 @@ function connexion() {
     <p class="err" id="err" hidden></p>
     <button class="btn block" style="margin-top:16px" id="go">Se connecter</button>
   </form>
-  <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p>`;
+  <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p></div>`;
   let mode = 'login';
   app.querySelectorAll('[data-m]').forEach(c => c.onclick = () => {
     mode = c.dataset.m; app.querySelectorAll('[data-m]').forEach(x => x.classList.toggle('on', x === c));
@@ -138,7 +144,7 @@ function connexion() {
 function activation() {
   const p = state.profil;
   app.innerHTML = `
-  <div class="hero"><h1>ADRESS CLUB</h1><p>${p?.statut === 'desactive' ? 'Accès désactivé' : 'Activez votre accès'}</p></div>
+  <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>${p?.statut === 'desactive' ? 'Accès désactivé' : 'Activez votre accès'}</p></div>
   ${p?.statut === 'desactive' ? `<div class="card">Votre accès a été désactivé (fin d'occupation ou décision ADRESS). Contactez ADRESS IMMOBILIER si c'est une erreur.</div>` : `
   <form id="f" class="card">
     <p class="muted">Saisissez le code d'invitation remis par ADRESS IMMOBILIER pour votre logement.</p>
@@ -147,7 +153,7 @@ function activation() {
     <p class="err" id="err" hidden></p>
     <button class="btn block" style="margin-top:16px">Activer mon accès</button>
   </form>`}
-  <p class="center" style="margin-top:14px"><a href="#" id="out" class="muted">Se déconnecter</a></p>`;
+  <p class="center" style="margin-top:14px"><a href="#" id="out" class="muted">Se déconnecter</a></p></div>`;
   app.querySelector('#out').onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await chargerProfil(); router(); };
   const f = app.querySelector('#f');
   if (f) f.onsubmit = async (ev) => {
@@ -159,18 +165,26 @@ function activation() {
 }
 
 // ---------- accueil (§1, §7 bis) ----------
+const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+const ICO = {
+  market: svg('M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0'),
+  residences: svg('M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M9 9h.01M15 9h.01M9 13h.01M15 13h.01'),
+  flip: svg('M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z'),
+  news: svg('M12 3l2.1 5.4L20 9.5l-4.5 3.8L17 19l-5-3-5 3 1.5-5.7L4 9.5l5.9-1.1z'),
+  arrow: svg('M5 12h14M13 6l6 6-6 6')
+};
 async function accueil() {
   await majCompteurs();
   const nl = state.compteurs.demandes_non_lues || 0;
   app.innerHTML = `
-  <div class="hero"><h1>Bonjour ${esc(state.profil.nom_affichage || '')}</h1><p>${esc(state.profil.residence?.nom || 'ADRESS IMMOBILIER')}</p></div>
-  <div class="grid2">
-    <a class="card entry" href="#/market">${nl ? `<span class="badge">${nl}</span>` : ''}<b>Le Market</b><span>Vendre, donner, trouver</span></a>
-    <a class="card entry" href="#/residences"><b>Nos résidences</b><span>Photos et contact</span></a>
-    <a class="card entry" href="#/flip-immo"><b>Le Flip Immo</b><span>Le magazine ADRESS</span></a>
-    <a class="card entry" href="#/nouveautes"><b>Les nouveautés</b><span>Actualités et programmes</span></a>
+  <div class="hero"><span class="kicker">ADRESS CLUB</span><h1>Bonjour ${esc(state.profil.nom_affichage || '')}</h1><p>${esc(state.profil.residence?.nom || 'ADRESS IMMOBILIER')}</p></div>
+  <div class="grid2 home-tiles">
+    <a class="card entry" href="#/market"><span class="ico">${ICO.market}</span>${nl ? `<span class="badge">${nl}</span>` : ''}<b>Le Market</b><span>Vendre, donner, trouver</span></a>
+    <a class="card entry" href="#/residences"><span class="ico">${ICO.residences}</span><b>Nos résidences</b><span>Photos et contact</span></a>
+    <a class="card entry" href="#/flip-immo"><span class="ico">${ICO.flip}</span><b>Le Flip Immo</b><span>Le magazine ADRESS</span></a>
+    <a class="card entry" href="#/nouveautes"><span class="ico">${ICO.news}</span><b>Les nouveautés</b><span>Actualités et programmes</span></a>
   </div>
-  <a class="card banner" href="#/bonnes-adresses"><span><b>Nos bonnes adresses</b><br><span class="muted">Partenaires et boutiques recommandés par ADRESS</span></span><span aria-hidden="true">›</span></a>
+  <a class="card banner" href="#/bonnes-adresses"><span><b>Nos bonnes adresses</b><br><span class="muted">Partenaires et boutiques recommandés par ADRESS</span></span><span class="arrow">${ICO.arrow}</span></a>
   <div style="margin-top:12px"><a class="btn ghost block" href="#/mes-annonces">Mes annonces et demandes${nl ? ` · ${nl} nouvelle${nl > 1 ? 's' : ''}` : ''}</a></div>
   ${state.profil.is_admin ? `<div style="margin-top:10px"><a class="btn soft block" href="#/admin">Espace ADRESS (gestion)</a></div>` : ''}
   <p class="center" style="margin-top:14px"><a class="muted" href="#/avis">Donner mon avis</a></p>`;
@@ -209,7 +223,7 @@ async function market() {
     const id = b.dataset.fav, on = b.textContent === '♥';
     const r = on ? await sb.from('favoris').delete().eq('annonce_id', id) : await sb.from('favoris').insert({ user_id: state.session.user.id, annonce_id: id });
     if (r.error) return toast(errMsg(r.error));
-    b.textContent = on ? '♡' : '♥';
+    b.textContent = on ? '♡' : '♥'; b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
   });
 }
 
@@ -224,8 +238,8 @@ async function annonce(id) {
   const dejaDemande = !!dem.data;
   app.innerHTML = `
   <a class="back" href="#/market">‹ Le Market</a>
-  <div class="gal">${urls.map(u => `<img src="${esc(u)}" alt="${esc(a.titre)}">`).join('')}</div>
-  ${urls.length > 1 ? `<p class="muted small">${urls.length} photos, faites glisser</p>` : ''}
+  <div class="detail"><div class="detail-media"><div class="gal">${urls.map(u => `<img src="${esc(u)}" alt="${esc(a.titre)}">`).join('')}</div>
+  ${urls.length > 1 ? `<p class="muted small">${urls.length} photos, faites glisser</p>` : ''}</div><div class="detail-info">
   <div class="tags">${a.statut === 'reserve' ? '<span class="badge warn">Réservé : nouvelles demandes suspendues</span>' : ''}${a.is_adress ? '<span class="badge">ADRESS IMMOBILIER</span>' : ''}</div>
   <h1>${esc(a.titre)}</h1>
   <h2 style="margin-top:4px">${prix(a)}</h2>
@@ -236,7 +250,7 @@ async function annonce(id) {
     : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'Demande envoyée ✓' : 'Je suis intéressé'}</button>
       <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
     : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
-  ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}`;
+  ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}</div></div>`;
   const b = app.querySelector('#int');
   if (b && !dejaDemande) b.onclick = async () => {
     b.disabled = true; b.textContent = 'Envoi…';
@@ -262,7 +276,7 @@ function publier() {
   let type = 'vente', files = [];
   app.innerHTML = `
   <a class="back" href="#/market">‹ Le Market</a><h1>Publier une annonce</h1><p class="muted">Publication immédiate, visible ${state.params.duree_publication_jours || 60} jours.</p>
-  <form id="f" novalidate>
+  <form id="f" class="narrow" novalidate>
   <div class="chips" id="typ"><a class="chip on" data-v="vente">Je vends</a><a class="chip" data-v="don">Je donne</a></div>
   <label>Photos (1 à ${max}) *</label>
   <label class="btn ghost block" for="ph" style="margin:0">📷 Prendre ou choisir des photos</label>
@@ -482,6 +496,8 @@ window.addEventListener('hashchange', router);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });
+document.addEventListener('pointerdown', (e) => { const b = e.target.closest('.btn'); if (!b || b.disabled) return; const r = b.getBoundingClientRect(), s = Math.max(r.width, r.height), x = document.createElement('span'); x.className = 'ripple'; x.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`; b.appendChild(x); setTimeout(() => x.remove(), 650); });
 await chargerProfil();
 router();
 setInterval(majCompteurs, 60000);

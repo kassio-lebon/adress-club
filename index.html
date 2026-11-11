@@ -5,25 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ADRESS CLUB</title>
 <meta name="description" content="L'espace privé des résidents ADRESS IMMOBILIER : Le Market, nos résidences, Le Flip Immo, les nouveautés.">
-<meta name="theme-color" content="#1f2a37">
+<meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ADRESS CLUB">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="top" id="top" hidden>
-  <a href="#/" class="brand" aria-label="Accueil ADRESS CLUB">ADRESS CLUB</a>
-  <nav class="top-actions">
-    <a href="#/notifications" class="icon-btn" aria-label="Notifications"><span aria-hidden="true">🔔</span><span class="dot" id="notifDot" hidden></span></a>
-    <a href="#/profil" class="icon-btn" aria-label="Mon compte"><span aria-hidden="true">👤</span></a>
+  <a href="#/" class="brand" aria-label="Accueil ADRESS CLUB"><img src="logo.png" alt="ADRESS IMMOBILIER" width="96" height="40"><span class="brand-club">CLUB</span></a>
+  <nav class="top-nav" aria-label="Navigation principale">
+    <a href="#/" data-nav="accueil">Accueil</a>
+    <a href="#/market" data-nav="market">Le Market</a>
+    <a href="#/mes-annonces" data-nav="mes-annonces">Mes annonces</a>
+    <a href="#/bonnes-adresses" data-nav="bonnes-adresses">Bonnes adresses</a>
+    <a href="#/publier" class="btn sm" data-nav="publier">+ Publier</a>
   </nav>
+  <div class="top-actions">
+    <a href="#/notifications" class="icon-btn" aria-label="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot" id="notifDot" hidden></span></a>
+    <a href="#/profil" class="icon-btn" aria-label="Mon compte"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></a>
+  </div>
 </header>
-<main id="app" class="wrap" aria-live="polite"><p class="muted center pad">Chargement…</p></main>
-<a href="#/publier" class="fab" id="fab" hidden>+ Publier</a>
+<main id="app" class="wrap" aria-live="polite"><div class="splash"><img src="logo.png" alt="ADRESS IMMOBILIER"><span class="spinner" aria-label="Chargement"></span></div></main>
+<nav class="tabbar" id="nav" hidden aria-label="Navigation">
+  <a href="#/" data-nav="accueil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></a>
+  <a href="#/market" data-nav="market"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg><span>Market</span></a>
+  <a href="#/publier" data-nav="publier" class="tab-pub" aria-label="Publier une annonce"><span class="pub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span>Publier</span></a>
+  <a href="#/mes-annonces" data-nav="mes-annonces"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Mes annonces</span><b class="nav-badge" id="navBadge" hidden></b></a>
+  <a href="#/profil" data-nav="profil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><span>Compte</span></a>
+</nav>
 <div class="toast" id="toast" role="status" hidden></div>
 <script type="module" src="app.js"></script>
 </body>
