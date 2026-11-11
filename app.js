@@ -180,7 +180,8 @@ async function accueil() {
   const nl = state.compteurs.demandes_non_lues || 0;
   const { data: recents } = await sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8);
   const urls = await photosUrls((recents || []).map(a => a.photos[0]));
-  const res = state.profil.residence || {}, ph = res.photo_path;
+  const res = state.profil.residence || {}; let ph = res.photo_path;
+  if (!ph) { const { data: r1 } = await sb.from('residences').select('photo_path').eq('visible', true).not('photo_path', 'is', null).order('ordre').limit(1); ph = r1 && r1[0] && r1[0].photo_path; }
   const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
   app.innerHTML = '<div class="home">'
     + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz" style="background-image:url(\'' + esc(publicUrl(ph)) + '\')"></div>' : '')
