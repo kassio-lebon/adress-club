@@ -1,0 +1,476 @@
+// ADRESS CLUB — application des résidents (PWA)
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+import { renderAdmin } from './admin.js';
+
+export const SUPABASE_URL = 'https://xvevjlovjpeqfpzfihrj.supabase.co';
+export const SUPABASE_KEY = 'sb_publishable_oPj4LrfV0uvN95MmpTPl8A_x5XLxVcj';
+export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+
+export const CATEGORIES = ['Meubles','Électroménager','Décoration','Enfants et bébé','Vêtements et accessoires','Électronique','Sport et loisirs','Maison et jardin','Autre'];
+export const ETATS = ['Neuf','Très bon état','Bon état','Usagé','À réparer'];
+export const CAT_PARTENAIRES = ['Rideaux et décoration','Aménagement et revêtements','Électroménager','Boutiques et inspirations'];
+const STATUTS = { disponible:'Disponible', reserve:'Réservé', vendu:'Vendu', don_effectue:'Don effectué', retire:'Retiré', expire:'Expiré' };
+
+export const state = { session: null, profil: null, params: {}, compteurs: { demandes_non_lues: 0, notifications_non_lues: 0 } };
+const app = document.getElementById('app');
+
+// ---------- utilitaires ----------
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+export const fcfa = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
+export const dateFr = (d, h) => d ? new Date(d).toLocaleDateString('fr-FR', h ? { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' } : { day:'2-digit', month:'2-digit', year:'numeric' }) : '';
+export function toast(msg, ms = 3500) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => t.hidden = true, ms); }
+export const errMsg = (e) => (e && (e.message || e.error_description)) ? String(e.message || e.error_description).replace(/^.*?ERROR:\s*/,'') : 'Une erreur est survenue, réessayez.';
+export const publicUrl = (path) => path ? sb.storage.from('contenus').getPublicUrl(path).data.publicUrl : '';
+function prix(a) { return a.type === 'don' ? 'GRATUIT' : fcfa(a.prix_fcfa); }
+const qs = () => new URLSearchParams((location.hash.split('?')[1]) || '');
+const track = (type, ref_id) => sb.from('evenements').insert({ type, ref_id: ref_id || null }).then(() => {});
+
+const signedCache = new Map();
+async function photosUrls(paths) {
+  const need = paths.filter(p => p && !signedCache.has(p));
+  if (need.length) {
+    const { data } = await sb.storage.from('annonces').createSignedUrls(need, 3600);
+    (data || []).forEach(x => { if (x.signedUrl) signedCache.set(x.path, x.signedUrl); });
+  }
+  return paths.map(p => signedCache.get(p) || '');
+}
+
+function compress(file, max = 1280) {
+  return new Promise((ok, ko) => {
+    const img = new Image(); const u = URL.createObjectURL(file);
+    img.onload = () => { const s = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => { URL.revokeObjectURL(u); b ? ok(b) : ko(new Error('Image illisible')); }, 'image/jpeg', 0.82); };
+    img.onerror = () => ko(new Error('Image illisible')); img.src = u;
+  });
+}
+
+// ---------- session et profil ----------
+async function chargerProfil() {
+  const { data: { session } } = await sb.auth.getSession();
+  state.session = session;
+  if (!session) { state.profil = null; return; }
+  const { data } = await sb.from('profiles').select('*, residence:residences(nom)').eq('id', session.user.id).maybeSingle();
+  state.profil = data;
+  if (data?.statut === 'actif') {
+    const { data: p } = await sb.from('parametres').select('cle,valeur');
+    state.params = Object.fromEntries((p || []).map(x => [x.cle, Number(x.valeur)]));
+  }
+}
+export async function majCompteurs() {
+  if (state.profil?.statut !== 'actif') return;
+  const { data } = await sb.rpc('compteurs');
+  if (data) state.compteurs = data;
+  const n = (state.compteurs.demandes_non_lues || 0) + (state.compteurs.notifications_non_lues || 0);
+  document.getElementById('notifDot').hidden = !(state.compteurs.notifications_non_lues > 0);
+  try { if ('setAppBadge' in navigator) n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch (_) {}
+}
+const actif = () => state.profil?.statut === 'actif';
+
+// ---------- routeur ----------
+const routes = {
+  '': accueil, 'market': market, 'annonce': annonce, 'publier': publier, 'mes-annonces': mesAnnonces,
+  'residences': residences, 'nouveautes': nouveautes, 'flip-immo': flip, 'bonnes-adresses': bonnesAdresses,
+  'notifications': notifications, 'profil': profil, 'avis': avis, 'admin': (p) => renderAdmin(app, p)
+};
+async function router() {
+  const [path] = location.hash.replace(/^#\/?/, '').split('?');
+  const [name, param] = path.split('/');
+  document.getElementById('top').hidden = !actif();
+  document.getElementById('fab').hidden = !actif() || ['publier','admin','avis'].includes(name);
+  window.scrollTo(0, 0);
+  if (!state.session) return connexion();
+  if (!actif()) return activation();
+  const view = routes[name] || accueil;
+  try { await view(param); } catch (e) { console.error(e); app.innerHTML = `<div class="card">${esc(errMsg(e))}</div>`; }
+  majCompteurs();
+}
+
+// ---------- connexion / activation (§2) ----------
+function connexion() {
+  app.innerHTML = `
+  <div class="hero"><h1>ADRESS CLUB</h1><p>L'espace privé des résidents ADRESS IMMOBILIER</p></div>
+  <div class="chips" role="tablist"><a class="chip on" data-m="login">Se connecter</a><a class="chip" data-m="signup">J'ai un code d'invitation</a></div>
+  <form id="f" class="card" novalidate>
+    <div id="sign" hidden>
+      <label for="code">Code d'invitation</label><input id="code" type="text" autocomplete="off" placeholder="Remis par ADRESS IMMOBILIER" style="text-transform:uppercase">
+      <label for="nom">Nom d'affichage (visible des autres résidents)</label><input id="nom" type="text" maxlength="40" placeholder="Awa K.">
+    </div>
+    <label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required>
+    <label for="mdp">Mot de passe</label><input id="mdp" type="password" autocomplete="current-password" minlength="8" required>
+    <p class="hint" id="mdpHint" hidden>8 caractères minimum.</p>
+    <p class="err" id="err" hidden></p>
+    <button class="btn block" style="margin-top:16px" id="go">Se connecter</button>
+  </form>
+  <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p>`;
+  let mode = 'login';
+  app.querySelectorAll('[data-m]').forEach(c => c.onclick = () => {
+    mode = c.dataset.m; app.querySelectorAll('[data-m]').forEach(x => x.classList.toggle('on', x === c));
+    app.querySelector('#sign').hidden = mode !== 'signup'; app.querySelector('#mdpHint').hidden = mode !== 'signup';
+    app.querySelector('#go').textContent = mode === 'signup' ? 'Créer mon accès' : 'Se connecter';
+    app.querySelector('#mdp').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  });
+  app.querySelector('#f').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const err = app.querySelector('#err'); err.hidden = true;
+    const email = app.querySelector('#email').value.trim(), password = app.querySelector('#mdp').value;
+    const show = (m) => { err.textContent = m; err.hidden = false; go.disabled = false; };
+    const go = app.querySelector('#go'); go.disabled = true;
+    if (!email || password.length < (mode === 'signup' ? 8 : 1)) return show(mode === 'signup' ? 'E-mail et mot de passe de 8 caractères minimum.' : 'Saisissez votre e-mail et votre mot de passe.');
+    if (mode === 'login') {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) return show('E-mail ou mot de passe incorrect.');
+    } else {
+      const code = app.querySelector('#code').value.trim(), nom = app.querySelector('#nom').value.trim();
+      if (!code || !nom) return show('Le code d\'invitation et le nom d\'affichage sont obligatoires.');
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) return show(error.message.includes('registered') ? 'Un compte existe déjà avec cet e-mail : connectez-vous.' : errMsg(error));
+      if (!data.session) return show('Vérifiez votre boîte e-mail pour confirmer votre adresse, puis connectez-vous.');
+      const r = await sb.rpc('utiliser_invitation', { p_code: code, p_nom_affichage: nom, p_telephone: null, p_consentement: false });
+      if (r.error) { await chargerProfil(); return show(errMsg(r.error)); }
+    }
+    await chargerProfil(); track('connexion'); location.hash = '#/'; router();
+  };
+}
+
+function activation() {
+  const p = state.profil;
+  app.innerHTML = `
+  <div class="hero"><h1>ADRESS CLUB</h1><p>${p?.statut === 'desactive' ? 'Accès désactivé' : 'Activez votre accès'}</p></div>
+  ${p?.statut === 'desactive' ? `<div class="card">Votre accès a été désactivé (fin d'occupation ou décision ADRESS). Contactez ADRESS IMMOBILIER si c'est une erreur.</div>` : `
+  <form id="f" class="card">
+    <p class="muted">Saisissez le code d'invitation remis par ADRESS IMMOBILIER pour votre logement.</p>
+    <label for="code">Code d'invitation</label><input id="code" type="text" style="text-transform:uppercase">
+    <label for="nom">Nom d'affichage</label><input id="nom" type="text" maxlength="40">
+    <p class="err" id="err" hidden></p>
+    <button class="btn block" style="margin-top:16px">Activer mon accès</button>
+  </form>`}
+  <p class="center" style="margin-top:14px"><a href="#" id="out" class="muted">Se déconnecter</a></p>`;
+  app.querySelector('#out').onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await chargerProfil(); router(); };
+  const f = app.querySelector('#f');
+  if (f) f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const r = await sb.rpc('utiliser_invitation', { p_code: f.querySelector('#code').value, p_nom_affichage: f.querySelector('#nom').value, p_telephone: null, p_consentement: false });
+    if (r.error) { const e = f.querySelector('#err'); e.textContent = errMsg(r.error); e.hidden = false; return; }
+    await chargerProfil(); location.hash = '#/'; router();
+  };
+}
+
+// ---------- accueil (§1, §7 bis) ----------
+async function accueil() {
+  await majCompteurs();
+  const nl = state.compteurs.demandes_non_lues || 0;
+  app.innerHTML = `
+  <div class="hero"><h1>Bonjour ${esc(state.profil.nom_affichage || '')}</h1><p>${esc(state.profil.residence?.nom || 'ADRESS IMMOBILIER')}</p></div>
+  <div class="grid2">
+    <a class="card entry" href="#/market">${nl ? `<span class="badge">${nl}</span>` : ''}<b>Le Market</b><span>Vendre, donner, trouver</span></a>
+    <a class="card entry" href="#/residences"><b>Nos résidences</b><span>Photos et contact</span></a>
+    <a class="card entry" href="#/flip-immo"><b>Le Flip Immo</b><span>Le magazine ADRESS</span></a>
+    <a class="card entry" href="#/nouveautes"><b>Les nouveautés</b><span>Actualités et programmes</span></a>
+  </div>
+  <a class="card banner" href="#/bonnes-adresses"><span><b>Nos bonnes adresses</b><br><span class="muted">Partenaires et boutiques recommandés par ADRESS</span></span><span aria-hidden="true">›</span></a>
+  <div style="margin-top:12px"><a class="btn ghost block" href="#/mes-annonces">Mes annonces et demandes${nl ? ` · ${nl} nouvelle${nl > 1 ? 's' : ''}` : ''}</a></div>
+  ${state.profil.is_admin ? `<div style="margin-top:10px"><a class="btn soft block" href="#/admin">Espace ADRESS (gestion)</a></div>` : ''}
+  <p class="center" style="margin-top:14px"><a class="muted" href="#/avis">Donner mon avis</a></p>`;
+}
+
+// ---------- Le Market (§3, §4) ----------
+async function market() {
+  const p = qs(); const type = p.get('type') || ''; const q = (p.get('q') || '').trim(); const vue = p.get('vue') || '';
+  let req = sb.from(vue === 'favoris' ? 'v_favoris' : 'v_market').select('*').order('date_publication', { ascending: false }).limit(80);
+  if (type) req = req.eq('type', type);
+  if (q) req = req.ilike('titre', `%${q.replace(/[%_]/g, '')}%`);
+  const [{ data, error }, fav] = await Promise.all([req, sb.from('favoris').select('annonce_id')]);
+  if (error) throw error;
+  const favs = new Set((fav.data || []).map(f => f.annonce_id));
+  const urls = await photosUrls((data || []).map(a => a.photos[0]));
+  const lien = (o) => '#/market?' + new URLSearchParams(Object.fromEntries(Object.entries({ type, q, vue, ...o }).filter(([, v]) => v))).toString();
+  app.innerHTML = `
+  <a class="back" href="#/">‹ Accueil</a><h1>Le Market</h1><p class="muted">Les objets à vendre ou à donner entre résidents</p>
+  <form id="s" role="search" style="margin-top:10px"><label class="sr" for="q">Rechercher</label><input id="q" type="search" placeholder="Rechercher un objet…" value="${esc(q)}"></form>
+  <div class="chips">
+    <a class="chip ${!type && !vue ? 'on' : ''}" href="${lien({ type: '', vue: '' })}">Tout</a>
+    <a class="chip ${type === 'vente' ? 'on' : ''}" href="${lien({ type: 'vente', vue: '' })}">À vendre</a>
+    <a class="chip ${type === 'don' ? 'on' : ''}" href="${lien({ type: 'don', vue: '' })}">À donner</a>
+    <a class="chip ${vue === 'favoris' ? 'on' : ''}" href="${lien({ vue: 'favoris', type: '' })}">♥ Favoris</a>
+  </div>
+  ${data.length ? `<div class="grid2 grid3">${data.map((a, i) => `
+    <div class="card item">
+      <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urls[i])}')" role="img" aria-label="${esc(a.titre)}"></div>
+      ${a.statut === 'reserve' ? '<span class="badge st">Réservé</span>' : a.is_adress ? '<span class="badge st">ADRESS IMMOBILIER</span>' : ''}
+      <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc(a.residence || '')}</div></div></a>
+      ${a.est_a_moi ? '' : `<button class="fav" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${favs.has(a.id) ? '♥' : '♡'}</button>`}
+    </div>`).join('')}</div>`
+  : `<div class="card center pad">${vue === 'favoris' ? 'Aucun favori pour le moment.' : 'Aucune annonce pour le moment.'}<br><br><a class="btn" href="#/publier">+ Publier</a></div>`}`;
+  app.querySelector('#s').onsubmit = (e) => { e.preventDefault(); location.hash = lien({ q: app.querySelector('#q').value.trim() }); };
+  app.querySelectorAll('[data-fav]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.fav, on = b.textContent === '♥';
+    const r = on ? await sb.from('favoris').delete().eq('annonce_id', id) : await sb.from('favoris').insert({ user_id: state.session.user.id, annonce_id: id });
+    if (r.error) return toast(errMsg(r.error));
+    b.textContent = on ? '♡' : '♥';
+  });
+}
+
+async function annonce(id) {
+  const { data: a } = await sb.from('v_market').select('*').eq('id', id).maybeSingle();
+  if (!a) {
+    app.innerHTML = `<a class="back" href="#/market">‹ Le Market</a><div class="card center pad"><b>Cette annonce n'est plus disponible.</b><br><br><a class="btn" href="#/market">Voir le Market</a></div>`;
+    return;
+  }
+  track('vue_annonce', a.id);
+  const [urls, dem] = await Promise.all([photosUrls(a.photos), sb.from('demandes').select('id').eq('annonce_id', a.id).eq('demandeur_id', state.session.user.id).maybeSingle()]);
+  const dejaDemande = !!dem.data;
+  app.innerHTML = `
+  <a class="back" href="#/market">‹ Le Market</a>
+  <div class="gal">${urls.map(u => `<img src="${esc(u)}" alt="${esc(a.titre)}">`).join('')}</div>
+  ${urls.length > 1 ? `<p class="muted small">${urls.length} photos, faites glisser</p>` : ''}
+  <div class="tags">${a.statut === 'reserve' ? '<span class="badge warn">Réservé : nouvelles demandes suspendues</span>' : ''}${a.is_adress ? '<span class="badge">ADRESS IMMOBILIER</span>' : ''}</div>
+  <h1>${esc(a.titre)}</h1>
+  <h2 style="margin-top:4px">${prix(a)}</h2>
+  <div class="tags"><span class="tag">${esc(a.categorie)}</span><span class="tag">${esc(a.etat)}</span><span class="tag">${esc(a.residence || '')}</span></div>
+  ${a.description ? `<p style="white-space:pre-line">${esc(a.description)}</p>` : ''}
+  <p class="muted">Publié par ${esc(a.vendeur)} le ${dateFr(a.date_publication)}</p>
+  ${a.est_a_moi ? `<a class="btn ghost block" href="#/mes-annonces">Gérer mon annonce</a>`
+    : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'Demande envoyée ✓' : 'Je suis intéressé'}</button>
+      <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
+    : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
+  ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}`;
+  const b = app.querySelector('#int');
+  if (b && !dejaDemande) b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Envoi…';
+    const { data: rang, error } = await sb.rpc('je_suis_interesse', { p_annonce: a.id });
+    if (error) { b.disabled = false; b.textContent = 'Je suis intéressé'; return toast(errMsg(error)); }
+    b.textContent = 'Demande envoyée ✓';
+    toast(`Demande enregistrée (n° ${rang}). Le vendeur a été prévenu.`);
+    if (!state.profil.consentement_contact) setTimeout(() => toast('Astuce : autorisez le partage de votre téléphone dans « Mon compte » pour que le vendeur puisse vous joindre.', 6000), 3800);
+  };
+  const s = app.querySelector('#sig');
+  if (s) s.onclick = async (e) => {
+    e.preventDefault();
+    const m = prompt('Pourquoi signalez-vous cette annonce ? (facultatif)');
+    if (m === null) return;
+    const { error } = await sb.rpc('signaler_annonce', { p_id: a.id, p_motif: 'Autre', p_commentaire: m });
+    toast(error ? errMsg(error) : 'Merci, ADRESS examinera cette annonce.');
+  };
+}
+
+// ---------- Publier (§3) ----------
+function publier() {
+  const max = state.params.max_photos || 5;
+  let type = 'vente', files = [];
+  app.innerHTML = `
+  <a class="back" href="#/market">‹ Le Market</a><h1>Publier une annonce</h1><p class="muted">Publication immédiate, visible ${state.params.duree_publication_jours || 60} jours.</p>
+  <form id="f" novalidate>
+  <div class="chips" id="typ"><a class="chip on" data-v="vente">Je vends</a><a class="chip" data-v="don">Je donne</a></div>
+  <label>Photos (1 à ${max}) *</label>
+  <label class="btn ghost block" for="ph" style="margin:0">📷 Prendre ou choisir des photos</label>
+  <input id="ph" type="file" accept="image/*" multiple class="sr">
+  <div class="thumbs" id="th"></div>
+  <label for="ti">Titre *</label><input id="ti" type="text" maxlength="80" placeholder="Canapé 3 places">
+  <div class="grid2">
+    <div><label for="ca">Catégorie *</label><select id="ca"><option value="">Choisir…</option>${CATEGORIES.map(c => `<option>${c}</option>`).join('')}</select></div>
+    <div><label for="et">État *</label><select id="et">${ETATS.map(c => `<option ${c === 'Bon état' ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+  </div>
+  <label for="de">Description courte</label><textarea id="de" maxlength="1000" placeholder="Dimensions, défauts éventuels, disponibilité…"></textarea>
+  <div id="pxBox"><label for="px">Prix (FCFA) *</label><input id="px" type="number" inputmode="numeric" min="1" step="1" placeholder="25000"></div>
+  <p id="grat" class="muted" hidden style="margin-top:14px">Votre objet sera affiché <b>GRATUIT</b>.</p>
+  <p class="hint">Résidence : ${esc(state.profil.residence?.nom || '—')} (renseignée automatiquement). Vous êtes seul responsable du contenu, des photos et des échanges.</p>
+  <p class="err" id="err" hidden></p>
+  <button class="btn block" id="go" style="margin-top:16px">Publier</button>
+  </form>`;
+  const $ = (s) => app.querySelector(s);
+  const err = (m) => { $('#err').textContent = m; $('#err').hidden = !m; };
+  app.querySelectorAll('#typ .chip').forEach(c => c.onclick = () => {
+    type = c.dataset.v; app.querySelectorAll('#typ .chip').forEach(x => x.classList.toggle('on', x === c));
+    $('#pxBox').hidden = type !== 'vente'; $('#grat').hidden = type !== 'don';
+  });
+  const dessiner = () => { $('#th').innerHTML = files.map((f, i) => `<div class="th"><img src="${URL.createObjectURL(f)}" alt="Photo ${i + 1}"><button type="button" data-rm="${i}" aria-label="Retirer la photo ${i + 1}">×</button></div>`).join('');
+    app.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { files.splice(+b.dataset.rm, 1); dessiner(); }); };
+  $('#ph').onchange = (e) => { files = files.concat([...e.target.files]).slice(0, max); if (e.target.files.length + files.length > max) toast(`${max} photos maximum.`); e.target.value = ''; dessiner(); };
+  $('#f').onsubmit = async (ev) => {
+    ev.preventDefault(); err('');
+    const titre = $('#ti').value.trim(), categorie = $('#ca').value, etat = $('#et').value, description = $('#de').value.trim(), px = parseInt($('#px').value, 10);
+    if (!files.length) return err('Ajoutez au moins une photo.');
+    if (titre.length < 2 || !categorie) return err('Le titre et la catégorie sont obligatoires.');
+    if (type === 'vente' && !(px > 0)) return err('Le prix est obligatoire pour une vente.');
+    const go = $('#go'); go.disabled = true; go.textContent = 'Envoi des photos…';
+    try {
+      const uid = state.session.user.id, paths = [];
+      for (const f of files) {
+        const blob = await compress(f), path = `${uid}/${crypto.randomUUID()}.jpg`;
+        const { error } = await sb.storage.from('annonces').upload(path, blob, { contentType: 'image/jpeg' });
+        if (error) throw error; paths.push(path);
+      }
+      go.textContent = 'Publication…';
+      const { data, error } = await sb.from('annonces').insert({ type, titre, categorie, etat, description: description || null, prix_fcfa: type === 'vente' ? px : null, photos: paths }).select('id').single();
+      if (error) throw error;
+      toast('Votre annonce est en ligne.'); location.hash = `#/annonce/${data.id}`;
+    } catch (e) { go.disabled = false; go.textContent = 'Publier'; err(errMsg(e)); }
+  };
+}
+
+// ---------- Mes annonces et demandes (§4, §5) ----------
+async function mesAnnonces() {
+  const onglet = qs().get('o') || 'annonces';
+  const tabs = `<div class="chips"><a class="chip ${onglet === 'annonces' ? 'on' : ''}" href="#/mes-annonces">Mes annonces</a><a class="chip ${onglet === 'envoyees' ? 'on' : ''}" href="#/mes-annonces?o=envoyees">Mes demandes envoyées</a></div>`;
+  if (onglet === 'envoyees') {
+    const { data } = await sb.from('demandes').select('id, rang, created_at, statut, annonce_id').eq('demandeur_id', state.session.user.id).order('created_at', { ascending: false });
+    const ids = (data || []).map(d => d.annonce_id);
+    const { data: ouvertes } = ids.length ? await sb.from('v_market').select('id,titre,statut').in('id', ids) : { data: [] };
+    const m = new Map((ouvertes || []).map(o => [o.id, o]));
+    app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes demandes</h1>${tabs}<div class="list">${(data || []).map(d => { const o = m.get(d.annonce_id); return `
+      <div class="card"><b>${o ? `<a href="#/annonce/${d.annonce_id}">${esc(o.titre)}</a>` : 'Annonce clôturée'}</b>
+      <div class="muted small">Demande n° ${d.rang} du ${dateFr(d.created_at, true)}${o?.statut === 'reserve' ? ' · réservé par le vendeur' : ''}</div></div>`; }).join('') || '<div class="card center pad">Vous n\'avez envoyé aucune demande.</div>'}</div>`;
+    return;
+  }
+  const [{ data: mes, error }, { data: dem }] = await Promise.all([
+    sb.from('annonces').select('*').eq('vendeur_id', state.session.user.id).order('date_publication', { ascending: false }),
+    sb.rpc('mes_demandes_recues')]);
+  if (error) throw error;
+  const urls = await photosUrls((mes || []).map(a => a.photos[0]));
+  const parAnnonce = (id) => (dem || []).filter(d => d.annonce_id === id);
+  const ouverte = (a) => ['disponible', 'reserve'].includes(a.statut) && !a.retiree_par_adress;
+  const prol = state.params.duree_prolongation_jours || 30;
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes annonces</h1>${tabs}
+  <p class="muted">Contactez les intéressés dans l'ordre d'arrivée des demandes.</p>
+  <div class="list">${(mes || []).map((a, i) => { const ds = parAnnonce(a.id), nl = ds.filter(d => !d.lue).length; return `
+  <div class="card" data-id="${a.id}">
+    <div style="display:flex;gap:12px"><div class="ph" style="width:72px;height:72px;flex:none;border-radius:10px;background-image:url('${esc(urls[i])}')"></div>
+    <div style="min-width:0"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(a.titre)}</a>` : esc(a.titre)}</b>
+      <div class="muted small">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUTS[a.statut]} · ${prix(a)}</div>
+      <div class="muted small">${ouverte(a) ? `Expire le ${dateFr(a.date_expiration)}` : `Clôturée${a.date_cloture ? ' le ' + dateFr(a.date_cloture) : ''} · archivée`}</div></div></div>
+    ${ds.length ? `<details ${ouverte(a) ? 'open' : ''} data-lire="${nl ? a.id : ''}"><summary style="margin-top:10px">${ds.length} demande${ds.length > 1 ? 's' : ''}${nl ? ` · <span class="badge">${nl} nouvelle${nl > 1 ? 's' : ''}</span>` : ''}</summary>
+      ${ds.map(d => `<div class="dem"><b>n° ${d.rang}</b> ${esc(d.demandeur)} ${d.statut === 'contactee' ? '<span class="badge ok">contacté</span>' : ''}
+        <div class="muted small">Le ${dateFr(d.created_at, true)}</div>
+        ${d.contact ? `<div class="row" style="margin-top:6px"><a class="btn sm soft" data-ct="${d.id}" target="_blank" rel="noopener" href="https://wa.me/${esc(d.contact.replace(/[^0-9]/g, ''))}">WhatsApp</a><a class="btn sm soft" data-ct="${d.id}" href="tel:${esc(d.contact.replace(/[^0-9+]/g, ''))}">Appeler</a></div>`
+          : `<div class="muted small">Ce résident n'a pas partagé ses coordonnées.</div>`}</div>`).join('')}</details>` : ''}
+    ${ouverte(a) ? `<div class="row" style="margin-top:12px">
+      <button class="btn sm ghost" data-act="${a.statut === 'reserve' ? 'disponible' : 'reserve'}">${a.statut === 'reserve' ? 'Remettre disponible' : 'Réservé'}</button>
+      <button class="btn sm" data-act="${a.type === 'don' ? 'don_effectue' : 'vendu'}">${a.type === 'don' ? 'Don effectué' : 'Vendu'}</button>
+      <button class="btn sm ghost" data-act="retire">Retirer</button></div>` : ''}
+    ${(ouverte(a) || a.statut === 'expire') && !a.retiree_par_adress ? `<button class="btn sm soft block" style="margin-top:8px" data-act="prolonger">Prolonger de ${prol} jours</button>` : ''}
+  </div>`; }).join('') || '<div class="card center pad">Vous n\'avez encore publié aucune annonce.<br><br><a class="btn" href="#/publier">+ Publier</a></div>'}</div>`;
+  app.querySelectorAll('details[data-lire]').forEach(d => { if (d.dataset.lire) sb.rpc('marquer_demandes_lues', { p_annonce: d.dataset.lire }).then(majCompteurs); });
+  app.querySelectorAll('[data-ct]').forEach(l => l.addEventListener('click', () => sb.rpc('marquer_contactee', { p_demande: l.dataset.ct })));
+  app.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
+    const id = b.closest('[data-id]').dataset.id, act = b.dataset.act;
+    if (['vendu', 'don_effectue', 'retire'].includes(act) && !confirm(act === 'retire' ? 'Retirer cette annonce du Market ?' : 'Confirmer ? L\'annonce sera immédiatement retirée du Market et archivée.')) return;
+    b.disabled = true;
+    const r = act === 'prolonger' ? await sb.rpc('prolonger_annonce', { p_id: id }) : await sb.rpc('changer_statut_annonce', { p_id: id, p_statut: act });
+    if (r.error) { b.disabled = false; return toast(errMsg(r.error)); }
+    if (act === 'vendu' || act === 'don_effectue') { location.hash = `#/avis?annonce=${id}`; return; }
+    toast(act === 'prolonger' ? `Annonce prolongée jusqu'au ${dateFr(r.data)}.` : 'Annonce mise à jour.');
+    mesAnnonces();
+  });
+}
+
+// ---------- Contenus ADRESS (§7, §7 bis) ----------
+async function residences() {
+  const { data } = await sb.from('residences').select('*').eq('visible', true).order('ordre');
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos résidences</h1><p class="muted">Les résidences ADRESS IMMOBILIER</p>
+  <div class="list" style="margin-top:12px">${(data || []).map(r => `<div class="card item">
+    ${r.photo_path ? `<div class="ph" style="aspect-ratio:16/9;background-image:url('${esc(publicUrl(r.photo_path))}')"></div>` : ''}
+    <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc(r.quartier || '')}${r.type_bien ? ' · ' + esc(r.type_bien) : ''}</div>
+    ${r.description ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(r.lien_decouvrir)}" target="_blank" rel="noopener">Découvrir</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
+  (data || []).forEach(r => track('vue_residence', r.id));
+  app.querySelectorAll('[data-r]').forEach(a => a.addEventListener('click', () => track('clic_residence', a.dataset.r)));
+}
+async function nouveautes() {
+  const { data } = await sb.from('contenus').select('*').eq('visible', true).neq('type', 'Flip Immo').order('date_parution', { ascending: false });
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Les nouveautés</h1><p class="muted">Nouvelles résidences, programmes à venir et actualités ADRESS</p>
+  <div class="list" style="margin-top:12px">${(data || []).map(c => `<div class="card item">
+    ${c.image_path ? `<div class="ph" style="aspect-ratio:16/9;background-image:url('${esc(publicUrl(c.image_path))}')"></div>` : ''}
+    <div class="bd" style="padding:14px"><div class="muted small">${esc(c.type)} · ${dateFr(c.date_parution)}</div><h3>${esc(c.titre)}</h3>
+    ${c.texte ? `<p style="white-space:pre-line">${esc(c.texte)}</p>` : ''}${c.lien ? `<a class="btn sm" href="${esc(c.lien)}" target="_blank" rel="noopener">En savoir plus</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune nouveauté pour le moment.</div>'}</div>`;
+}
+async function flip() {
+  const { data } = await sb.from('contenus').select('*').eq('visible', true).eq('type', 'Flip Immo').order('date_parution', { ascending: false }).limit(1);
+  const f = data?.[0];
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Le Flip Immo</h1><p class="muted">Le magazine ADRESS IMMOBILIER</p>
+  ${f ? `<div class="card center" style="margin-top:12px">${f.image_path ? `<img src="${esc(publicUrl(f.image_path))}" alt="Couverture du Flip Immo" style="margin:0 auto;max-height:520px;border-radius:10px">` : ''}
+    <h2>${esc(f.titre)}${f.numero ? ' – n° ' + esc(f.numero) : ''}</h2>${f.lien ? `<a class="btn block" id="lire" href="${esc(f.lien)}" target="_blank" rel="noopener">Lire le magazine</a>` : ''}</div>`
+  : '<div class="card center pad" style="margin-top:12px">Le prochain numéro arrive bientôt.</div>'}`;
+  const l = app.querySelector('#lire'); if (l) l.addEventListener('click', () => track('clic_flip', f.id));
+}
+async function bonnesAdresses() {
+  const cat = qs().get('cat') || '';
+  let req = sb.from('partenaires').select('*').eq('visible', true).eq('valide_par_adress', true).order('ordre');
+  if (cat) req = req.eq('categorie', cat);
+  const { data } = await req;
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos bonnes adresses</h1><p class="muted">Partenaires et boutiques recommandés par ADRESS</p>
+  <div class="chips"><a class="chip ${!cat ? 'on' : ''}" href="#/bonnes-adresses">Tout</a>${CAT_PARTENAIRES.map(c => `<a class="chip ${cat === c ? 'on' : ''}" href="#/bonnes-adresses?cat=${encodeURIComponent(c)}">${c}</a>`).join('')}</div>
+  <div class="list">${(data || []).map(p => `<div class="card" style="display:flex;gap:12px;align-items:center">
+    <div style="width:76px;height:76px;flex:none;border-radius:10px;background:#f1f3f5 center/contain no-repeat ${p.logo_path ? `url('${esc(publicUrl(p.logo_path))}')` : ''}"></div>
+    <div style="flex:1;min-width:0"><b>${esc(p.nom)}</b><div class="muted small">${esc(p.categorie)}</div>${p.description ? `<div style="font-size:14px;margin:4px 0">${esc(p.description)}</div>` : ''}
+    ${p.lien ? `<a class="btn sm" data-p="${p.id}" href="${esc(p.lien)}" target="_blank" rel="noopener">Découvrir</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune adresse dans cette catégorie pour le moment.</div>'}</div>
+  <p class="muted small center" style="margin-top:14px">Recommandations éditoriales d'ADRESS : pas de paiement intégré ni de commission.</p>`;
+  app.querySelectorAll('[data-p]').forEach(a => a.addEventListener('click', () => track('clic_partenaire', a.dataset.p)));
+}
+
+// ---------- Notifications (§6) ----------
+async function notifications() {
+  const { data } = await sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Notifications</h1>
+  <div class="list" style="margin-top:12px">${(data || []).map(n => `<a class="card notif ${n.lue ? '' : 'unread'}" style="display:block;text-decoration:none" href="${n.type === 'interet' || n.type === 'rappel_j53' || n.type === 'expiration' ? '#/mes-annonces' : n.type === 'nouveautes' ? '#/market' : '#/'}">
+    <b>${esc(n.titre)}</b>${n.message ? `<div class="muted small">${esc(n.message)}</div>` : ''}<div class="muted small">${dateFr(n.created_at, true)}</div></a>`).join('') || '<div class="card center pad">Aucune notification.</div>'}</div>
+  <p class="muted small center" style="margin-top:12px">Réglez vos alertes dans <a href="#/profil">Mon compte</a>.</p>`;
+  const nonLues = (data || []).filter(n => !n.lue).map(n => n.id);
+  if (nonLues.length) await sb.from('notifications').update({ lue: true }).in('id', nonLues);
+}
+
+// ---------- Mon compte ----------
+function profil() {
+  const p = state.profil;
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mon compte</h1>
+  <form id="f" class="card" style="margin-top:12px">
+    <label for="nom">Nom d'affichage (visible des autres résidents)</label><input id="nom" type="text" maxlength="40" value="${esc(p.nom_affichage)}">
+    <label for="tel">Téléphone (privé)</label><input id="tel" type="tel" value="${esc(p.telephone || '')}" placeholder="+225 07 00 00 00 00">
+    <label class="check"><input id="cons" type="checkbox" ${p.consentement_contact ? 'checked' : ''}> J'accepte que mon téléphone soit communiqué uniquement aux vendeurs des objets pour lesquels je clique « Je suis intéressé ».</label>
+    <h2>Alertes</h2>
+    <label class="check"><input id="nq" type="checkbox" ${p.notif_quotidienne ? 'checked' : ''}> Résumé quotidien des nouvelles annonces (une fois par jour au maximum)</label>
+    <label class="check"><input id="ni" type="checkbox" ${p.notif_interet ? 'checked' : ''}> M'alerter quand un résident est intéressé par mon annonce</label>
+    <button class="btn block" style="margin-top:12px">Enregistrer</button>
+  </form>
+  <div class="card" style="margin-top:12px"><p class="muted small">Résidence : ${esc(p.residence?.nom || '—')}<br>Compte activé le ${dateFr(p.date_activation)}</p>
+  <div class="row"><a class="btn ghost" href="#/avis">Donner mon avis</a><button class="btn ghost" id="install" hidden>Installer l'application</button><button class="btn danger" id="out">Se déconnecter</button></div></div>`;
+  const $ = (s) => app.querySelector(s);
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.rpc('maj_preferences', { p_nom_affichage: $('#nom').value, p_telephone: $('#tel').value, p_consentement: $('#cons').checked, p_notif_quotidienne: $('#nq').checked, p_notif_interet: $('#ni').checked });
+    if (error) return toast(errMsg(error));
+    await chargerProfil(); toast('Préférences enregistrées.');
+  };
+  $('#out').onclick = async () => { await sb.auth.signOut(); await chargerProfil(); location.hash = '#/'; router(); };
+  if (window._installPrompt) { $('#install').hidden = false; $('#install').onclick = () => window._installPrompt.prompt(); }
+}
+
+// ---------- Avis (§8) ----------
+function avis() {
+  const an = qs().get('annonce');
+  let u = null;
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Votre avis</h1>
+  ${an ? '<p class="badge ok">Annonce clôturée et retirée du Market.</p>' : ''}
+  <p>${an ? 'Cela vous a-t-il été utile ?' : 'ADRESS CLUB vous est-il utile ?'}</p>
+  <div class="chips" id="ut"><a class="chip" data-v="Oui">Oui</a><a class="chip" data-v="Partiellement">Partiellement</a><a class="chip" data-v="Non">Non</a></div>
+  <label for="am">Que pouvons-nous améliorer ? (facultatif)</label><textarea id="am" maxlength="2000"></textarea>
+  <p class="err" id="err" hidden></p>
+  <button class="btn block" id="go" style="margin-top:14px">Envoyer mon avis</button>
+  <p class="center"><a class="muted" href="#/mes-annonces">Passer</a></p>`;
+  app.querySelectorAll('#ut .chip').forEach(c => c.onclick = () => { u = c.dataset.v; app.querySelectorAll('#ut .chip').forEach(x => x.classList.toggle('on', x === c)); app.querySelector('#err').hidden = true; });
+  app.querySelector('#go').onclick = async () => {
+    if (!u) { const e = app.querySelector('#err'); e.textContent = 'Choisissez Oui, Partiellement ou Non.'; e.hidden = false; return; }
+    const { error } = await sb.from('avis').insert({ auteur_id: state.session.user.id, annonce_id: an || null, utilite: u, amelioration: app.querySelector('#am').value.trim() || null, origine: an ? 'cloture' : 'menu' });
+    if (error) return toast(errMsg(error));
+    toast('Merci pour votre avis.'); location.hash = an ? '#/mes-annonces' : '#/';
+  };
+}
+
+// ---------- démarrage ----------
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window._installPrompt = e; });
+window.addEventListener('hashchange', router);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+await chargerProfil();
+router();
+setInterval(majCompteurs, 60000);
