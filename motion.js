@@ -10,21 +10,19 @@ let pending = null, shared = false;
 
 // ---------- intro (une fois par session) ----------
 let seen = false; try { seen = sessionStorage.getItem('acl-intro') === '1'; sessionStorage.setItem('acl-intro', '1'); } catch (_) {}
-let intro = null;
+let intro = null; const t0 = Date.now();
 if (!reduce && !seen) {
-  intro = document.createElement('div'); intro.className = 'intro';
-  intro.innerHTML = '<video class="intro-vid" src="intro.mp4?v=10" muted playsinline autoplay preload="auto"></video><div class="intro-in"><img src="logo.png" alt=""><i></i><span>CLUB</span></div>';
+  intro = document.createElement('div'); intro.className = 'intro intro2';
+  intro.innerHTML = '<div class="intro-stage">' + markSvg('intro-mark') + '<div class="intro-in"><img src="logo.png" alt=""><i></i><span>CLUB</span></div></div>';
   document.body.appendChild(intro);
-  const vid = intro.querySelector('video'); vid.addEventListener('playing', () => intro && intro.classList.add('has-vid'), { once: true });
-  vid.addEventListener('timeupdate', () => { if (vid.currentTime > 1.7 && intro) intro.classList.add('show-logo'); });
+  // impact ressenti : légère vibration quand les deux traits se croisent
+  setTimeout(() => { try { if (matchMedia('(pointer: coarse)').matches && navigator.vibrate) navigator.vibrate([14, 60, 22]); } catch (_) {} }, 950);
 }
 const closeIntro = () => {
   if (!intro) return; const el = intro; intro = null;
-  let done = false; const go = (d) => { if (done) return; done = true; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, d); };
-  const v = el.querySelector('video');
-  if (v && el.classList.contains('has-vid') && !v.ended) { v.addEventListener('ended', () => go(150), { once: true }); setTimeout(() => go(0), 4500); } else go(900);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 900); }, Math.max(0, 2900 - (Date.now() - t0)));
 };
-setTimeout(closeIntro, 3500);
+setTimeout(closeIntro, 4200);
 
 // ---------- transitions entre écrans (View Transitions API) ----------
 document.addEventListener('click', (e) => {
