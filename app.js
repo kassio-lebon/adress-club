@@ -550,31 +550,40 @@ async function residences() {
 }
 // Diaporama « envie » : fondu + zoom lent (Ken Burns), barres de progression façon story, toucher pour avancer
 const DUREE_DIAPO = 3800;
-function chargerImg(url) {
-  // sans « referer » : les photos du site adressimmobilier.com s'affichent (protection anti-hotlink)
-  return new Promise(ok => { const t = new Image(); t.referrerPolicy = 'no-referrer'; t.onload = () => ok(url); t.onerror = () => { const g = url.replace(/-\d+x\d+(\.\w+)$/, '$1'); if (g === url) return ok(''); const f = new Image(); f.referrerPolicy = 'no-referrer'; f.onload = () => ok(g); f.onerror = () => ok(''); f.src = g; }; t.src = url; });
-}
 function diaporama(box) {
   const urls = JSON.parse(box.dataset.imgs || '[]'); if (!urls.length) return;
   const reduit = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const slides = urls.map((_, i) => { const d = document.createElement('img'); d.alt = ''; d.referrerPolicy = 'no-referrer'; d.className = 'rs-s k' + (i % 4); box.prepend(d); return d; });
+  const slides = urls.map((_, i) => { const d = document.createElement('img'); d.alt = ''; d.referrerPolicy = 'no-referrer'; d.decoding = 'async'; d.className = 'rs-s k' + (i % 4); box.prepend(d); return d; });
   const bars = [...box.querySelectorAll('.rs-bars i')], num = box.querySelector('.rs-n');
+  // une photo n'est montrée qu'une fois téléchargée ET décodée (jamais d'écran gris pendant le défilement)
   const prets = new Map();
-  const prep = (i) => { if (!prets.has(i)) prets.set(i, chargerImg(urls[i]).then(u => { if (u) slides[i].src = u; else slides[i].classList.add('ko'); return u; })); return prets.get(i); };
-  let cur = -1, timer = null, visible = true;
-  const aller = async (i) => {
-    i = (i + urls.length) % urls.length; await prep(i);
-    if (cur >= 0) { slides[cur].classList.remove('on'); slides[cur].classList.add('was'); const p = cur; setTimeout(() => slides[p].classList.remove('was'), 1000); }
-    cur = i; const s = slides[i]; s.classList.remove('on'); void s.offsetWidth; s.classList.add('on');
+  const prep = (i) => {
+    if (!prets.has(i)) prets.set(i, new Promise(ok => { const im = slides[i]; if (!im.getAttribute('src')) im.src = urls[i]; (im.decode ? im.decode() : Promise.resolve()).then(() => ok(true), () => { prets.delete(i); im.removeAttribute('src'); ok(false); }); }));
+    return prets.get(i);
+  };
+  let cur = -1, timer = null, visible = true, jeton = 0, nett = null;
+  const planifier = () => { clearTimeout(timer); if (urls.length > 1 && !reduit && visible) timer = setTimeout(() => aller(cur + 1), DUREE_DIAPO); };
+  const aller = async (i, essais = urls.length) => {
+    i = (i + urls.length) % urls.length; const t = ++jeton; clearTimeout(timer);
+    const ok = await prep(i);
+    if (t !== jeton) return; // un autre geste a pris le relais
+    if (!ok) { if (essais > 1) return aller(i + 1, essais - 1); return planifier(); } // photo introuvable : on passe à la suivante
+    if (i === cur) return planifier();
+    const prev = cur >= 0 ? slides[cur] : null;
+    if (prev) { prev.classList.remove('on'); prev.classList.add('was'); }
+    cur = i; const s = slides[i];
+    if (s.classList.contains('was')) s.classList.replace('was', 'on'); // encore visible : on la reprend sans refaire le fondu
+    else { s.classList.remove('on'); void s.offsetWidth; s.classList.add('on'); }
+    clearTimeout(nett); nett = setTimeout(() => slides.forEach(x => x.classList.remove('was')), 950); // les anciennes photos restent dessous jusqu'à la fin du fondu
     bars.forEach((b, k) => { b.className = k < i ? 'done' : ''; }); if (bars[i]) { void bars[i].offsetWidth; bars[i].className = 'go'; }
     if (num) num.textContent = (i + 1) + ' / ' + urls.length;
-    prep(i + 1 < urls.length ? i + 1 : 0);
-    clearTimeout(timer); if (urls.length > 1 && !reduit && visible) timer = setTimeout(() => aller(cur + 1), DUREE_DIAPO);
+    prep((i + 1) % urls.length);
+    planifier();
   };
   box.addEventListener('click', (e) => { const x = e.clientX - box.getBoundingClientRect().left; aller(x < box.clientWidth / 3 ? cur - 1 : cur + 1); });
   let x0 = null; box.addEventListener('touchstart', e => x0 = e.touches[0].clientX, { passive: true });
   box.addEventListener('touchend', e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 40) { e.preventDefault(); aller(dx < 0 ? cur + 1 : cur - 1); } });
-  if ('IntersectionObserver' in window) new IntersectionObserver(([en]) => { visible = en.isIntersecting; box.classList.toggle('pause', !visible); if (!visible) clearTimeout(timer); else if (cur >= 0 && urls.length > 1 && !reduit) { clearTimeout(timer); timer = setTimeout(() => aller(cur + 1), DUREE_DIAPO); } }).observe(box);
+  if ('IntersectionObserver' in window) new IntersectionObserver(([en]) => { visible = en.isIntersecting; box.classList.toggle('pause', !visible); if (!visible) clearTimeout(timer); else if (cur >= 0) planifier(); }).observe(box);
   aller(0);
 }
 async function nouveautes() {
