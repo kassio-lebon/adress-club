@@ -10,10 +10,16 @@ let seen = false; try { seen = sessionStorage.getItem('acl-intro') === '1'; sess
 let intro = null;
 if (!reduce && !seen) {
   intro = document.createElement('div'); intro.className = 'intro';
-  intro.innerHTML = '<div class="intro-in"><img src="logo.png" alt=""><i></i><span>CLUB</span></div>';
+  intro.innerHTML = '<video class="intro-vid" src="intro.mp4?v=9" muted playsinline autoplay preload="auto"></video><div class="intro-in"><img src="logo.png" alt=""><i></i><span>CLUB</span></div>';
   document.body.appendChild(intro);
+  const vid = intro.querySelector('video'); vid.addEventListener('playing', () => intro && intro.classList.add('has-vid'), { once: true });
 }
-const closeIntro = () => { if (!intro) return; const el = intro; intro = null; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, 900); };
+const closeIntro = () => {
+  if (!intro) return; const el = intro; intro = null;
+  let done = false; const go = (d) => { if (done) return; done = true; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, d); };
+  const v = el.querySelector('video');
+  if (v && el.classList.contains('has-vid') && !v.ended) { v.addEventListener('ended', () => go(150), { once: true }); setTimeout(() => go(0), 4500); } else go(900);
+};
 setTimeout(closeIntro, 3500);
 
 // ---------- transitions entre écrans (View Transitions API) ----------

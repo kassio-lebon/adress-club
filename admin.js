@@ -1,7 +1,7 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
 import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES } from './app.js';
 
-const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bonnes adresses'],['avis','Avis'],['parametres','Paramètres']];
+const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
 const TYPES_BIEN = ['Appartements','Villas en résidence','Villas individuelles','Mixte'];
 
@@ -148,7 +148,7 @@ async function residences(box) {
 async function partenaires(box) {
   const { data } = await sb.from('partenaires').select('*').order('ordre');
   box.innerHTML = `<p class="muted">Un partenaire n'apparaît aux résidents que s'il est <b>validé par ADRESS</b> et <b>visible</b>.</p>
-  <div class="card"><h3>Ajouter une bonne adresse</h3><form id="f">
+  <div class="card"><h3>Ajouter un bon plan</h3><form id="f">
     <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Catégorie *</label><select id="ca">${CAT_PARTENAIRES.map(c => `<option>${c}</option>`).join('')}</select></div></div>
     <label>Description (200 car. max)</label><input id="de" type="text" maxlength="200">
     <div class="grid2"><div><label>Lien</label><input id="li" type="url" placeholder="https://"></div><div><label>Type de lien</label><select id="tl"><option>Site web</option><option>WhatsApp</option><option>Flipbook</option></select></div></div>

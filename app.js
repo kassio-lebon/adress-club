@@ -8,6 +8,7 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSess
 
 export const CATEGORIES = ['Meubles','Électroménager','Décoration','Enfants et bébé','Vêtements et accessoires','Électronique','Sport et loisirs','Maison et jardin','Autre'];
 export const ETATS = ['Neuf','Très bon état','Bon état','Usagé','À réparer'];
+export const FILTRES_BP = ['Rideaux et décoration','Aménagement et revêtements'];
 export const CAT_PARTENAIRES = ['Rideaux et décoration','Aménagement et revêtements','Électroménager','Boutiques et inspirations'];
 const STATUTS = { disponible:'Disponible', reserve:'Réservé', vendu:'Vendu', don_effectue:'Don effectué', retire:'Retiré', expire:'Expiré' };
 
@@ -194,7 +195,7 @@ async function accueil() {
     + lien('#/residences', ICO.residences, 'Nos résidences', 'Photos et contact')
     + lien('#/flip-immo', ICO.flip, 'Le Flip Immo', 'Le magazine ADRESS')
     + lien('#/nouveautes', ICO.news, 'Les nouveautés', 'Programmes et actualités')
-    + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Nos bonnes adresses</b><small>Partenaires et boutiques recommandés par ADRESS</small></span>' + ICO.arrow + '</a>'
+    + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Les bons plans</b><small>La sélection ADRESS pour vivre Abidjan</small></span>' + ICO.arrow + '</a>'
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
 }
@@ -422,13 +423,19 @@ async function bonnesAdresses() {
   let req = sb.from('partenaires').select('*').eq('visible', true).eq('valide_par_adress', true).order('ordre');
   if (cat) req = req.eq('categorie', cat);
   const { data } = await req;
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos bonnes adresses</h1><p class="muted">Partenaires et boutiques recommandés par ADRESS</p>
-  <div class="chips"><a class="chip ${!cat ? 'on' : ''}" href="#/bonnes-adresses">Tout</a>${CAT_PARTENAIRES.map(c => `<a class="chip ${cat === c ? 'on' : ''}" href="#/bonnes-adresses?cat=${encodeURIComponent(c)}">${c}</a>`).join('')}</div>
-  <div class="list">${(data || []).map(p => `<div class="card" style="display:flex;gap:12px;align-items:center">
-    <div style="width:76px;height:76px;flex:none;border-radius:10px;background:#f1f3f5 center/contain no-repeat ${p.logo_path ? `url('${esc(publicUrl(p.logo_path))}')` : ''}"></div>
-    <div style="flex:1;min-width:0"><b>${esc(p.nom)}</b><div class="muted small">${esc(p.categorie)}</div>${p.description ? `<div style="font-size:14px;margin:4px 0">${esc(p.description)}</div>` : ''}
-    ${p.lien ? `<a class="btn sm" data-p="${p.id}" href="${esc(lienFlip(p.lien, p.nom))}" ${estFlip(p.lien) ? '' : 'target="_blank" rel="noopener"'}>${estFlip(p.lien) ? 'Feuilleter' : 'Découvrir'}</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune adresse dans cette catégorie pour le moment.</div>'}</div>
-  <p class="muted small center" style="margin-top:14px">Recommandations éditoriales d'ADRESS : pas de paiement intégré ni de commission.</p>`;
+  const tous = data || [], flips = cat ? [] : tous.filter(p => estFlip(p.lien)), adresses = tous.filter(p => !estFlip(p.lien));
+  const ligne = (p) => '<div class="card bp">'
+    + '<div class="bp-logo"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '></div>'
+    + '<div class="bp-txt"><b>' + esc(p.nom) + '</b><div class="muted small">' + esc(p.categorie) + '</div>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>'
+    + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(p.lien) + '" target="_blank" rel="noopener">Découvrir</a>' : '') + '</div>';
+  const flipCard = (p) => '<a class="flipcard" data-p="' + p.id + '" href="' + esc(lienFlip(p.lien, p.nom)) + '">'
+    + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><i class="orb o1"></i><i class="orb o2"></i><em>' + esc(p.nom) + '</em></span>'
+    + '<span class="fc-txt"><small>Le guide ADRESS</small><b>' + esc(p.nom) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
+  app.innerHTML = '<a class="back" href="#/">‹ Accueil</a><h1>Les bons plans</h1><p class="muted">La sélection ADRESS pour vivre Abidjan</p>'
+    + '<div class="chips"><a class="chip ' + (!cat ? 'on' : '') + '" href="#/bonnes-adresses">Tout</a>' + FILTRES_BP.map(c => '<a class="chip ' + (cat === c ? 'on' : '') + '" href="#/bonnes-adresses?cat=' + encodeURIComponent(c) + '">' + c + '</a>').join('') + '</div>'
+    + (adresses.length ? '<div class="list">' + adresses.map(ligne).join('') + '</div>' : (flips.length ? '' : '<div class="card center pad">Aucun bon plan dans cette catégorie pour le moment.</div>'))
+    + (flips.length ? '<section><h2>À feuilleter</h2><div class="list">' + flips.map(flipCard).join('') + '</div></section>' : '')
+    + '<p class="muted small center" style="margin-top:22px">Sélection éditoriale d’ADRESS IMMOBILIER, sans paiement intégré ni commission.</p>';
   app.querySelectorAll('[data-p]').forEach(a => a.addEventListener('click', () => track('clic_partenaire', a.dataset.p)));
 }
 

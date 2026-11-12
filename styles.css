@@ -454,3 +454,30 @@ html{touch-action:manipulation}
   .hero .bgz{will-change:transform}
   .page-in .grid2>*:nth-child(n+7),.page-in .list>*:nth-child(n+7){animation-delay:.3s}
 }
+
+/* ---------- Bons plans ---------- */
+.bp{display:flex;gap:14px;align-items:center}
+.bp-logo{width:64px;height:64px;flex:none;border-radius:12px;background:var(--sunken) center/contain no-repeat}
+.bp-txt{flex:1;min-width:0}
+.bp-txt p{margin:4px 0 0;font-size:14px;color:var(--ink-2)}
+.flipcard{display:grid;grid-template-columns:118px 1fr;gap:18px;align-items:center;padding:16px;border-radius:var(--r-lg);background:var(--ink);color:#fff;text-decoration:none;overflow:hidden;transition:transform .3s var(--ease)}
+.fc-cover{position:relative;aspect-ratio:3/4;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,#30323a,#16171a) center/cover;display:flex;align-items:flex-end;padding:10px;
+  box-shadow:0 12px 26px -10px rgba(0,0,0,.7);transform:rotate(-3deg);transition:transform .5s var(--ease)}
+.fc-cover em{position:relative;z-index:3;font-style:normal;font-weight:800;font-size:12.5px;line-height:1.15;letter-spacing:.05em;text-transform:uppercase}
+.fc-cover .orb{position:absolute;border-radius:50%;pointer-events:none}
+.fc-cover .o1{right:-50px;top:-28px;width:150px;height:92px;border:2px solid rgba(255,255,255,.2);animation:orbit1 16s linear infinite}
+.fc-cover .o2{right:-26px;top:-18px;width:120px;height:74px;border:2px solid rgba(212,16,29,.85);animation:orbit2 22s linear infinite}
+.fc-txt{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fc-txt small{color:#FF8A92;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.fc-txt b{font-size:18px;font-weight:700}
+.fc-txt span{color:rgba(255,255,255,.72);font-size:13.5px;line-height:1.45}
+.fc-txt u{text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-weight:600;font-size:14px}
+.fc-txt u svg{transition:transform .3s var(--ease)}
+.flipcard:active{transform:scale(.985)}
+@media (hover:hover){.flipcard:hover .fc-cover{transform:rotate(0) scale(1.04)}.flipcard:hover u svg{transform:translateX(5px)}}
+
+/* ---------- vidéo d'ouverture ---------- */
+.intro-vid{position:absolute;inset:0;margin:auto;width:min(92vw,520px);height:auto;aspect-ratio:1/1;opacity:0;transition:opacity .25s;mix-blend-mode:multiply;z-index:0;pointer-events:none}
+.intro.has-vid .intro-vid{opacity:1}
+.intro-in{z-index:1}
+.intro.has-vid .intro-in::before{display:none}
