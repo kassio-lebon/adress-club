@@ -536,13 +536,45 @@ async function mesAnnonces() {
 // ---------- Contenus ADRESS (§7, §7 bis) ----------
 async function residences() {
   const { data } = await sb.from('residences').select('*').eq('visible', true).order('ordre');
+  const imgs = (r) => [...new Set([r.photo_path, ...(r.photos || [])].filter(Boolean).map(publicUrl))];
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos résidences</h1><p class="muted">Les résidences ADRESS IMMOBILIER</p>
-  <div class="list" style="margin-top:12px">${(data || []).map(r => `<div class="card item">
-    ${r.photo_path ? `<div class="ph" style="aspect-ratio:16/9;background-image:url('${esc(publicUrl(r.photo_path))}')"></div>` : ''}
+  <div class="list" style="margin-top:12px">${(data || []).map((r, k) => { const im = imgs(r); return `<div class="card item res-card" style="--k:${k}">
+    ${im.length ? `<div class="rs" data-imgs="${esc(JSON.stringify(im))}" role="img" aria-label="Photos de ${esc(r.nom)}">
+      ${im.length > 1 ? `<div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div>` : ''}
+      ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}</div>` : ''}
     <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc(r.quartier || '')}${r.type_bien ? ' · ' + esc(r.type_bien) : ''}</div>
-    ${r.description ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(r.lien_decouvrir)}" target="_blank" rel="noopener">Découvrir</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
+    ${r.description ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(r.lien_decouvrir)}" target="_blank" rel="noopener">Découvrir la résidence ↗</a>` : ''}</div></div>`; }).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
   (data || []).forEach(r => track('vue_residence', r.id));
   app.querySelectorAll('[data-r]').forEach(a => a.addEventListener('click', () => track('clic_residence', a.dataset.r)));
+  app.querySelectorAll('.rs').forEach(diaporama);
+}
+// Diaporama « envie » : fondu + zoom lent (Ken Burns), barres de progression façon story, toucher pour avancer
+const DUREE_DIAPO = 3800;
+function chargerImg(url) {
+  return new Promise(ok => { const t = new Image(); t.onload = () => ok(url); t.onerror = () => { const g = url.replace(/-\d+x\d+(\.\w+)$/, '$1'); if (g === url) return ok(''); const f = new Image(); f.onload = () => ok(g); f.onerror = () => ok(''); f.src = g; }; t.src = url; });
+}
+function diaporama(box) {
+  const urls = JSON.parse(box.dataset.imgs || '[]'); if (!urls.length) return;
+  const reduit = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const slides = urls.map((_, i) => { const d = document.createElement('div'); d.className = 'rs-s k' + (i % 4); box.prepend(d); return d; });
+  const bars = [...box.querySelectorAll('.rs-bars i')], num = box.querySelector('.rs-n');
+  const prets = new Map();
+  const prep = (i) => { if (!prets.has(i)) prets.set(i, chargerImg(urls[i]).then(u => { if (u) slides[i].style.backgroundImage = `url("${u}")`; else slides[i].classList.add('ko'); return u; })); return prets.get(i); };
+  let cur = -1, timer = null, visible = true;
+  const aller = async (i) => {
+    i = (i + urls.length) % urls.length; await prep(i);
+    if (cur >= 0) { slides[cur].classList.remove('on'); slides[cur].classList.add('was'); const p = cur; setTimeout(() => slides[p].classList.remove('was'), 1000); }
+    cur = i; const s = slides[i]; s.classList.remove('on'); void s.offsetWidth; s.classList.add('on');
+    bars.forEach((b, k) => { b.className = k < i ? 'done' : ''; }); if (bars[i]) { void bars[i].offsetWidth; bars[i].className = 'go'; }
+    if (num) num.textContent = (i + 1) + ' / ' + urls.length;
+    prep(i + 1 < urls.length ? i + 1 : 0);
+    clearTimeout(timer); if (urls.length > 1 && !reduit && visible) timer = setTimeout(() => aller(cur + 1), DUREE_DIAPO);
+  };
+  box.addEventListener('click', (e) => { const x = e.clientX - box.getBoundingClientRect().left; aller(x < box.clientWidth / 3 ? cur - 1 : cur + 1); });
+  let x0 = null; box.addEventListener('touchstart', e => x0 = e.touches[0].clientX, { passive: true });
+  box.addEventListener('touchend', e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 40) { e.preventDefault(); aller(dx < 0 ? cur + 1 : cur - 1); } });
+  if ('IntersectionObserver' in window) new IntersectionObserver(([en]) => { visible = en.isIntersecting; box.classList.toggle('pause', !visible); if (!visible) clearTimeout(timer); else if (cur >= 0 && urls.length > 1 && !reduit) { clearTimeout(timer); timer = setTimeout(() => aller(cur + 1), DUREE_DIAPO); } }).observe(box);
+  aller(0);
 }
 async function nouveautes() {
   const { data } = await sb.from('contenus').select('*').eq('visible', true).neq('type', 'Flip Immo').order('date_parution', { ascending: false });

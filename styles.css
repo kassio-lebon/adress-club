@@ -630,3 +630,29 @@ details.adv summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--in
 .gal-n{position:absolute;right:12px;top:12px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;z-index:2}
 .dots i{cursor:pointer}
 @media (max-width:760px){.gal-nav{width:38px;height:38px;font-size:24px}.gal-nav.prev{left:24px}.gal-nav.next{right:24px}.gal-n{right:24px}}
+
+/* v28 : résidences — diaporama « envie » */
+.res-card{animation:resIn .7s cubic-bezier(.16,1,.3,1) calc(var(--k,0) * 90ms) both}
+@keyframes resIn{from{opacity:0;transform:translateY(24px) scale(.98)}}
+.rs{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--sunken);cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+.rs::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.32),transparent 28%,transparent 70%,rgba(0,0,0,.35));pointer-events:none;z-index:2}
+.rs-s{position:absolute;inset:-2%;background:center/cover no-repeat;opacity:0;z-index:0}
+.rs-s.ko{background:var(--sunken)}
+.rs-s.was{opacity:1;z-index:0;animation:none}
+.rs-s.on{z-index:1;animation:rsFade .9s ease both,var(--kb) 4.8s linear both}
+.rs.pause .rs-s.on,.rs.pause .rs-bars i.go b{animation-play-state:paused}
+.rs-s.k0{--kb:kb0}.rs-s.k1{--kb:kb1}.rs-s.k2{--kb:kb2}.rs-s.k3{--kb:kb3}
+@keyframes rsFade{from{opacity:0;filter:blur(6px)}to{opacity:1;filter:none}}
+@keyframes kb0{from{transform:scale(1.02)}to{transform:scale(1.14) translate(-2%,-1%)}}
+@keyframes kb1{from{transform:scale(1.15) translate(2%,1%)}to{transform:scale(1.03)}}
+@keyframes kb2{from{transform:scale(1.04) translate(-2%,1%)}to{transform:scale(1.15) translate(2%,-1%)}}
+@keyframes kb3{from{transform:scale(1.14) translate(0,-2%)}to{transform:scale(1.04) translate(0,1%)}}
+.rs-bars{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:4px;z-index:3}
+.rs-bars i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.4);overflow:hidden}
+.rs-bars i b{display:block;height:100%;width:0;background:#fff}
+.rs-bars i.done b{width:100%}
+.rs-bars i.go b{animation:rsBar 3.8s linear both}
+@keyframes rsBar{to{width:100%}}
+.rs-loc{position:absolute;left:12px;bottom:12px;z-index:3;color:#fff;font-size:12.5px;font-weight:700;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:6px 11px;border-radius:999px;animation:resIn .6s .4s cubic-bezier(.16,1,.3,1) both}
+.rs-n{position:absolute;right:12px;bottom:12px;z-index:3;color:#fff;font-size:11.5px;font-weight:700;background:rgba(0,0,0,.35);padding:5px 9px;border-radius:999px}
+@media (prefers-reduced-motion:reduce){.rs-s.on{animation:rsFade .3s ease both}.res-card{animation:none}}
