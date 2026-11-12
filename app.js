@@ -38,7 +38,7 @@ async function photosUrls(paths) {
   return paths.map(p => signedCache.get(p) || '');
 }
 
-function compress(file, max = 1280) {
+export function compress(file, max = 1280) {
   return new Promise((ok, ko) => {
     const img = new Image(); const u = URL.createObjectURL(file);
     img.onload = () => { const s = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas');
@@ -437,8 +437,9 @@ async function bonnesAdresses() {
     + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(p.nom) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
   app.innerHTML = '<a class="back" href="#/">‹ Accueil</a><h1>Les bons plans</h1><p class="muted">La sélection ADRESS pour vivre Abidjan</p>'
     + '<div class="chips"><a class="chip ' + (!cat ? 'on' : '') + '" href="#/bonnes-adresses">Tout</a>' + FILTRES_BP.map(c => '<a class="chip ' + (cat === c ? 'on' : '') + '" href="#/bonnes-adresses?cat=' + encodeURIComponent(c) + '">' + c + '</a>').join('') + '</div>'
-    + (adresses.length ? '<div class="list">' + adresses.map(ligne).join('') + '</div>' : (flips.length ? '' : '<div class="card center pad">Aucun bon plan dans cette catégorie pour le moment.</div>'))
     + (flips.length ? '<section><h2>À feuilleter</h2><div class="list">' + flips.map(flipCard).join('') + '</div></section>' : '')
+    + (cat ? [cat] : FILTRES_BP).map(c => { const l = adresses.filter(p => p.categorie === c); return l.length ? '<section><h2>' + esc(c) + '</h2><div class="list">' + l.map(ligne).join('') + '</div></section>' : ''; }).join('')
+    + (!adresses.length && !flips.length ? '<div class="card center pad">Aucun bon plan dans cette catégorie pour le moment.</div>' : '')
     + '<p class="muted small center" style="margin-top:22px">Sélection éditoriale d’ADRESS IMMOBILIER, sans paiement intégré ni commission.</p>';
   app.querySelectorAll('[data-p]').forEach(a => a.addEventListener('click', () => track('clic_partenaire', a.dataset.p)));
 }

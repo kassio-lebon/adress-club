@@ -1,5 +1,5 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
-import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES } from './app.js';
+import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES, FILTRES_BP, compress } from './app.js';
 
 const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
@@ -15,6 +15,9 @@ export async function renderAdmin(app, ong) {
 }
 const rerender = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
 async function uploadPublic(file, dossier) {
+  if (/^image\/(jpeg|heic|heif|webp)$/i.test(file.type) || (file.type.startsWith('image/') && file.size > 1500000 && !/png|svg/i.test(file.type))) {
+    file = new File([await compress(file, 1920)], 'photo.jpg', { type: 'image/jpeg' });
+  }
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
   const path = `${dossier}/${crypto.randomUUID()}.${ext}`;
   const { error } = await sb.storage.from('contenus').upload(path, file, { contentType: file.type });
@@ -134,14 +137,28 @@ async function residences(box) {
     <label>Lien « Découvrir »</label><input id="li" type="url" placeholder="https://">
     <label>Photo</label><input id="ph" type="file" accept="image/*">
     <button class="btn block" style="margin-top:12px">Ajouter</button></form></div>
-  <h2>Résidences</h2><div class="list">${(data || []).map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.nom)}</b> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
-    <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
+  <h2>Résidences</h2><div class="list">${(data || []).map(r => `<div class="card" data-id="${r.id}" style="display:flex;gap:12px;align-items:center">
+    <div style="width:72px;height:54px;flex:none;border-radius:8px;background:#f1f3f5 center/cover no-repeat ${r.photo_path ? `url('${esc(publicUrl(r.photo_path))}')` : ''}"></div>
+    <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
+    <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button>
+      <label class="btn sm ghost" style="margin:0">Photo<input type="file" accept="image/*" data-photo class="sr"></label>
+      <button class="btn sm ghost" data-edit>Modifier</button></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
   const $ = (s) => box.querySelector(s);
   $('#f').onsubmit = (e) => { e.preventDefault(); action(async () => {
     const f = $('#ph').files[0]; const photo_path = f ? await uploadPublic(f, 'residences') : null;
     check(await sb.from('residences').insert({ nom: $('#no').value.trim(), quartier: $('#qu').value.trim() || null, type_bien: $('#tb').value || null, ordre: +$('#or').value || 100, description: $('#de').value.trim() || null, lien_decouvrir: $('#li').value.trim() || null, photo_path }));
   }, 'Résidence ajoutée.'); };
   box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => action(async () => check(await sb.from('residences').update({ visible: b.dataset.v === '1' }).eq('id', b.closest('[data-id]').dataset.id))));
+  const rid = (el) => el.closest('[data-id]').dataset.id;
+  box.querySelectorAll('[data-photo]').forEach(i => i.onchange = () => i.files[0] && action(async () => { toast('Envoi de la photo…'); const photo_path = await uploadPublic(i.files[0], 'residences'); check(await sb.from('residences').update({ photo_path }).eq('id', rid(i))); }, 'Photo mise à jour.'));
+  box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+    const r = (data || []).find(x => x.id === rid(b)); if (!r) return;
+    const nom = prompt('Nom de la résidence', r.nom); if (nom === null) return;
+    const quartier = prompt('Quartier', r.quartier || ''); if (quartier === null) return;
+    const description = prompt('Description', r.description || ''); if (description === null) return;
+    const lien = prompt('Lien « Découvrir » (https://…)', r.lien_decouvrir || ''); if (lien === null) return;
+    action(async () => check(await sb.from('residences').update({ nom: nom.trim() || r.nom, quartier: quartier.trim() || null, description: description.trim() || null, lien_decouvrir: lien.trim() || null }).eq('id', r.id)));
+  });
 }
 
 // ---------- Nos bonnes adresses (§7 bis) ----------
@@ -149,7 +166,7 @@ async function partenaires(box) {
   const { data } = await sb.from('partenaires').select('*').order('ordre');
   box.innerHTML = `<p class="muted">Un partenaire n'apparaît aux résidents que s'il est <b>validé par ADRESS</b> et <b>visible</b>.</p>
   <div class="card"><h3>Ajouter un bon plan</h3><form id="f">
-    <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Catégorie *</label><select id="ca">${CAT_PARTENAIRES.map(c => `<option>${c}</option>`).join('')}</select></div></div>
+    <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Catégorie *</label><select id="ca">${FILTRES_BP.map(c => `<option>${c}</option>`).join('')}</select></div></div>
     <label>Description (200 car. max)</label><input id="de" type="text" maxlength="200">
     <div class="grid2"><div><label>Lien</label><input id="li" type="url" placeholder="https://"></div><div><label>Type de lien</label><select id="tl"><option>Site web</option><option>WhatsApp</option><option>Flipbook</option></select></div></div>
     <label>Logo</label><input id="lo" type="file" accept="image/*">
