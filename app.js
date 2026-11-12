@@ -374,7 +374,31 @@ async function annonce(id) {
     : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
   ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}</div></div>`;
   const b = app.querySelector('#int');
+  // Le vendeur doit pouvoir joindre l'intéressé : sans numéro partagé, on le demande avant d'envoyer
+  const contactOk = () => state.profil.consentement_contact && (state.profil.telephone || '').replace(/[^0-9]/g, '').length >= 8;
+  const demanderNumero = () => new Promise(ok => {
+    const z = app.querySelector('#zoo');
+    z.innerHTML = `<form class="card ask-tel" novalidate><b>Comment le vendeur peut-il vous joindre ?</b>
+      <p class="muted small">Votre numéro est transmis uniquement au vendeur de cet objet, pour qu'il vous contacte.</p>
+      <label for="t2">Votre téléphone (WhatsApp de préférence)</label><input id="t2" type="tel" inputmode="tel" autocomplete="tel" placeholder="+225 07 00 00 00 00" value="${esc(state.profil.telephone || '')}">
+      <label class="check"><input id="c2" type="checkbox" checked> J'accepte que mon numéro soit communiqué aux vendeurs des objets qui m'intéressent.</label>
+      <p class="err" id="e2" hidden></p>
+      <div class="row"><button class="btn" type="submit">Envoyer ma demande</button><button class="btn ghost" type="button" id="x2">Annuler</button></div></form>`;
+    z.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => z.querySelector('#t2').focus(), 300);
+    const err = (m) => { const e = z.querySelector('#e2'); e.textContent = m; e.hidden = !m; };
+    z.querySelector('#x2').onclick = () => { z.innerHTML = ''; ok(false); };
+    z.querySelector('form').onsubmit = async (e) => {
+      e.preventDefault(); const t = z.querySelector('#t2').value.trim();
+      if (t.replace(/[^0-9]/g, '').length < 8) return err('Indiquez un numéro de téléphone valide.');
+      if (!z.querySelector('#c2').checked) return err('Cochez la case pour que le vendeur puisse vous contacter.');
+      const p = state.profil;
+      const { error } = await sb.rpc('maj_preferences', { p_nom_affichage: p.nom_affichage, p_telephone: t, p_consentement: true, p_notif_quotidienne: p.notif_quotidienne, p_notif_interet: p.notif_interet });
+      if (error) return err(errMsg(error));
+      p.telephone = t; p.consentement_contact = true; z.innerHTML = ''; ok(true);
+    };
+  });
   if (b && !dejaDemande) b.onclick = async () => {
+    if (!contactOk() && !(await demanderNumero())) return;
     b.disabled = true; b.textContent = 'Envoi…';
     const { data: rang, error } = await sb.rpc('je_suis_interesse', { p_annonce: a.id });
     if (error) { b.disabled = false; b.textContent = 'Ça m’intéresse, ça m’enjaille !'; return toast(errMsg(error)); }
@@ -534,7 +558,7 @@ async function mesAnnonces() {
       ${ds.map(d => `<div class="dem"><b>n° ${d.rang}</b> ${esc(d.demandeur)} ${d.statut === 'contactee' ? '<span class="badge ok">contacté</span>' : ''}
         <div class="muted small">Le ${dateFr(d.created_at, true)}</div>
         ${d.contact ? `<div class="row" style="margin-top:6px"><a class="btn sm soft" data-ct="${d.id}" target="_blank" rel="noopener" href="https://wa.me/${esc(d.contact.replace(/[^0-9]/g, ''))}">WhatsApp</a><a class="btn sm soft" data-ct="${d.id}" href="tel:${esc(d.contact.replace(/[^0-9+]/g, ''))}">Appeler</a></div>`
-          : `<div class="muted small">Ce résident n'a pas partagé ses coordonnées.</div>`}</div>`).join('')}</details>` : ''}
+          : `<div class="muted small">Numéro pas encore partagé : il s'affichera ici dès que ce résident l'ajoutera.</div>`}</div>`).join('')}</details>` : ''}
     ${ouverte(a) ? `<div class="row" style="margin-top:12px">
       <button class="btn sm ghost" data-act="${a.statut === 'reserve' ? 'disponible' : 'reserve'}">${a.statut === 'reserve' ? 'Remettre disponible' : 'Réservé'}</button>
       <button class="btn sm" data-act="${a.type === 'don' ? 'don_effectue' : 'vendu'}">${a.type === 'don' ? 'Don effectué' : 'Vendu'}</button>
@@ -678,7 +702,7 @@ function profil() {
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mon compte</h1>
   <form id="f" class="card" style="margin-top:12px">
     <label for="nom">Nom d'affichage (visible des autres résidents)</label><input id="nom" type="text" maxlength="40" value="${esc(p.nom_affichage)}">
-    <label for="tel">Téléphone (privé)</label><input id="tel" type="tel" value="${esc(p.telephone || '')}" placeholder="+225 07 00 00 00 00">
+    <label for="tel">Téléphone (privé, nécessaire pour être recontacté sur le Market)</label><input id="tel" type="tel" value="${esc(p.telephone || '')}" placeholder="+225 07 00 00 00 00">
     <label class="check"><input id="cons" type="checkbox" ${p.consentement_contact ? 'checked' : ''}> J'accepte que mon téléphone soit communiqué uniquement aux vendeurs des objets pour lesquels je clique « Ça m’intéresse ».</label>
     <h2>Alertes</h2>
     <label class="check"><input id="nq" type="checkbox" ${p.notif_quotidienne ? 'checked' : ''}> Résumé quotidien des nouvelles annonces (une fois par jour au maximum)</label>
