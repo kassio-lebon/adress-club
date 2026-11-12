@@ -13,7 +13,7 @@ let seen = false; try { seen = sessionStorage.getItem('acl-intro') === '1'; sess
 let intro = null; const t0 = Date.now();
 if (!reduce && !seen) {
   intro = document.createElement('div'); intro.className = 'intro intro2';
-  intro.innerHTML = '<div class="intro-stage">' + markSvg('intro-mark') + '<div class="intro-in"><i></i><span>CLUB</span></div></div>';
+  intro.innerHTML = '<div class="intro-stage">' + markSvg('intro-mark') + '<div class="intro-in"><img class="wm" src="logo.png" alt="ADRESS IMMOBILIER"><i></i><span>CLUB</span></div></div>';
   document.body.appendChild(intro);
   // impact ressenti : légère vibration quand les deux traits se croisent
   setTimeout(() => { try { if (matchMedia('(pointer: coarse)').matches && navigator.vibrate) navigator.vibrate([14, 60, 22]); } catch (_) {} }, 950);

@@ -728,3 +728,6 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 .pw-eye:hover,.pw-eye:focus-visible{color:var(--ink);background:#F2F2F3}
 .pw-eye{color:#3F424A}
 .pw-eye svg{width:22px;height:22px}
+
+/* v43 : intro — nom ADRESS IMMOBILIER conservé, seul le petit emblème du logo est masqué */
+.intro2 .intro-in img.wm{height:70px;-webkit-mask-image:linear-gradient(90deg,transparent 33.5%,#000 33.5%),linear-gradient(180deg,transparent 81.5%,#000 81.5%);mask-image:linear-gradient(90deg,transparent 33.5%,#000 33.5%),linear-gradient(180deg,transparent 81.5%,#000 81.5%);-webkit-mask-composite:source-over;mask-composite:add}
