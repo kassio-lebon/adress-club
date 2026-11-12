@@ -152,7 +152,7 @@ function connexion() {
       if (!code || !nom) return show('Le code d\'invitation et le nom d\'affichage sont obligatoires.');
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) return show(error.message.includes('registered') ? 'Un compte existe déjà avec cet e-mail : connectez-vous.' : errMsg(error));
-      if (!data.session) return show('Vérifiez votre boîte e-mail pour confirmer votre adresse, puis connectez-vous.');
+      if (!data.session) { try { localStorage.setItem('acl-inv', JSON.stringify({ code, nom })); } catch (_) {} return show('Dernière étape : ouvrez l’e-mail ADRESS CLUB reçu à ' + email + ' et touchez « Confirmer mon adresse ».'); }
       const r = await sb.rpc('utiliser_invitation', { p_code: code, p_nom_affichage: nom, p_telephone: null, p_consentement: false });
       if (r.error) { await chargerProfil(); return show(errMsg(r.error)); }
     }
@@ -161,14 +161,14 @@ function connexion() {
 }
 
 function activation() {
-  const p = state.profil;
+  const p = state.profil; let inv = {}; try { inv = JSON.parse(localStorage.getItem('acl-inv') || '{}'); } catch (_) {}
   app.innerHTML = `
   <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>${p?.statut === 'desactive' ? 'Accès désactivé' : 'Activez votre accès'}</p></div>
   ${p?.statut === 'desactive' ? `<div class="card">Votre accès a été désactivé (fin d'occupation ou décision ADRESS). Contactez ADRESS IMMOBILIER si c'est une erreur.</div>` : `
   <form id="f" class="card">
     <p class="muted">Saisissez le code d'invitation remis par ADRESS IMMOBILIER pour votre logement.</p>
-    <label for="code">Code d'invitation</label><input id="code" type="text" style="text-transform:uppercase">
-    <label for="nom">Nom d'affichage</label><input id="nom" type="text" maxlength="40">
+    <label for="code">Code d'invitation</label><input id="code" type="text" style="text-transform:uppercase" value="${esc(inv.code || '')}">
+    <label for="nom">Nom d'affichage</label><input id="nom" type="text" maxlength="40" value="${esc(inv.nom || '')}">
     <p class="err" id="err" hidden></p>
     <button class="btn block" style="margin-top:16px">Activer mon accès</button>
   </form>`}
@@ -179,6 +179,7 @@ function activation() {
     ev.preventDefault();
     const r = await sb.rpc('utiliser_invitation', { p_code: f.querySelector('#code').value, p_nom_affichage: f.querySelector('#nom').value, p_telephone: null, p_consentement: false });
     if (r.error) { const e = f.querySelector('#err'); e.textContent = errMsg(r.error); e.hidden = false; return; }
+    try { localStorage.removeItem('acl-inv'); } catch (_) {}
     await chargerProfil(); location.hash = '#/'; router();
   };
 }
