@@ -3,6 +3,7 @@
   "short_name": "ADRESS CLUB",
   "description": "L'espace privé des résidents ADRESS IMMOBILIER",
   "lang": "fr",
+  "id": "./",
   "start_url": "./#/",
   "scope": "./",
   "display": "standalone",

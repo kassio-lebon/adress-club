@@ -201,6 +201,7 @@ const ICO = {
 const estInstallee = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 export async function installer() {
+  if (!window._installPrompt && !estIOS()) await new Promise(r => { let n = 0; const t = setInterval(() => { if (window._installPrompt || ++n > 15) { clearInterval(t); r(); } }, 100); });
   if (window._installPrompt) {
     window._installPrompt.prompt();
     const r = await window._installPrompt.userChoice.catch(() => null);
