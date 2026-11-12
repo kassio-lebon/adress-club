@@ -21,7 +21,7 @@ export const fcfa = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
 export const dateFr = (d, h) => d ? new Date(d).toLocaleDateString('fr-FR', h ? { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' } : { day:'2-digit', month:'2-digit', year:'numeric' }) : '';
 export function toast(msg, ms = 3500) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => t.hidden = true, ms); }
 export const errMsg = (e) => (e && (e.message || e.error_description)) ? String(e.message || e.error_description).replace(/^.*?ERROR:\s*/,'') : 'Une erreur est survenue, réessayez.';
-export const publicUrl = (path) => path ? sb.storage.from('contenus').getPublicUrl(path).data.publicUrl : '';
+export const publicUrl = (path) => !path ? '' : /^https?:\/\//.test(path) ? path : sb.storage.from('contenus').getPublicUrl(path).data.publicUrl;
 function prix(a) { return a.type === 'don' ? 'GRATUIT' : fcfa(a.prix_fcfa); }
 const qs = () => new URLSearchParams((location.hash.split('?')[1]) || '');
 const estFlip = (u) => /^https:\/\/([a-z0-9-]+\.)?heyzine\.com\//i.test(u || '');
