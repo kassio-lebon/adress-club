@@ -264,7 +264,7 @@ async function accueil() {
   if (!ph) { const { data: r1 } = await sb.from('residences').select('photo_path').eq('visible', true).not('photo_path', 'is', null).order('ordre').limit(1); ph = r1 && r1[0] && r1[0].photo_path; }
   const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
   app.innerHTML = '<div class="home">'
-    + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz" style="background-image:url(\'' + esc(publicUrl(ph)) + '\')"></div>' : '')
+    + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<img class="bgz" alt="" referrerpolicy="no-referrer" src="' + esc(publicUrl(ph)) + '">' : '')
     + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>Bonjour ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
     + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
     + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'
@@ -551,15 +551,16 @@ async function residences() {
 // Diaporama « envie » : fondu + zoom lent (Ken Burns), barres de progression façon story, toucher pour avancer
 const DUREE_DIAPO = 3800;
 function chargerImg(url) {
-  return new Promise(ok => { const t = new Image(); t.onload = () => ok(url); t.onerror = () => { const g = url.replace(/-\d+x\d+(\.\w+)$/, '$1'); if (g === url) return ok(''); const f = new Image(); f.onload = () => ok(g); f.onerror = () => ok(''); f.src = g; }; t.src = url; });
+  // sans « referer » : les photos du site adressimmobilier.com s'affichent (protection anti-hotlink)
+  return new Promise(ok => { const t = new Image(); t.referrerPolicy = 'no-referrer'; t.onload = () => ok(url); t.onerror = () => { const g = url.replace(/-\d+x\d+(\.\w+)$/, '$1'); if (g === url) return ok(''); const f = new Image(); f.referrerPolicy = 'no-referrer'; f.onload = () => ok(g); f.onerror = () => ok(''); f.src = g; }; t.src = url; });
 }
 function diaporama(box) {
   const urls = JSON.parse(box.dataset.imgs || '[]'); if (!urls.length) return;
   const reduit = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const slides = urls.map((_, i) => { const d = document.createElement('div'); d.className = 'rs-s k' + (i % 4); box.prepend(d); return d; });
+  const slides = urls.map((_, i) => { const d = document.createElement('img'); d.alt = ''; d.referrerPolicy = 'no-referrer'; d.className = 'rs-s k' + (i % 4); box.prepend(d); return d; });
   const bars = [...box.querySelectorAll('.rs-bars i')], num = box.querySelector('.rs-n');
   const prets = new Map();
-  const prep = (i) => { if (!prets.has(i)) prets.set(i, chargerImg(urls[i]).then(u => { if (u) slides[i].style.backgroundImage = `url("${u}")`; else slides[i].classList.add('ko'); return u; })); return prets.get(i); };
+  const prep = (i) => { if (!prets.has(i)) prets.set(i, chargerImg(urls[i]).then(u => { if (u) slides[i].src = u; else slides[i].classList.add('ko'); return u; })); return prets.get(i); };
   let cur = -1, timer = null, visible = true;
   const aller = async (i) => {
     i = (i + urls.length) % urls.length; await prep(i);
