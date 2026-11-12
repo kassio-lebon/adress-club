@@ -41,38 +41,72 @@ async function stats(box) {
 async function invitations(box) {
   const [res, log, inv] = await Promise.all([
     sb.from('residences').select('id,nom').order('nom'),
-    sb.from('logements').select('id,code,numero,residence_id,residences(nom)').order('code'),
-    sb.from('invitations').select('*, logements(code,numero)').order('created_at', { ascending: false }).limit(100)]);
+    sb.from('logements').select('id,code,numero,residence_id').eq('actif', true).order('code'),
+    sb.from('invitations').select('*, logements(code,numero,residences(nom))').order('created_at', { ascending: false }).limit(200)]);
   const R = res.data || [], Lg = log.data || [];
+  const lienApp = location.origin + location.pathname;
+  const message = (i) => `Bonjour${i.nom_affichage ? ' ' + i.nom_affichage : ''},\n\nBienvenue dans ADRESS CLUB, l'espace privé des résidents ADRESS IMMOBILIER.\n\n1. Ouvrez ${lienApp}\n2. Touchez « J'ai un code d'invitation »\n3. Saisissez votre code : ${i.code}\n\nCe code est personnel et valable jusqu'au ${dateFr(i.expire_le)}.`;
+  const etat = (i) => i.utilisee_par ? `<span class="badge ok">Activé le ${dateFr(i.utilisee_le)}</span>` : new Date(i.expire_le) < new Date() ? '<span class="badge soft">Expiré</span>' : '<span class="badge warn">En attente</span>';
+  if (!R.length) { box.innerHTML = '<div class="card center pad">Ajoutez d’abord une résidence dans l’onglet <a href="#/admin/residences">Résidences</a>.</div>'; return; }
   box.innerHTML = `
-  <div class="card"><h3>Créer un code d'invitation</h3><p class="muted small">Un compte par logement. À remettre au résident après vérification de son éligibilité.</p>
+  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Un code par personne. Plusieurs personnes dans un même logement = plusieurs codes.</p>
   <form id="fi">
-    <label>Logement *</label><select id="lg" required><option value="">Choisir…</option>${Lg.map(l => `<option value="${l.id}">${esc(l.code)} – ${esc(l.residences?.nom || '')} ${esc(l.numero || '')}</option>`).join('')}</select>
-    <div class="grid2"><div><label>Nom d'affichage proposé</label><input id="na" type="text"></div><div><label>Type d'occupant</label><select id="to"><option>Particulier</option><option>Entreprise / organisme</option></select></div></div>
-    <div class="grid2"><div><label>Responsable (entreprise)</label><input id="rp" type="text"></div><div><label>Fin d'occupation</label><input id="fo" type="date"></div></div>
-    <label class="check"><input id="ia" type="checkbox"> Compte ADRESS IMMOBILIER (annonces identifiées ADRESS)</label>
-    <label class="check"><input id="ad" type="checkbox"> Administrateur (accès à cet espace)</label>
-    <button class="btn block">Générer le code</button></form></div>
-  <div class="card" style="margin-top:12px"><h3>Ajouter un logement</h3><form id="fl" class="grid2" style="align-items:end">
-    <div><label>Résidence *</label><select id="lr">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
-    <div><label>Code logement *</label><input id="lc" type="text" placeholder="RES-A12"></div>
-    <div><label>N° / porte</label><input id="ln" type="text"></div>
-    <div><label>Type</label><select id="lt"><option>Appartement</option><option>Villa en résidence</option><option>Villa individuelle</option></select></div>
-    <button class="btn" style="grid-column:1/-1">Ajouter le logement</button></form>
-    ${R.length ? '' : '<p class="err">Créez d\'abord une résidence (onglet Résidences).</p>'}</div>
-  <h2>Codes émis</h2><div style="overflow-x:auto"><table class="adm"><tr><th>Code</th><th>Logement</th><th>État</th><th></th></tr>
-  ${(inv.data || []).map(i => `<tr><td><b>${esc(i.code)}</b>${i.is_admin ? ' <span class="badge soft">admin</span>' : ''}</td><td>${esc(i.logements?.code || '—')}</td>
-    <td>${i.utilisee_par ? `Utilisé le ${dateFr(i.utilisee_le)}` : new Date(i.expire_le) < new Date() ? 'Expiré' : `Valide jusqu'au ${dateFr(i.expire_le)}`}</td>
-    <td>${i.utilisee_par ? '' : `<button class="btn sm ghost" data-cp="${esc(i.code)}">Copier</button> <button class="btn sm danger" data-del="${esc(i.code)}">Supprimer</button>`}</td></tr>`).join('')}</table></div>`;
+    <div class="grid2">
+      <div><label for="ir">Résidence</label><select id="ir">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
+      <div><label for="lg">Logement</label><select id="lg"></select></div>
+    </div>
+    <div id="nvBox" hidden><label for="nv">N° du nouveau logement</label><input id="nv" type="text" placeholder="ex : A12" autocomplete="off"></div>
+    <label for="na">Nom du locataire</label><input id="na" type="text" placeholder="ex : M. Koné" autocomplete="off">
+    <details class="adv"><summary>Options (entreprise, fin de bail, compte ADRESS)</summary>
+      <div class="grid2"><div><label for="to">Type d'occupant</label><select id="to"><option>Particulier</option><option>Entreprise / organisme</option></select></div><div><label for="fo">Fin d'occupation</label><input id="fo" type="date"></div></div>
+      <label for="rp">Responsable (si entreprise)</label><input id="rp" type="text">
+      <label class="check"><input id="ia" type="checkbox"> Compte ADRESS IMMOBILIER (annonces identifiées ADRESS)</label>
+      <label class="check"><input id="ad" type="checkbox"> Administrateur (accès à cet espace)</label>
+    </details>
+    <p class="err" id="err" hidden></p>
+    <button class="btn block" id="go" style="margin-top:14px">Créer l'invitation</button></form>
+    <div id="res" hidden></div></div>
+  <h2>Invitations</h2><div style="overflow-x:auto"><table class="adm"><tr><th>Locataire</th><th>Logement</th><th>Code</th><th>État</th><th></th></tr>
+  ${(inv.data || []).map(i => `<tr data-code="${esc(i.code)}"><td><b>${esc(i.nom_affichage || '—')}</b>${i.is_admin ? ' <span class="badge soft">admin</span>' : ''}</td><td>${esc(i.logements?.residences?.nom || '')}<div class="muted small">${esc(i.logements?.numero || i.logements?.code || '—')}</div></td>
+    <td><b>${esc(i.code)}</b></td><td>${etat(i)}</td>
+    <td>${i.utilisee_par ? '' : `<div class="row" style="flex-wrap:nowrap"><button class="btn sm soft" data-wa>WhatsApp</button><button class="btn sm ghost" data-cp>Copier</button><button class="btn sm ghost" data-del aria-label="Supprimer">×</button></div>`}</td></tr>`).join('')}</table></div>`;
   const $ = (s) => box.querySelector(s);
-  $('#fi').onsubmit = (e) => { e.preventDefault(); action(async () => {
-    const d = check(await sb.from('invitations').insert({ logement_id: $('#lg').value || null, nom_affichage: $('#na').value.trim() || null, type_occupant: $('#to').value, responsable: $('#rp').value.trim() || null, date_fin_occupation: $('#fo').value || null, is_adress: $('#ia').checked, is_admin: $('#ad').checked }).select('code').single());
-    try { await navigator.clipboard.writeText(d.code); } catch (_) {}
-    alert(`Code d'invitation : ${d.code}\n(copié dans le presse-papiers, valable 30 jours)`);
-  }, 'Code créé.'); };
-  $('#fl').onsubmit = (e) => { e.preventDefault(); action(async () => check(await sb.from('logements').insert({ residence_id: $('#lr').value, code: $('#lc').value.trim().toUpperCase(), numero: $('#ln').value.trim() || null, type_logement: $('#lt').value })), 'Logement ajouté.'); };
-  box.querySelectorAll('[data-cp]').forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.cp); toast('Code copié.'); } catch (_) { toast(b.dataset.cp); } });
-  box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirm('Supprimer ce code ?') && action(async () => check(await sb.from('invitations').delete().eq('code', b.dataset.del)), 'Code supprimé.'));
+  const err = (m) => { $('#err').textContent = m; $('#err').hidden = !m; };
+  const majLogements = () => {
+    const l = Lg.filter(x => x.residence_id === $('#ir').value);
+    $('#lg').innerHTML = l.map(x => `<option value="${x.id}">${esc(x.numero || x.code)}</option>`).join('') + '<option value="+">＋ Nouveau logement…</option>';
+    $('#nvBox').hidden = $('#lg').value !== '+';
+  };
+  $('#ir').onchange = majLogements; $('#lg').onchange = () => { $('#nvBox').hidden = $('#lg').value !== '+'; if ($('#lg').value === '+') $('#nv').focus(); };
+  majLogements();
+  const partager = (i) => {
+    const r = $('#res'); r.hidden = false;
+    r.innerHTML = `<div class="inv-ok"><small>Code de ${esc(i.nom_affichage || 'ce locataire')}</small><b>${esc(i.code)}</b>
+      <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(message(i))}">Envoyer par WhatsApp</a><button class="btn ghost" type="button" id="cpm">Copier le message</button></div></div>`;
+    $('#cpm').onclick = async () => { try { await navigator.clipboard.writeText(message(i)); toast('Message copié.'); } catch (_) { toast(i.code); } };
+    r.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  $('#fi').onsubmit = async (e) => {
+    e.preventDefault(); err('');
+    const go = $('#go'); go.disabled = true;
+    try {
+      let logement = $('#lg').value;
+      if (logement === '+') {
+        const num = $('#nv').value.trim().toUpperCase(); if (!num) { go.disabled = false; return err('Indiquez le numéro du logement.'); }
+        const pref = (R.find(r => r.id === $('#ir').value)?.nom || 'RES').normalize('NFD').replace(/[^A-Za-z ]/g, '').split(' ').filter(w => w.length > 2 && !/^(residence|les|des)$/i.test(w)).map(w => w[0]).join('').toUpperCase().slice(0, 4) || 'RES';
+        const d = check(await sb.from('logements').insert({ residence_id: $('#ir').value, code: `${pref}-${num}-${Date.now().toString(36).slice(-3).toUpperCase()}`, numero: num, type_logement: 'Appartement' }).select('id,code,numero,residence_id').single());
+        Lg.push(d); logement = d.id;
+      }
+      const i = check(await sb.from('invitations').insert({ logement_id: logement, nom_affichage: $('#na').value.trim() || null, type_occupant: $('#to').value, responsable: $('#rp').value.trim() || null, date_fin_occupation: $('#fo').value || null, is_adress: $('#ia').checked, is_admin: $('#ad').checked }).select('*').single());
+      toast('Invitation créée.'); partager(i);
+      $('#na').value = ''; $('#nv').value = ''; majLogements(); $('#lg').value = logement; $('#nvBox').hidden = true;
+    } catch (ex) { err(errMsg(ex)); }
+    go.disabled = false;
+  };
+  const trouve = (b) => (inv.data || []).find(x => x.code === b.closest('[data-code]').dataset.code);
+  box.querySelectorAll('[data-wa]').forEach(b => b.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(message(trouve(b))), '_blank', 'noopener'));
+  box.querySelectorAll('[data-cp]').forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(message(trouve(b))); toast('Message copié.'); } catch (_) { toast(trouve(b).code); } });
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirm('Supprimer cette invitation ?') && action(async () => check(await sb.from('invitations').delete().eq('code', trouve(b).code)), 'Invitation supprimée.'));
 }
 
 // ---------- Comptes (§2) ----------
