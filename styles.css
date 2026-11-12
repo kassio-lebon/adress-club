@@ -704,3 +704,9 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 .ask-tel{margin-top:12px;text-align:left;border:1.5px solid #F3D6D8;animation:reveal .45s cubic-bezier(.16,1,.3,1)}
 .ask-tel b{display:block;font-size:16px}
 .ask-tel .row{margin-top:12px}
+
+/* v38 : connexion — emblèmes animés bien visibles aussi sur ordinateur */
+@media (min-width:700px){
+  .login-mark{width:min(60vw,820px);right:-9vw;top:-14vh;opacity:.14}
+  .login-mark.lm2{width:min(50vw,680px);left:-11vw;bottom:-20vh;opacity:.1}
+}
