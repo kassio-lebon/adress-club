@@ -660,3 +660,12 @@ details.adv summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--in
 /* v29 : images en balise img (photos du site ADRESS) */
 img.rs-s{inset:auto;left:-2%;top:-2%;width:104%;height:104%;object-fit:cover;display:block}
 img.bgz{width:100%;height:100%;object-fit:cover;display:block}
+
+/* v30 : photos de résidences nettes, format portrait */
+.rs{aspect-ratio:4/5;max-height:min(78vh,640px)}
+.rs-s.on{animation:rsFade2 .9s ease both,var(--kb) 4.8s linear both}
+@keyframes rsFade2{from{opacity:0}}
+@keyframes kb0{from{transform:scale(1)}to{transform:scale(1.07) translate(-1%,-1%)}}
+@keyframes kb1{from{transform:scale(1.07) translate(1%,1%)}to{transform:scale(1)}}
+@keyframes kb2{from{transform:scale(1) translate(-1%,1%)}to{transform:scale(1.07) translate(1%,-1%)}}
+@keyframes kb3{from{transform:scale(1.07) translate(0,-1%)}to{transform:scale(1) translate(0,1%)}}
