@@ -73,7 +73,7 @@ const actif = () => state.profil?.statut === 'actif';
 
 // ---------- routeur ----------
 const routes = {
-  '': accueil, 'market': market, 'annonce': annonce, 'publier': publier, 'mes-annonces': mesAnnonces,
+  '': accueil, 'market': market, 'annonce': annonce, 'publier': publier, 'modifier': modifier, 'mes-annonces': mesAnnonces,
   'residences': residences, 'nouveautes': nouveautes, 'flip-immo': flip, 'bonnes-adresses': bonnesAdresses,
   'notifications': notifications, 'profil': profil, 'avis': avis, 'lire': lire, 'admin': (p) => renderAdmin(app, p)
 };
@@ -82,7 +82,7 @@ async function router() {
   const [name, param] = path.split('/');
   document.getElementById('top').hidden = !actif();
   document.getElementById('nav').hidden = !actif();
-  const sect = ({ '': 'accueil', annonce: 'market' })[name] ?? name;
+  const sect = ({ '': 'accueil', annonce: 'market', modifier: 'mes-annonces' })[name] ?? name;
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === sect));
   window.scrollTo(0, 0);
   if (!state.session) return connexion();
@@ -258,7 +258,7 @@ async function annonce(id) {
   <div class="tags"><span class="tag">${esc(a.categorie)}</span><span class="tag">${esc(a.etat)}</span>${a.residence ? `<span class="tag">${esc(a.residence)}</span>` : ''}</div>
   ${a.description ? `<p style="white-space:pre-line">${esc(a.description)}</p>` : ''}
   <p class="muted">Publié par ${esc(a.vendeur)} le ${dateFr(a.date_publication)}</p>
-  ${a.est_a_moi ? `<a class="btn ghost block" href="#/mes-annonces">Gérer mon annonce</a>`
+  ${a.est_a_moi ? `<div class="row"><a class="btn block" href="#/modifier/${a.id}">Modifier</a><a class="btn ghost block" href="#/mes-annonces">Gérer (réservé, vendu…)</a></div>`
     : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'Demande envoyée ✓' : 'Je suis intéressé'}</button>
       <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
     : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
@@ -279,6 +279,65 @@ async function annonce(id) {
     if (m === null) return;
     const { error } = await sb.rpc('signaler_annonce', { p_id: a.id, p_motif: 'Autre', p_commentaire: m });
     toast(error ? errMsg(error) : 'Merci, ADRESS examinera cette annonce.');
+  };
+}
+
+// ---------- Modifier une annonce (vendeur) ----------
+async function modifier(id) {
+  const { data: a } = await sb.from('annonces').select('*').eq('id', id).maybeSingle();
+  if (!a || a.vendeur_id !== state.session.user.id || !['disponible', 'reserve'].includes(a.statut) || a.retiree_par_adress) {
+    app.innerHTML = `<a class="back" href="#/mes-annonces">‹ Mes annonces</a><div class="card center pad">Cette annonce ne peut plus être modifiée.</div>`; return;
+  }
+  const max = state.params.max_photos || 5;
+  let gardees = [...a.photos], files = [];
+  const urls = await photosUrls(a.photos); const urlDe = Object.fromEntries(a.photos.map((p, i) => [p, urls[i]]));
+  app.innerHTML = `
+  <a class="back" href="#/mes-annonces">‹ Mes annonces</a><h1>Modifier l’annonce</h1><p class="muted">${a.type === 'don' ? 'Objet à donner' : 'Objet à vendre'} · les intéressés gardent leur rang.</p>
+  <form id="f" class="narrow" novalidate>
+  <label>Photos (1 à ${max}) *</label>
+  <div class="thumbs" id="th"></div>
+  <label class="drop" for="ph">${ICO.camera}Ajouter des photos<small>Jusqu’à ${max} photos au total</small></label>
+  <input id="ph" type="file" accept="image/*" multiple class="sr">
+  <label for="ti">Titre *</label><input id="ti" type="text" maxlength="80" value="${esc(a.titre)}">
+  <div class="grid2">
+    <div><label for="ca">Catégorie *</label><select id="ca">${CATEGORIES.map(c => `<option ${c === a.categorie ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+    <div><label for="et">État *</label><select id="et">${ETATS.map(c => `<option ${c === a.etat ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+  </div>
+  <label for="de">Description courte</label><textarea id="de" maxlength="1000">${esc(a.description || '')}</textarea>
+  ${a.type === 'vente' ? `<label for="px">Prix (FCFA) *</label><input id="px" type="number" inputmode="numeric" min="1" step="1" value="${a.prix_fcfa || ''}">` : '<p class="muted" style="margin-top:14px">Votre objet reste affiché <b>GRATUIT</b>.</p>'}
+  <p class="err" id="err" hidden></p>
+  <button class="btn block" id="go" style="margin-top:16px">Enregistrer les modifications</button>
+  <a class="btn ghost block" style="margin-top:8px" href="#/mes-annonces">Annuler</a>
+  </form>`;
+  const $ = (s) => app.querySelector(s);
+  const err = (m) => { $('#err').textContent = m; $('#err').hidden = !m; };
+  const dessiner = () => {
+    $('#th').innerHTML = gardees.map((p, i) => `<div class="th"><img src="${esc(urlDe[p])}" alt="Photo ${i + 1}"><button type="button" data-rg="${i}" aria-label="Retirer la photo">×</button></div>`).join('')
+      + files.map((f, i) => `<div class="th"><img src="${URL.createObjectURL(f)}" alt="Nouvelle photo ${i + 1}"><button type="button" data-rn="${i}" aria-label="Retirer la photo">×</button></div>`).join('');
+    app.querySelectorAll('[data-rg]').forEach(b => b.onclick = () => { gardees.splice(+b.dataset.rg, 1); dessiner(); });
+    app.querySelectorAll('[data-rn]').forEach(b => b.onclick = () => { files.splice(+b.dataset.rn, 1); dessiner(); });
+  };
+  dessiner();
+  $('#ph').onchange = (e) => { const place = max - gardees.length; files = files.concat([...e.target.files]).slice(0, Math.max(0, place)); if (gardees.length + files.length >= max) toast(`${max} photos maximum.`); e.target.value = ''; dessiner(); };
+  $('#f').onsubmit = async (ev) => {
+    ev.preventDefault(); err('');
+    const titre = $('#ti').value.trim(), px = a.type === 'vente' ? parseInt($('#px').value, 10) : null;
+    if (!gardees.length && !files.length) return err('Gardez ou ajoutez au moins une photo.');
+    if (titre.length < 2) return err('Le titre est obligatoire.');
+    if (a.type === 'vente' && !(px > 0)) return err('Le prix est obligatoire pour une vente.');
+    const go = $('#go'); go.disabled = true; go.textContent = files.length ? 'Envoi des photos…' : 'Enregistrement…';
+    try {
+      const uid = state.session.user.id, paths = [...gardees];
+      for (const f of files) {
+        const blob = await compress(f), path = `${uid}/${crypto.randomUUID()}.jpg`;
+        const { error } = await sb.storage.from('annonces').upload(path, blob, { contentType: 'image/jpeg' });
+        if (error) throw error; paths.push(path);
+      }
+      const { error } = await sb.rpc('modifier_annonce', { p_id: a.id, p_titre: titre, p_categorie: $('#ca').value, p_etat: $('#et').value, p_description: $('#de').value.trim(), p_prix: px, p_photos: paths });
+      if (error) throw (/schema cache|could not find/i.test(error.message) ? new Error('La modification sera disponible très bientôt (mise à jour du serveur en cours).') : error);
+      a.photos.filter(p => !paths.includes(p)).forEach(p => signedCache.delete(p));
+      toast('Annonce mise à jour.'); location.hash = `#/annonce/${a.id}`;
+    } catch (e) { go.disabled = false; go.textContent = 'Enregistrer les modifications'; err(errMsg(e)); }
   };
 }
 
@@ -376,7 +435,7 @@ async function mesAnnonces() {
       <button class="btn sm ghost" data-act="${a.statut === 'reserve' ? 'disponible' : 'reserve'}">${a.statut === 'reserve' ? 'Remettre disponible' : 'Réservé'}</button>
       <button class="btn sm" data-act="${a.type === 'don' ? 'don_effectue' : 'vendu'}">${a.type === 'don' ? 'Don effectué' : 'Vendu'}</button>
       <button class="btn sm ghost" data-act="retire">Retirer</button></div>` : ''}
-    ${(ouverte(a) || a.statut === 'expire') && !a.retiree_par_adress ? `<button class="btn sm soft block" style="margin-top:8px" data-act="prolonger">Prolonger de ${prol} jours</button>` : ''}
+    ${(ouverte(a) || a.statut === 'expire') && !a.retiree_par_adress ? `<div class="row" style="margin-top:8px">${ouverte(a) ? `<a class="btn sm soft" href="#/modifier/${a.id}">Modifier</a>` : ''}<button class="btn sm soft" data-act="prolonger">Prolonger de ${prol} jours</button></div>` : ''}
   </div>`; }).join('') || '<div class="card center pad">Vous n\'avez encore publié aucune annonce.<br><br><a class="btn" href="#/publier">+ Publier</a></div>'}</div>`;
   app.querySelectorAll('details[data-lire]').forEach(d => { if (d.dataset.lire) sb.rpc('marquer_demandes_lues', { p_annonce: d.dataset.lire }).then(majCompteurs); });
   app.querySelectorAll('[data-ct]').forEach(l => l.addEventListener('click', () => sb.rpc('marquer_contactee', { p_demande: l.dataset.ct })));
