@@ -812,6 +812,19 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); wind
 window.addEventListener('appinstalled', () => { window._installPrompt = null; document.querySelectorAll('.install-card').forEach(x => x.remove()); });
 window.addEventListener('hashchange', router);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
+// Œil 👁 sur tous les champs mot de passe : afficher / masquer ce qu'on tape
+const OEIL = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OEIL_BARRE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4"/><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function yeux(root) {
+  root.querySelectorAll('input[type=password]:not([data-oeil])').forEach(inp => {
+    inp.dataset.oeil = '1';
+    const w = document.createElement('span'); w.className = 'pw'; inp.before(w); w.appendChild(inp);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pw-eye'; b.innerHTML = OEIL; b.setAttribute('aria-label', 'Afficher le mot de passe');
+    b.onclick = () => { const vis = inp.type === 'password'; inp.type = vis ? 'text' : 'password'; b.innerHTML = vis ? OEIL_BARRE : OEIL; b.setAttribute('aria-label', vis ? 'Masquer le mot de passe' : 'Afficher le mot de passe'); inp.focus({ preventScroll: true }); };
+    w.appendChild(b);
+  });
+}
+new MutationObserver(() => yeux(document)).observe(document.body, { childList: true, subtree: true });
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } if (ev === 'PASSWORD_RECOVERY') { state.recup = true; setTimeout(router, 0); } });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });

@@ -720,3 +720,9 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 .intro2 .intro-in span{font-size:clamp(30px,8vw,44px);font-weight:800;letter-spacing:.38em;margin-right:-.38em;color:var(--ink)}
 .intro2 .intro-in i{height:4px}
 .aide-mdp{margin-top:16px;padding:12px 14px;border-radius:12px;background:#F6F6F7;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+
+/* v41 : œil pour afficher le mot de passe */
+.pw{position:relative;display:block}
+.pw input{padding-right:48px!important;width:100%}
+.pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;border-radius:10px;padding:0}
+.pw-eye:hover,.pw-eye:focus-visible{color:var(--ink);background:#F2F2F3}
