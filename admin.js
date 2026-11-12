@@ -133,8 +133,24 @@ async function comptes(box) {
   ${(data || []).map(p => `<tr data-id="${p.id}"><td><b>${esc(p.nom_affichage || '(sans nom)')}</b>${p.is_admin ? ' <span class="badge soft">admin</span>' : ''}${p.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${esc(p.type_occupant)} · ${esc(p.residences?.nom || '')}</div></td>
     <td>${p.logements ? esc(p.logements.numero || p.logements.code) : '—'}</td><td>${p.statut === 'actif' ? '<span class="badge ok">actif</span>' : p.statut === 'desactive' ? '<span class="badge soft">retiré</span>' : 'en attente'}</td>
     <td><input type="date" data-fin value="${p.date_fin_occupation || ''}" style="min-width:140px"></td>
-    <td>${p.id === state.session.user.id ? '' : p.statut === 'actif' ? '<button class="btn sm danger" data-st="desactive">Retirer</button>' : p.statut === 'desactive' ? '<span class="muted small">Nouveau code pour revenir</span>' : ''}</td></tr>`).join('')}</table></div>`;
+    <td>${p.id === state.session.user.id ? '' : `<div class="row" style="flex-wrap:nowrap">${p.statut === 'actif' ? '<button class="btn sm danger" data-st="desactive">Retirer</button>' : p.statut === 'desactive' ? '<span class="muted small">Nouveau code pour revenir</span>' : ''}<button class="btn sm ghost" data-mdp title="Mot de passe oublié">Mot de passe</button></div>`}</td></tr>`).join('')}</table></div>
+  <div id="mdpRes"></div>`;
   box.querySelectorAll('[data-fin]').forEach(i => i.onchange = () => action(async () => check(await sb.from('profiles').update({ date_fin_occupation: i.value || null }).eq('id', i.closest('tr').dataset.id)), 'Date enregistrée.'));
+  box.querySelectorAll('[data-mdp]').forEach(b => b.onclick = async () => {
+    const tr = b.closest('tr'), p = (data || []).find(x => x.id === tr.dataset.id); if (!p) return;
+    if (!confirm('Donner un mot de passe provisoire à ' + (p.nom_affichage || 'ce compte') + ' ?\n\nSon ancien mot de passe ne fonctionnera plus. Il pourra le changer ensuite dans Mon compte.')) return;
+    const al = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint32Array(6));
+    const mdp = 'Adress-' + [...r].map(n => al[n % al.length]).join('');
+    b.disabled = true; const { data: email, error } = await sb.rpc('admin_reinitialiser_mdp', { p_user: p.id, p_mdp: mdp }); b.disabled = false;
+    if (error) return toast(errMsg(error));
+    const lien = location.origin + location.pathname;
+    const msg = `Bonjour${p.nom_affichage ? ' ' + p.nom_affichage : ''},\n\nVoici votre mot de passe provisoire ADRESS CLUB :\n${mdp}\n\n1. Ouvrez ${lien}\n2. Connectez-vous avec votre e-mail (${email}) et ce mot de passe\n3. Changez-le dans Mon compte › Changer mon mot de passe`;
+    const res = box.querySelector('#mdpRes');
+    res.innerHTML = `<div class="inv-ok"><small>Mot de passe provisoire de ${esc(p.nom_affichage || email)} (${esc(email)})</small><b style="letter-spacing:.06em;font-size:24px">${esc(mdp)}</b>
+      <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Envoyer par WhatsApp</a><button class="btn ghost" type="button" id="cpm2">Copier le message</button></div></div>`;
+    res.querySelector('#cpm2').onclick = async () => { try { await navigator.clipboard.writeText(msg); toast('Message copié.'); } catch (_) { toast(mdp); } };
+    res.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
   box.querySelectorAll('[data-st]').forEach(b => b.onclick = () => confirm('Retirer ce locataire ?\n\n• Son accès à ADRESS CLUB est coupé\n• Son logement redevient libre\n• Ses annonces sont mises en pause (masquées du Market)\n\nRien n\'est perdu : avec un nouveau code, il retrouve ses annonces, favoris et historique.') && action(async () => check(await sb.from('profiles').update({ statut: b.dataset.st }).eq('id', b.closest('tr').dataset.id))));
 }
 

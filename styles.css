@@ -714,3 +714,9 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 /* v39 : formulaire en mode modification */
 .card.editing{outline:2px solid var(--red);outline-offset:2px;animation:reveal .45s cubic-bezier(.16,1,.3,1)}
 .card.editing h3{color:var(--red)}
+
+/* v40 : intro sans petit logo, CLUB plus grand ; mot de passe oublié */
+.intro2 .intro-in{margin-top:6px}
+.intro2 .intro-in span{font-size:clamp(30px,8vw,44px);font-weight:800;letter-spacing:.38em;margin-right:-.38em;color:var(--ink)}
+.intro2 .intro-in i{height:4px}
+.aide-mdp{margin-top:16px;padding:12px 14px;border-radius:12px;background:#F6F6F7;font-size:13.5px;line-height:1.5;color:var(--ink-2)}

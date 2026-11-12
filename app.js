@@ -4,6 +4,7 @@ import { renderAdmin } from './admin.js';
 
 export const SUPABASE_URL = 'https://xvevjlovjpeqfpzfihrj.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_oPj4LrfV0uvN95MmpTPl8A_x5XLxVcj';
+const RECUP = /type=recovery/.test(location.hash);
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
 export const CATEGORIES = ['Meubles','Électroménager','Décoration','Enfants et bébé','Vêtements et accessoires','Électronique','Sport et loisirs','Maison et jardin','Autre'];
@@ -126,6 +127,7 @@ async function router() {
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === sect));
   window.scrollTo(0, 0);
   if (!state.session) return connexion();
+  if (state.recup || RECUP) { state.recup = true; return nouveauMdp(); }
   if (!actif()) return activation();
   const view = routes[name] || accueil;
   app.classList.remove('page-in');
@@ -150,6 +152,7 @@ function connexion() {
     <p class="hint" id="mdpHint" hidden>8 caractères minimum.</p>
     <p class="err" id="err" hidden></p>
     <button class="btn block" style="margin-top:16px" id="go">Se connecter</button>
+    <p class="center small" id="oubliP" style="margin:12px 0 0"><a href="#" id="oubli">Mot de passe oublié ?</a></p>
   </form>
   <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p>
   ${estInstallee() ? '' : '<p class="center" style="margin-top:6px"><button class="linkbtn" type="button" id="inst">📲 Installer l’application sur mon téléphone</button></p>'}</div>`;
@@ -160,7 +163,9 @@ function connexion() {
     app.querySelector('#sign').hidden = mode !== 'signup'; app.querySelector('#mdpHint').hidden = mode !== 'signup';
     app.querySelector('#go').textContent = mode === 'signup' ? 'Créer mon accès' : 'Se connecter';
     app.querySelector('#mdp').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+    app.querySelector('#oubliP').hidden = mode === 'signup';
   });
+  app.querySelector('#oubli').onclick = (e) => { e.preventDefault(); motDePasseOublie(app.querySelector('#email').value.trim()); };
   app.querySelector('#f').onsubmit = async (ev) => {
     ev.preventDefault();
     const err = app.querySelector('#err'); err.hidden = true;
@@ -230,6 +235,44 @@ export async function deconnecter(btn) {
   try { await Promise.race([sb.auth.signOut({ scope: 'local' }), new Promise(r => setTimeout(r, 2500))]); } catch (_) {}
   try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token/.test(k) || k === 'acl-sig').forEach(k => localStorage.removeItem(k)); } catch (_) {}
   location.hash = '#/'; location.reload();
+}
+// Mot de passe oublié : lien par e-mail si possible, sinon mot de passe provisoire donné par ADRESS
+function motDePasseOublie(email0) {
+  const f = app.querySelector('#f');
+  f.innerHTML = `<h3 style="margin-top:0">Mot de passe oublié</h3>
+    <p class="muted small">Indiquez l'e-mail de votre compte : nous vous envoyons un lien pour choisir un nouveau mot de passe.</p>
+    <label for="em2">E-mail</label><input id="em2" type="email" autocomplete="email" value="${esc(email0 || '')}">
+    <p class="err" id="er2" hidden></p><div id="ok2" hidden></div>
+    <button class="btn block" style="margin-top:14px" id="go2" type="button">Recevoir le lien</button>
+    <div class="aide-mdp"><b>Pas d'e-mail reçu ?</b> Contactez ADRESS IMMOBILIER : un administrateur vous donne un <b>mot de passe provisoire</b> en quelques secondes, à changer ensuite dans Mon compte.</div>
+    <p class="center small" style="margin:12px 0 0"><a href="#" id="ret">‹ Retour à la connexion</a></p>`;
+  f.querySelector('#ret').onclick = (e) => { e.preventDefault(); connexion(); };
+  f.querySelector('#go2').onclick = async () => {
+    const em = f.querySelector('#em2').value.trim(), er = f.querySelector('#er2'), b = f.querySelector('#go2');
+    er.hidden = true; if (!/^\S+@\S+\.\S+$/.test(em)) { er.textContent = 'Indiquez une adresse e-mail valide.'; er.hidden = false; return; }
+    b.disabled = true; b.textContent = 'Envoi…';
+    const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + location.pathname });
+    b.hidden = true; const ok = f.querySelector('#ok2'); ok.hidden = false;
+    ok.innerHTML = error ? `<p class="err">L'e-mail n'a pas pu être envoyé pour le moment. Demandez un mot de passe provisoire à ADRESS IMMOBILIER (voir ci-dessous).</p>`
+      : `<div class="inv-ok" style="text-align:left"><b style="font-size:16px;letter-spacing:0;margin:0 0 6px">E-mail envoyé ✓</b>Si un compte existe pour ${esc(em)}, vous allez recevoir un lien. Ouvrez-le sur ce téléphone pour choisir un nouveau mot de passe. Pensez à regarder dans les courriers indésirables.</div>`;
+  };
+}
+function nouveauMdp() {
+  app.innerHTML = `<div class="login"><div class="login-brand"><h1>ADRESS <span>CLUB</span></h1><p>Choisissez votre nouveau mot de passe</p></div>
+    <form id="fn" class="card" novalidate><label for="n1">Nouveau mot de passe</label><input id="n1" type="password" autocomplete="new-password" minlength="8">
+    <label for="n2">Confirmer le mot de passe</label><input id="n2" type="password" autocomplete="new-password" minlength="8">
+    <p class="hint">8 caractères minimum.</p><p class="err" id="ern" hidden></p>
+    <button class="btn block" style="margin-top:14px" id="gon">Enregistrer et continuer</button></form></div>`;
+  const $ = (s) => app.querySelector(s);
+  $('#fn').onsubmit = async (e) => {
+    e.preventDefault(); const er = $('#ern'), a = $('#n1').value, b = $('#n2').value; er.hidden = true;
+    if (a.length < 8) { er.textContent = '8 caractères minimum.'; er.hidden = false; return; }
+    if (a !== b) { er.textContent = 'Les deux mots de passe ne sont pas identiques.'; er.hidden = false; return; }
+    $('#gon').disabled = true;
+    const { error } = await sb.auth.updateUser({ password: a });
+    if (error) { er.textContent = errMsg(error); er.hidden = false; $('#gon').disabled = false; return; }
+    state.recup = false; toast('Mot de passe enregistré.'); await chargerProfil(); location.hash = '#/'; router();
+  };
 }
 export async function installer() {
   if (!window._installPrompt && !estIOS()) await new Promise(r => { let n = 0; const t = setInterval(() => { if (window._installPrompt || ++n > 15) { clearInterval(t); r(); } }, 100); });
@@ -716,6 +759,10 @@ function profil() {
     <label class="check"><input id="ni" type="checkbox" ${p.notif_interet ? 'checked' : ''}> M'alerter quand un résident est intéressé par mon annonce</label>
     <button class="btn block" style="margin-top:12px">Enregistrer</button>
   </form>
+  <form class="card" id="fmdp" style="margin-top:12px" novalidate><h2 style="margin-top:0">Changer mon mot de passe</h2>
+    <label for="m1">Nouveau mot de passe</label><input id="m1" type="password" autocomplete="new-password" minlength="8">
+    <label for="m2">Confirmer</label><input id="m2" type="password" autocomplete="new-password" minlength="8">
+    <p class="err" id="erm" hidden></p><button class="btn ghost block" style="margin-top:12px" id="gom">Changer le mot de passe</button></form>
   <div class="card" style="margin-top:12px"><h2 style="margin-top:0">Installer l'appli : les vidéos</h2><p class="muted small">À regarder ou à montrer à un voisin : 40 secondes pour avoir ADRESS CLUB sur l'écran d'accueil.</p>
     <div class="tuto-grid"><div><b>Android</b>${videoTuto('android')}</div><div><b>iPhone</b>${videoTuto('ios')}</div></div></div>
   <div class="card" style="margin-top:12px"><p class="muted small">Résidence : ${esc(p.residence?.nom || '—')}<br>Compte activé le ${dateFr(p.date_activation)}</p>
@@ -728,6 +775,14 @@ function profil() {
     await chargerProfil(); toast('Préférences enregistrées.');
   };
   $('#out').onclick = () => deconnecter($('#out'));
+  $('#fmdp').onsubmit = async (e) => {
+    e.preventDefault(); const er = $('#erm'), a = $('#m1').value, b = $('#m2').value; er.hidden = true;
+    if (a.length < 8) { er.textContent = '8 caractères minimum.'; er.hidden = false; return; }
+    if (a !== b) { er.textContent = 'Les deux mots de passe ne sont pas identiques.'; er.hidden = false; return; }
+    $('#gom').disabled = true; const { error } = await sb.auth.updateUser({ password: a }); $('#gom').disabled = false;
+    if (error) { er.textContent = errMsg(error); er.hidden = false; return; }
+    $('#m1').value = $('#m2').value = ''; toast('Mot de passe changé.');
+  };
   if (!estInstallee()) { $('#install').hidden = false; $('#install').onclick = installer; }
 }
 
@@ -757,7 +812,7 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); wind
 window.addEventListener('appinstalled', () => { window._installPrompt = null; document.querySelectorAll('.install-card').forEach(x => x.remove()); });
 window.addEventListener('hashchange', router);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
-sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } });
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } if (ev === 'PASSWORD_RECOVERY') { state.recup = true; setTimeout(router, 0); } });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });
 await chargerProfil();
