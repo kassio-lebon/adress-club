@@ -28,6 +28,24 @@ const estFlip = (u) => /^https:\/\/([a-z0-9-]+\.)?heyzine\.com\//i.test(u || '')
 const lienFlip = (u, t) => estFlip(u) ? '#/lire?' + new URLSearchParams({ u, t: t || '' }).toString() : u;
 const track = (type, ref_id) => sb.from('evenements').insert({ type, ref_id: ref_id || null }).then(() => {});
 
+// recherche instantanée : filtre les éléments à chaque frappe (sans accents ni majuscules)
+const norm = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export function filtreLive(input, items, vide) {
+  const run = () => {
+    const mots = norm(input.value).split(/\s+/).filter(Boolean); let n = 0;
+    items().forEach(el => { const ok = mots.every(m => norm(el.textContent).includes(m)); el.hidden = !ok; if (ok) n++; });
+    if (vide) { vide.hidden = n > 0 || !mots.length; vide.textContent = 'Aucun résultat pour « ' + input.value.trim() + ' ».'; }
+  };
+  input.addEventListener('input', run); run(); return run;
+}
+export function barreRecherche(avant, items, placeholder) {
+  if (!avant) return;
+  const w = document.createElement('div'); w.className = 'live-search';
+  w.innerHTML = '<label class="sr">Rechercher</label><input type="search" placeholder="' + esc(placeholder) + '" autocomplete="off">';
+  const vide = document.createElement('p'); vide.className = 'muted center no-res'; vide.hidden = true;
+  avant.before(w); avant.after(vide); filtreLive(w.querySelector('input'), items, vide);
+}
+
 const signedCache = new Map();
 async function photosUrls(paths) {
   const need = paths.filter(p => p && !signedCache.has(p));
@@ -205,7 +223,6 @@ async function market() {
   const p = qs(); const type = p.get('type') || ''; const q = (p.get('q') || '').trim(); const vue = p.get('vue') || '';
   let req = sb.from(vue === 'favoris' ? 'v_favoris' : 'v_market').select('*').order('date_publication', { ascending: false }).limit(80);
   if (type) req = req.eq('type', type);
-  if (q) req = req.ilike('titre', `%${q.replace(/[%_]/g, '')}%`);
   const [{ data, error }, fav] = await Promise.all([req, sb.from('favoris').select('annonce_id')]);
   if (error) throw error;
   const favs = new Set((fav.data || []).map(f => f.annonce_id));
@@ -230,7 +247,11 @@ async function market() {
   : vue === 'favoris'
     ? `<div class="card center pad empty-fav"><div class="ef-heart">♡</div><b>Aucun favori pour le moment</b><p class="muted">Touchez le cœur ♡ sur une annonce d’un autre résident pour la retrouver ici.<br>Vos propres annonces n’ont pas de cœur : elles sont dans « Mes annonces ».</p><a class="btn" href="#/market">Parcourir le Market</a></div>`
     : `<div class="card center pad">${q ? 'Aucune annonce ne correspond à « ' + esc(q) + ' ».' : 'Aucune annonce pour le moment.'}<br><br><a class="btn" href="#/publier">+ Publier</a></div>`}`;
-  app.querySelector('#s').onsubmit = (e) => { e.preventDefault(); location.hash = lien({ q: app.querySelector('#q').value.trim() }); };
+  app.querySelector('#s').onsubmit = (e) => e.preventDefault();
+  const qi = app.querySelector('#q'), grille = app.querySelector('.grid2');
+  if (grille) { const vide = document.createElement('p'); vide.className = 'muted center no-res'; vide.hidden = true; grille.after(vide);
+    filtreLive(qi, () => grille.querySelectorAll('.item'), vide);
+    qi.addEventListener('input', () => { try { history.replaceState(null, '', lien({ q: qi.value.trim() })); } catch (_) {} }); }
   app.querySelectorAll('[data-fav]').forEach(b => b.onclick = async () => {
     const id = b.dataset.fav, on = b.textContent === '♥';
     const r = on ? await sb.from('favoris').delete().eq('annonce_id', id) : await sb.from('favoris').insert({ user_id: state.session.user.id, annonce_id: id });
@@ -405,9 +426,10 @@ async function mesAnnonces() {
     const ids = (data || []).map(d => d.annonce_id);
     const { data: ouvertes } = ids.length ? await sb.from('v_market').select('id,titre,statut').in('id', ids) : { data: [] };
     const m = new Map((ouvertes || []).map(o => [o.id, o]));
-    app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes demandes</h1>${tabs}<div class="list">${(data || []).map(d => { const o = m.get(d.annonce_id); return `
+    app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes demandes</h1>${tabs}<div class="list" id="lst">${(data || []).map(d => { const o = m.get(d.annonce_id); return `
       <div class="card"><b>${o ? `<a href="#/annonce/${d.annonce_id}">${esc(o.titre)}</a>` : 'Annonce clôturée'}</b>
       <div class="muted small">Demande n° ${d.rang} du ${dateFr(d.created_at, true)}${o?.statut === 'reserve' ? ' · réservé par le vendeur' : ''}</div></div>`; }).join('') || '<div class="card center pad">Vous n\'avez envoyé aucune demande.</div>'}</div>`;
+    if ((data || []).length) barreRecherche(app.querySelector('#lst'), () => app.querySelectorAll('#lst > .card'), 'Rechercher une demande…');
     return;
   }
   const [{ data: mes, error }, { data: dem }] = await Promise.all([
@@ -420,7 +442,7 @@ async function mesAnnonces() {
   const prol = state.params.duree_prolongation_jours || 30;
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes annonces</h1>${tabs}
   <p class="muted">Contactez les intéressés dans l'ordre d'arrivée des demandes.</p>
-  <div class="list">${(mes || []).map((a, i) => { const ds = parAnnonce(a.id), nl = ds.filter(d => !d.lue).length; return `
+  <div class="list" id="lst">${(mes || []).map((a, i) => { const ds = parAnnonce(a.id), nl = ds.filter(d => !d.lue).length; return `
   <div class="card" data-id="${a.id}">
     <div style="display:flex;gap:12px"><div class="ph" style="width:72px;height:72px;flex:none;border-radius:10px;background-image:url('${esc(urls[i])}')"></div>
     <div style="min-width:0"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(a.titre)}</a>` : esc(a.titre)}</b>
@@ -437,6 +459,7 @@ async function mesAnnonces() {
       <button class="btn sm ghost" data-act="retire">Retirer</button></div>` : ''}
     ${(ouverte(a) || a.statut === 'expire') && !a.retiree_par_adress ? `<div class="row" style="margin-top:8px">${ouverte(a) ? `<a class="btn sm soft" href="#/modifier/${a.id}">Modifier</a>` : ''}<button class="btn sm soft" data-act="prolonger">Prolonger de ${prol} jours</button></div>` : ''}
   </div>`; }).join('') || '<div class="card center pad">Vous n\'avez encore publié aucune annonce.<br><br><a class="btn" href="#/publier">+ Publier</a></div>'}</div>`;
+  if ((mes || []).length) { barreRecherche(app.querySelector('#lst'), () => app.querySelectorAll('#lst > .card[data-id]'), 'Rechercher dans mes annonces…'); const qs0 = app.querySelector('.live-search input'); if (qs0 && mesAnnonces._q) { qs0.value = mesAnnonces._q; qs0.dispatchEvent(new Event('input')); } if (qs0) qs0.addEventListener('input', () => mesAnnonces._q = qs0.value); }
   app.querySelectorAll('details[data-lire]').forEach(d => { if (d.dataset.lire) sb.rpc('marquer_demandes_lues', { p_annonce: d.dataset.lire }).then(majCompteurs); });
   app.querySelectorAll('[data-ct]').forEach(l => l.addEventListener('click', () => sb.rpc('marquer_contactee', { p_demande: l.dataset.ct })));
   app.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {

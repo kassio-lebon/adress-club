@@ -1,5 +1,5 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
-import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES, FILTRES_BP, compress } from './app.js';
+import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES, FILTRES_BP, compress, barreRecherche } from './app.js';
 
 const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
@@ -12,6 +12,10 @@ export async function renderAdmin(app, ong) {
   <div class="tabs chips">${ONGLETS.map(([k, l]) => `<a class="chip ${k === ong ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div><div id="adm"></div>`;
   const box = app.querySelector('#adm');
   await ({ stats, invitations, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
+  if (ong !== 'parametres') {
+    box.querySelectorAll('table.adm').forEach(t => { if (t.querySelectorAll('tr').length > 3) barreRecherche(t.parentElement.matches('div[style*="overflow"]') ? t.parentElement : t, () => [...t.querySelectorAll('tr')].slice(1), 'Rechercher…'); });
+    box.querySelectorAll('.list').forEach(l => { if (l.children.length > 3) barreRecherche(l, () => [...l.children], 'Rechercher…'); });
+  }
 }
 const rerender = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
 async function uploadPublic(file, dossier) {
