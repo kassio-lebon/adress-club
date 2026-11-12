@@ -221,10 +221,10 @@ async function market() {
     <a class="chip ${vue === 'favoris' ? 'on' : ''}" href="${lien({ vue: 'favoris', type: '' })}">♥ Favoris</a>
   </div>
   ${data.length ? `<div class="grid2 grid3">${data.map((a, i) => `
-    <div class="card item">
+    <div class="card item${a.statut === 'reserve' ? ' is-res' : ''}">
       <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urls[i])}')" role="img" aria-label="${esc(a.titre)}"></div>
-      ${a.statut === 'reserve' ? '<span class="badge st">Réservé</span>' : a.is_adress ? '<span class="badge st">ADRESS IMMOBILIER</span>' : ''}
-      <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc(a.residence || '')}</div></div></a>
+      ${a.statut === 'reserve' ? '<span class="badge st warn">Réservé</span>' : a.est_a_moi ? '<span class="badge st">Votre annonce</span>' : a.type === 'don' ? '<span class="badge st">À donner</span>' : ''}
+      <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc([a.categorie, a.residence || (a.is_adress ? 'ADRESS IMMOBILIER' : '')].filter(Boolean).join(' · '))}</div></div></a>
       ${a.est_a_moi ? '' : `<button class="fav" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${favs.has(a.id) ? '♥' : '♡'}</button>`}
     </div>`).join('')}</div>`
   : `<div class="card center pad">${vue === 'favoris' ? 'Aucun favori pour le moment.' : 'Aucune annonce pour le moment.'}<br><br><a class="btn" href="#/publier">+ Publier</a></div>`}`;
@@ -253,7 +253,7 @@ async function annonce(id) {
   <div class="tags">${a.statut === 'reserve' ? '<span class="badge warn">Réservé : nouvelles demandes suspendues</span>' : ''}${a.is_adress ? '<span class="badge">ADRESS IMMOBILIER</span>' : ''}</div>
   <h1>${esc(a.titre)}</h1>
   <h2 style="margin-top:4px">${prix(a)}</h2>
-  <div class="tags"><span class="tag">${esc(a.categorie)}</span><span class="tag">${esc(a.etat)}</span><span class="tag">${esc(a.residence || '')}</span></div>
+  <div class="tags"><span class="tag">${esc(a.categorie)}</span><span class="tag">${esc(a.etat)}</span>${a.residence ? `<span class="tag">${esc(a.residence)}</span>` : ''}</div>
   ${a.description ? `<p style="white-space:pre-line">${esc(a.description)}</p>` : ''}
   <p class="muted">Publié par ${esc(a.vendeur)} le ${dateFr(a.date_publication)}</p>
   ${a.est_a_moi ? `<a class="btn ghost block" href="#/mes-annonces">Gérer mon annonce</a>`
@@ -363,7 +363,7 @@ async function mesAnnonces() {
   <div class="card" data-id="${a.id}">
     <div style="display:flex;gap:12px"><div class="ph" style="width:72px;height:72px;flex:none;border-radius:10px;background-image:url('${esc(urls[i])}')"></div>
     <div style="min-width:0"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(a.titre)}</a>` : esc(a.titre)}</b>
-      <div class="muted small">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUTS[a.statut]} · ${prix(a)}</div>
+      <div class="muted small"><span class="pill ${a.retiree_par_adress ? 'off' : a.statut}">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUTS[a.statut]}</span> · ${prix(a)}</div>
       <div class="muted small">${ouverte(a) ? `Expire le ${dateFr(a.date_expiration)}` : `Clôturée${a.date_cloture ? ' le ' + dateFr(a.date_cloture) : ''} · archivée`}</div></div></div>
     ${ds.length ? `<details ${ouverte(a) ? 'open' : ''} data-lire="${nl ? a.id : ''}"><summary style="margin-top:10px">${ds.length} demande${ds.length > 1 ? 's' : ''}${nl ? ` · <span class="badge">${nl} nouvelle${nl > 1 ? 's' : ''}</span>` : ''}</summary>
       ${ds.map(d => `<div class="dem"><b>n° ${d.rang}</b> ${esc(d.demandeur)} ${d.statut === 'contactee' ? '<span class="badge ok">contacté</span>' : ''}
@@ -385,8 +385,12 @@ async function mesAnnonces() {
     const r = act === 'prolonger' ? await sb.rpc('prolonger_annonce', { p_id: id }) : await sb.rpc('changer_statut_annonce', { p_id: id, p_statut: act });
     if (r.error) { b.disabled = false; return toast(errMsg(r.error)); }
     if (act === 'vendu' || act === 'don_effectue') { location.hash = `#/avis?annonce=${id}`; return; }
-    toast(act === 'prolonger' ? `Annonce prolongée jusqu'au ${dateFr(r.data)}.` : 'Annonce mise à jour.');
-    mesAnnonces();
+    const titre = b.closest('[data-id]').querySelector('b').textContent.trim();
+    const msg = { prolonger: `« ${titre} » prolongée jusqu'au ${dateFr(r.data)}.`, reserve: `« ${titre} » est marquée réservée.`, disponible: `« ${titre} » est de nouveau disponible.`, retire: `« ${titre} » a été retirée du Market.` };
+    toast(msg[act] || 'Annonce mise à jour.');
+    const y = scrollY; await mesAnnonces(); scrollTo(0, y);
+    const c = app.querySelector(`[data-id="${id}"]`);
+    if (c) { const r2 = c.getBoundingClientRect(); if (r2.top < 70 || r2.bottom > innerHeight - 80) c.scrollIntoView({ block: 'center', behavior: 'smooth' }); c.classList.add('flash'); }
   });
 }
 
@@ -430,7 +434,7 @@ async function bonnesAdresses() {
     + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(p.lien) + '" target="_blank" rel="noopener">Découvrir</a>' : '') + '</div>';
   const flipCard = (p) => '<a class="flipcard" data-p="' + p.id + '" href="' + esc(lienFlip(p.lien, p.nom)) + '">'
     + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><i class="orb o1"></i><i class="orb o2"></i><em>' + esc(p.nom) + '</em></span>'
-    + '<span class="fc-txt"><small>Le guide ADRESS</small><b>' + esc(p.nom) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
+    + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(p.nom) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
   app.innerHTML = '<a class="back" href="#/">‹ Accueil</a><h1>Les bons plans</h1><p class="muted">La sélection ADRESS pour vivre Abidjan</p>'
     + '<div class="chips"><a class="chip ' + (!cat ? 'on' : '') + '" href="#/bonnes-adresses">Tout</a>' + FILTRES_BP.map(c => '<a class="chip ' + (cat === c ? 'on' : '') + '" href="#/bonnes-adresses?cat=' + encodeURIComponent(c) + '">' + c + '</a>').join('') + '</div>'
     + (adresses.length ? '<div class="list">' + adresses.map(ligne).join('') + '</div>' : (flips.length ? '' : '<div class="card center pad">Aucun bon plan dans cette catégorie pour le moment.</div>'))
