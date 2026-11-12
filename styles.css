@@ -548,3 +548,8 @@ html{touch-action:manipulation}
 .intro2.out{opacity:0;visibility:hidden;transition:opacity .8s ease .15s,visibility .9s}
 .intro2.out .intro-mark{animation:none;transform:scale(5);opacity:0;transition:transform .9s cubic-bezier(.7,0,.3,1),opacity .7s ease .1s}
 .intro2.out .intro-in{transform:translateY(10px);opacity:0;transition:all .45s ease}
+
+/* v14 : favoris vides */
+.empty-fav{display:flex;flex-direction:column;align-items:center;gap:8px;padding:34px 20px}
+.empty-fav .ef-heart{font-size:34px;line-height:1;color:var(--red);animation:heart 1.2s ease-in-out 2}
+.empty-fav p{margin:2px 0 10px;max-width:420px;line-height:1.55}
