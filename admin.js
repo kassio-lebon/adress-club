@@ -118,14 +118,14 @@ async function invitations(box) {
 // ---------- Comptes (§2) ----------
 async function comptes(box) {
   const { data } = await sb.from('profiles').select('id,nom_affichage,statut,date_activation,date_fin_occupation,type_occupant,is_admin,is_adress,logements(code,numero),residences(nom)').order('created_at', { ascending: false });
-  box.innerHTML = `<p class="muted">« Retirer » désactive le compte, libère le logement (il redevient disponible pour un nouveau code) et retire ses annonces du Market. Vous pouvez aussi renseigner une date de fin : le retrait est alors automatique.</p>
+  box.innerHTML = `<p class="muted">« Retirer » désactive le compte, libère le logement (il redevient disponible pour un nouveau code) et met ses annonces en pause (masquées du Market). Ses annonces, favoris et historique sont conservés : s'il revient avec un nouveau code, il retrouve tout. Vous pouvez aussi renseigner une date de fin : le retrait est alors automatique.</p>
   <div style="overflow-x:auto"><table class="adm"><tr><th>Résident</th><th>Logement</th><th>Statut</th><th>Fin d'occupation</th><th></th></tr>
   ${(data || []).map(p => `<tr data-id="${p.id}"><td><b>${esc(p.nom_affichage || '(sans nom)')}</b>${p.is_admin ? ' <span class="badge soft">admin</span>' : ''}${p.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${esc(p.type_occupant)} · ${esc(p.residences?.nom || '')}</div></td>
     <td>${p.logements ? esc(p.logements.numero || p.logements.code) : '—'}</td><td>${p.statut === 'actif' ? '<span class="badge ok">actif</span>' : p.statut === 'desactive' ? '<span class="badge soft">retiré</span>' : 'en attente'}</td>
     <td><input type="date" data-fin value="${p.date_fin_occupation || ''}" style="min-width:140px"></td>
     <td>${p.id === state.session.user.id ? '' : p.statut === 'actif' ? '<button class="btn sm danger" data-st="desactive">Retirer</button>' : p.statut === 'desactive' ? '<span class="muted small">Nouveau code pour revenir</span>' : ''}</td></tr>`).join('')}</table></div>`;
   box.querySelectorAll('[data-fin]').forEach(i => i.onchange = () => action(async () => check(await sb.from('profiles').update({ date_fin_occupation: i.value || null }).eq('id', i.closest('tr').dataset.id)), 'Date enregistrée.'));
-  box.querySelectorAll('[data-st]').forEach(b => b.onclick = () => confirm('Retirer ce locataire ?\n\n• Son accès à ADRESS CLUB est coupé\n• Son logement redevient libre\n• Ses annonces sont retirées du Market') && action(async () => check(await sb.from('profiles').update({ statut: b.dataset.st }).eq('id', b.closest('tr').dataset.id))));
+  box.querySelectorAll('[data-st]').forEach(b => b.onclick = () => confirm('Retirer ce locataire ?\n\n• Son accès à ADRESS CLUB est coupé\n• Son logement redevient libre\n• Ses annonces sont mises en pause (masquées du Market)\n\nRien n\'est perdu : avec un nouveau code, il retrouve ses annonces, favoris et historique.') && action(async () => check(await sb.from('profiles').update({ statut: b.dataset.st }).eq('id', b.closest('tr').dataset.id))));
 }
 
 // ---------- Modération (§3) ----------
