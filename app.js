@@ -164,7 +164,7 @@ function activation() {
   const p = state.profil; let inv = {}; try { inv = JSON.parse(localStorage.getItem('acl-inv') || '{}'); } catch (_) {}
   app.innerHTML = `
   <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>${p?.statut === 'desactive' ? 'Accès désactivé' : 'Activez votre accès'}</p></div>
-  ${p?.statut === 'desactive' ? `<div class="card">Votre accès a été désactivé (fin d'occupation ou décision ADRESS). Contactez ADRESS IMMOBILIER si c'est une erreur.</div>` : `
+  ${p?.statut === 'desactive' ? `<div class="card" style="margin-bottom:12px">Votre accès a été désactivé (fin d'occupation ou décision ADRESS). Si ADRESS IMMOBILIER vous a remis un nouveau code, saisissez-le ci-dessous.</div>` : ''}${`
   <form id="f" class="card">
     <p class="muted">Saisissez le code d'invitation remis par ADRESS IMMOBILIER pour votre logement.</p>
     <label for="code">Code d'invitation</label><input id="code" type="text" style="text-transform:uppercase" value="${esc(inv.code || '')}">

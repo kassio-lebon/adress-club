@@ -39,17 +39,20 @@ async function stats(box) {
 
 // ---------- Invitations et logements (§2) ----------
 async function invitations(box) {
-  const [res, log, inv] = await Promise.all([
+  const [res, log, inv, occ] = await Promise.all([
     sb.from('residences').select('id,nom').order('nom'),
     sb.from('logements').select('id,code,numero,residence_id').eq('actif', true).order('code'),
-    sb.from('invitations').select('*, logements(code,numero,residences(nom))').order('created_at', { ascending: false }).limit(200)]);
+    sb.from('invitations').select('*, logements(code,numero,residences(nom))').order('created_at', { ascending: false }).limit(200),
+    sb.from('profiles').select('logement_id,nom_affichage').eq('statut', 'actif').not('logement_id', 'is', null)]);
   const R = res.data || [], Lg = log.data || [];
+  const occupant = new Map((occ.data || []).map(p => [p.logement_id, p.nom_affichage || 'occupé']));
+  const enAttente = new Map((inv.data || []).filter(i => !i.utilisee_par && new Date(i.expire_le) > new Date() && i.logement_id).map(i => [i.logement_id, i.nom_affichage || 'code envoyé']));
   const lienApp = location.origin + location.pathname;
   const message = (i) => `Bonjour${i.nom_affichage ? ' ' + i.nom_affichage : ''},\n\nBienvenue dans ADRESS CLUB, l'espace privé des résidents ADRESS IMMOBILIER.\n\n1. Ouvrez ${lienApp}\n2. Touchez « J'ai un code d'invitation »\n3. Saisissez votre code : ${i.code}\n\nCe code est personnel et valable jusqu'au ${dateFr(i.expire_le)}.`;
   const etat = (i) => i.utilisee_par ? `<span class="badge ok">Activé le ${dateFr(i.utilisee_le)}</span>` : new Date(i.expire_le) < new Date() ? '<span class="badge soft">Expiré</span>' : '<span class="badge warn">En attente</span>';
   if (!R.length) { box.innerHTML = '<div class="card center pad">Ajoutez d’abord une résidence dans l’onglet <a href="#/admin/residences">Résidences</a>.</div>'; return; }
   box.innerHTML = `
-  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Un code par personne. Plusieurs personnes dans un même logement = plusieurs codes.</p>
+  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Un logement = une seule personne. Les logements occupés ou avec un code en attente sont grisés.</p>
   <form id="fi">
     <div class="grid2">
       <div><label for="ir">Résidence</label><select id="ir">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
@@ -74,7 +77,9 @@ async function invitations(box) {
   const err = (m) => { $('#err').textContent = m; $('#err').hidden = !m; };
   const majLogements = () => {
     const l = Lg.filter(x => x.residence_id === $('#ir').value);
-    $('#lg').innerHTML = l.map(x => `<option value="${x.id}">${esc(x.numero || x.code)}</option>`).join('') + '<option value="+">＋ Nouveau logement…</option>';
+    const etiq = (x) => occupant.has(x.id) ? ` — occupé (${occupant.get(x.id)})` : enAttente.has(x.id) ? ` — code en attente (${enAttente.get(x.id)})` : ' — libre';
+    $('#lg').innerHTML = l.map(x => `<option value="${x.id}" ${occupant.has(x.id) || enAttente.has(x.id) ? 'disabled' : ''}>${esc((x.numero || x.code) + etiq(x))}</option>`).join('') + '<option value="+">＋ Nouveau logement…</option><option value="0">Sans logement (équipe ADRESS)</option>';
+    const libre = [...$('#lg').options].find(o => !o.disabled); if (libre) $('#lg').value = libre.value;
     $('#nvBox').hidden = $('#lg').value !== '+';
   };
   $('#ir').onchange = majLogements; $('#lg').onchange = () => { $('#nvBox').hidden = $('#lg').value !== '+'; if ($('#lg').value === '+') $('#nv').focus(); };
@@ -90,7 +95,7 @@ async function invitations(box) {
     e.preventDefault(); err('');
     const go = $('#go'); go.disabled = true;
     try {
-      let logement = $('#lg').value;
+      let logement = $('#lg').value; if (logement === '0') logement = null;
       if (logement === '+') {
         const num = $('#nv').value.trim().toUpperCase(); if (!num) { go.disabled = false; return err('Indiquez le numéro du logement.'); }
         const pref = (R.find(r => r.id === $('#ir').value)?.nom || 'RES').normalize('NFD').replace(/[^A-Za-z ]/g, '').split(' ').filter(w => w.length > 2 && !/^(residence|les|des)$/i.test(w)).map(w => w[0]).join('').toUpperCase().slice(0, 4) || 'RES';
@@ -99,7 +104,8 @@ async function invitations(box) {
       }
       const i = check(await sb.from('invitations').insert({ logement_id: logement, nom_affichage: $('#na').value.trim() || null, type_occupant: $('#to').value, responsable: $('#rp').value.trim() || null, date_fin_occupation: $('#fo').value || null, is_adress: $('#ia').checked, is_admin: $('#ad').checked }).select('*').single());
       toast('Invitation créée.'); partager(i);
-      $('#na').value = ''; $('#nv').value = ''; majLogements(); $('#lg').value = logement; $('#nvBox').hidden = true;
+      if (logement) enAttente.set(logement, i.nom_affichage || 'code envoyé');
+      $('#na').value = ''; $('#nv').value = ''; majLogements(); $('#nvBox').hidden = true;
     } catch (ex) { err(errMsg(ex)); }
     go.disabled = false;
   };
@@ -111,15 +117,15 @@ async function invitations(box) {
 
 // ---------- Comptes (§2) ----------
 async function comptes(box) {
-  const { data } = await sb.from('profiles').select('id,nom_affichage,statut,date_activation,date_fin_occupation,type_occupant,is_admin,is_adress,logements(code),residences(nom)').order('created_at', { ascending: false });
-  box.innerHTML = `<p class="muted">Désactivez un compte en fin d'occupation, ou renseignez la date de fin : la désactivation est alors automatique.</p>
+  const { data } = await sb.from('profiles').select('id,nom_affichage,statut,date_activation,date_fin_occupation,type_occupant,is_admin,is_adress,logements(code,numero),residences(nom)').order('created_at', { ascending: false });
+  box.innerHTML = `<p class="muted">« Retirer » désactive le compte, libère le logement (il redevient disponible pour un nouveau code) et retire ses annonces du Market. Vous pouvez aussi renseigner une date de fin : le retrait est alors automatique.</p>
   <div style="overflow-x:auto"><table class="adm"><tr><th>Résident</th><th>Logement</th><th>Statut</th><th>Fin d'occupation</th><th></th></tr>
   ${(data || []).map(p => `<tr data-id="${p.id}"><td><b>${esc(p.nom_affichage || '(sans nom)')}</b>${p.is_admin ? ' <span class="badge soft">admin</span>' : ''}${p.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${esc(p.type_occupant)} · ${esc(p.residences?.nom || '')}</div></td>
-    <td>${esc(p.logements?.code || '—')}</td><td>${p.statut === 'actif' ? '<span class="badge ok">actif</span>' : p.statut === 'desactive' ? '<span class="badge warn">désactivé</span>' : 'en attente'}</td>
+    <td>${p.logements ? esc(p.logements.numero || p.logements.code) : '—'}</td><td>${p.statut === 'actif' ? '<span class="badge ok">actif</span>' : p.statut === 'desactive' ? '<span class="badge soft">retiré</span>' : 'en attente'}</td>
     <td><input type="date" data-fin value="${p.date_fin_occupation || ''}" style="min-width:140px"></td>
-    <td>${p.id === state.session.user.id ? '' : p.statut === 'actif' ? '<button class="btn sm danger" data-st="desactive">Désactiver</button>' : p.statut === 'desactive' ? '<button class="btn sm ghost" data-st="actif">Réactiver</button>' : ''}</td></tr>`).join('')}</table></div>`;
+    <td>${p.id === state.session.user.id ? '' : p.statut === 'actif' ? '<button class="btn sm danger" data-st="desactive">Retirer</button>' : p.statut === 'desactive' ? '<span class="muted small">Nouveau code pour revenir</span>' : ''}</td></tr>`).join('')}</table></div>`;
   box.querySelectorAll('[data-fin]').forEach(i => i.onchange = () => action(async () => check(await sb.from('profiles').update({ date_fin_occupation: i.value || null }).eq('id', i.closest('tr').dataset.id)), 'Date enregistrée.'));
-  box.querySelectorAll('[data-st]').forEach(b => b.onclick = () => (b.dataset.st === 'actif' || confirm('Désactiver ce compte ? Le résident ne pourra plus accéder à ADRESS CLUB.')) && action(async () => check(await sb.from('profiles').update({ statut: b.dataset.st }).eq('id', b.closest('tr').dataset.id))));
+  box.querySelectorAll('[data-st]').forEach(b => b.onclick = () => confirm('Retirer ce locataire ?\n\n• Son accès à ADRESS CLUB est coupé\n• Son logement redevient libre\n• Ses annonces sont retirées du Market') && action(async () => check(await sb.from('profiles').update({ statut: b.dataset.st }).eq('id', b.closest('tr').dataset.id))));
 }
 
 // ---------- Modération (§3) ----------
