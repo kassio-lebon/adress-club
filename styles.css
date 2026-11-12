@@ -710,3 +710,7 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
   .login-mark{width:min(60vw,820px);right:-9vw;top:-14vh;opacity:.14}
   .login-mark.lm2{width:min(50vw,680px);left:-11vw;bottom:-20vh;opacity:.1}
 }
+
+/* v39 : formulaire en mode modification */
+.card.editing{outline:2px solid var(--red);outline-offset:2px;animation:reveal .45s cubic-bezier(.16,1,.3,1)}
+.card.editing h3{color:var(--red)}

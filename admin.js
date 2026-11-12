@@ -28,6 +28,16 @@ async function uploadPublic(file, dossier) {
   if (error) throw error; return path;
 }
 const check = (r) => { if (r.error) throw r.error; return r.data; };
+// Formulaire « Ajouter » réutilisé pour « Modifier » : champs pré-remplis, bouton Enregistrer, Annuler
+function modeEdition(box, titre, labelFichier) {
+  const card = box.querySelector('#f').closest('.card');
+  card.querySelector('h3').textContent = titre;
+  card.querySelector('#f button.btn:not([type=button])').textContent = 'Enregistrer les modifications';
+  const lf = card.querySelector('[data-lf]'); if (lf && labelFichier) lf.textContent = labelFichier;
+  card.querySelector('#annul').hidden = false; card.classList.add('editing');
+  card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  card.querySelector('#annul').onclick = () => rerender();
+}
 async function action(fn, ok = 'Enregistré.') { try { await fn(); toast(ok); rerender(); } catch (e) { toast(errMsg(e)); } }
 
 // ---------- Indicateurs (§8) ----------
@@ -156,17 +166,25 @@ async function contenus(box) {
     <label>Titre *</label><input id="ti" type="text" required>
     <label>Texte</label><textarea id="tx"></textarea>
     <div class="grid2"><div><label>Lien (flipbook, page…)</label><input id="li" type="url" placeholder="https://"></div><div><label>N° (Flip Immo)</label><input id="nu" type="text"></div></div>
-    <label>Image / couverture</label><input id="im" type="file" accept="image/*">
-    <button class="btn block" style="margin-top:12px">Publier</button></form></div>
+    <label data-lf>Image / couverture</label><input id="im" type="file" accept="image/*">
+    <button class="btn block" style="margin-top:12px">Publier</button><button class="btn ghost block" type="button" id="annul" hidden style="margin-top:8px">Annuler</button></form></div>
   <h2>Contenus</h2><div class="list">${(data || []).map(c => `<div class="card" data-id="${c.id}" style="display:flex;gap:12px">
     ${c.image_path ? `<img src="${esc(publicUrl(c.image_path))}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px">` : ''}
     <div style="flex:1"><b>${esc(c.titre)}</b><div class="muted small">${esc(c.type)} · ${dateFr(c.date_parution)} · ${c.visible ? 'visible' : 'masqué'}</div>
-    <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${c.visible ? 0 : 1}">${c.visible ? 'Masquer' : 'Afficher'}</button><button class="btn sm danger" data-d>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucun contenu.</div>'}</div>`;
+    <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${c.visible ? 0 : 1}">${c.visible ? 'Masquer' : 'Afficher'}</button><button class="btn sm ghost" data-edit>Modifier</button><button class="btn sm danger" data-d>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucun contenu.</div>'}</div>`;
   const $ = (s) => box.querySelector(s);
+  let edit = null;
   $('#f').onsubmit = (e) => { e.preventDefault(); action(async () => {
     const f = $('#im').files[0]; const image_path = f ? await uploadPublic(f, 'contenus') : null;
-    check(await sb.from('contenus').insert({ type: $('#ty').value, titre: $('#ti').value.trim(), texte: $('#tx').value.trim() || null, lien: $('#li').value.trim() || null, numero: $('#nu').value.trim() || null, date_parution: $('#dp').value, image_path }));
-  }, 'Contenu publié.'); };
+    const v = { type: $('#ty').value, titre: $('#ti').value.trim(), texte: $('#tx').value.trim() || null, lien: $('#li').value.trim() || null, numero: $('#nu').value.trim() || null, date_parution: $('#dp').value };
+    if (edit) { if (image_path) v.image_path = image_path; check(await sb.from('contenus').update(v).eq('id', edit.id)); }
+    else check(await sb.from('contenus').insert({ ...v, image_path }));
+  }, edit ? 'Modifications enregistrées.' : 'Contenu publié.'); };
+  box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+    const c = (data || []).find(x => x.id === b.closest('[data-id]').dataset.id); if (!c) return; edit = c;
+    $('#ty').value = c.type; $('#dp').value = (c.date_parution || '').slice(0, 10); $('#ti').value = c.titre || ''; $('#tx').value = c.texte || ''; $('#li').value = c.lien || ''; $('#nu').value = c.numero || ''; $('#im').value = '';
+    modeEdition(box, 'Modifier « ' + c.titre + ' »', 'Image / couverture (laisser vide pour garder l’actuelle)');
+  });
   box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => action(async () => check(await sb.from('contenus').update({ visible: b.dataset.v === '1' }).eq('id', b.closest('[data-id]').dataset.id))));
   box.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirm('Supprimer ce contenu ?') && action(async () => check(await sb.from('contenus').delete().eq('id', b.closest('[data-id]').dataset.id)), 'Supprimé.'));
 }
@@ -179,8 +197,8 @@ async function residences(box) {
     <div class="grid2"><div><label>Type de bien</label><select id="tb"><option value="">—</option>${TYPES_BIEN.map(t => `<option>${t}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
     <label>Description</label><textarea id="de"></textarea>
     <label>Lien « Découvrir »</label><input id="li" type="url" placeholder="https://">
-    <label>Photo</label><input id="ph" type="file" accept="image/*">
-    <button class="btn block" style="margin-top:12px">Ajouter</button></form></div>
+    <label data-lf>Photo</label><input id="ph" type="file" accept="image/*">
+    <button class="btn block" style="margin-top:12px">Ajouter</button><button class="btn ghost block" type="button" id="annul" hidden style="margin-top:8px">Annuler</button></form></div>
   <h2>Résidences</h2><div class="list">${(data || []).map(r => `<div class="card" data-id="${r.id}" style="display:flex;gap:12px;align-items:center">
     <div style="width:72px;height:54px;flex:none;border-radius:8px;background:#f1f3f5 center/cover no-repeat ${r.photo_path ? `url('${esc(publicUrl(r.photo_path))}')` : ''}"></div>
     <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
@@ -188,20 +206,20 @@ async function residences(box) {
       <label class="btn sm ghost" style="margin:0">Photo<input type="file" accept="image/*" data-photo class="sr"></label>
       <button class="btn sm ghost" data-edit>Modifier</button></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
   const $ = (s) => box.querySelector(s);
+  let edit = null;
   $('#f').onsubmit = (e) => { e.preventDefault(); action(async () => {
     const f = $('#ph').files[0]; const photo_path = f ? await uploadPublic(f, 'residences') : null;
-    check(await sb.from('residences').insert({ nom: $('#no').value.trim(), quartier: $('#qu').value.trim() || null, type_bien: $('#tb').value || null, ordre: +$('#or').value || 100, description: $('#de').value.trim() || null, lien_decouvrir: $('#li').value.trim() || null, photo_path }));
-  }, 'Résidence ajoutée.'); };
+    const v = { nom: $('#no').value.trim(), quartier: $('#qu').value.trim() || null, type_bien: $('#tb').value || null, ordre: +$('#or').value || 100, description: $('#de').value.trim() || null, lien_decouvrir: $('#li').value.trim() || null };
+    if (edit) { if (photo_path) v.photo_path = photo_path; check(await sb.from('residences').update(v).eq('id', edit.id)); }
+    else check(await sb.from('residences').insert({ ...v, photo_path }));
+  }, edit ? 'Modifications enregistrées.' : 'Résidence ajoutée.'); };
   box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => action(async () => check(await sb.from('residences').update({ visible: b.dataset.v === '1' }).eq('id', b.closest('[data-id]').dataset.id))));
   const rid = (el) => el.closest('[data-id]').dataset.id;
   box.querySelectorAll('[data-photo]').forEach(i => i.onchange = () => i.files[0] && action(async () => { toast('Envoi de la photo…'); const photo_path = await uploadPublic(i.files[0], 'residences'); check(await sb.from('residences').update({ photo_path }).eq('id', rid(i))); }, 'Photo mise à jour.'));
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
-    const r = (data || []).find(x => x.id === rid(b)); if (!r) return;
-    const nom = prompt('Nom de la résidence', r.nom); if (nom === null) return;
-    const quartier = prompt('Quartier', r.quartier || ''); if (quartier === null) return;
-    const description = prompt('Description', r.description || ''); if (description === null) return;
-    const lien = prompt('Lien « Découvrir » (https://…)', r.lien_decouvrir || ''); if (lien === null) return;
-    action(async () => check(await sb.from('residences').update({ nom: nom.trim() || r.nom, quartier: quartier.trim() || null, description: description.trim() || null, lien_decouvrir: lien.trim() || null }).eq('id', r.id)));
+    const r = (data || []).find(x => x.id === rid(b)); if (!r) return; edit = r;
+    $('#no').value = r.nom || ''; $('#qu').value = r.quartier || ''; $('#tb').value = r.type_bien || ''; $('#or').value = r.ordre ?? 100; $('#de').value = r.description || ''; $('#li').value = r.lien_decouvrir || ''; $('#ph').value = '';
+    modeEdition(box, 'Modifier « ' + r.nom + ' »', 'Photo principale (laisser vide pour garder l’actuelle)');
   });
 }
 
@@ -213,8 +231,8 @@ async function partenaires(box) {
     <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Catégorie *</label><select id="ca">${FILTRES_BP.map(c => `<option>${c}</option>`).join('')}</select></div></div>
     <label>Description (200 car. max)</label><input id="de" type="text" maxlength="200">
     <div class="grid2"><div><label>Lien</label><input id="li" type="url" placeholder="https://"></div><div><label>Type de lien</label><select id="tl"><option>Site web</option><option>WhatsApp</option><option>Flipbook</option></select></div></div>
-    <label>Logo</label><input id="lo" type="file" accept="image/*">
-    <button class="btn block" style="margin-top:12px">Ajouter</button></form></div>
+    <label data-lf>Logo</label><input id="lo" type="file" accept="image/*">
+    <button class="btn block" style="margin-top:12px">Ajouter</button><button class="btn ghost block" type="button" id="annul" hidden style="margin-top:8px">Annuler</button></form></div>
   <h2>Partenaires</h2><div class="list">${(data || []).map(p => `<div class="card" data-id="${p.id}" style="display:flex;gap:12px;align-items:center">
     <div style="width:52px;height:52px;flex:none;border-radius:8px;background:#f1f3f5 center/contain no-repeat ${p.logo_path ? `url('${esc(publicUrl(p.logo_path))}')` : ''}"></div>
     <div style="flex:1;min-width:0"><b>${esc(p.nom)}</b><div class="muted small">${esc(p.categorie)} · ${p.lien ? 'lien ✓' : 'sans lien'}</div>
@@ -222,15 +240,22 @@ async function partenaires(box) {
       <button class="btn sm ${p.valide_par_adress ? 'soft' : 'ghost'}" data-k="valide_par_adress" data-v="${p.valide_par_adress ? 0 : 1}">${p.valide_par_adress ? 'Validé ✓' : 'Valider'}</button>
       <button class="btn sm ${p.visible ? 'soft' : 'ghost'}" data-k="visible" data-v="${p.visible ? 0 : 1}">${p.visible ? 'Visible ✓' : 'Rendre visible'}</button>
       <label class="btn sm ghost" style="margin:0">Logo<input type="file" accept="image/*" data-logo class="sr"></label>
-      <button class="btn sm ghost" data-lien>Lien</button></div></div></div>`).join('')}</div>`;
+      <button class="btn sm ghost" data-edit>Modifier</button></div></div></div>`).join('')}</div>`;
   const $ = (s) => box.querySelector(s); const id = (el) => el.closest('[data-id]').dataset.id;
+  let edit = null;
   $('#f').onsubmit = (e) => { e.preventDefault(); action(async () => {
     const f = $('#lo').files[0]; const logo_path = f ? await uploadPublic(f, 'partenaires') : null;
-    check(await sb.from('partenaires').insert({ nom: $('#no').value.trim(), categorie: $('#ca').value, description: $('#de').value.trim() || null, lien: $('#li').value.trim() || null, type_lien: $('#tl').value, logo_path }));
-  }, 'Partenaire ajouté.'); };
+    const v = { nom: $('#no').value.trim(), categorie: $('#ca').value, description: $('#de').value.trim() || null, lien: $('#li').value.trim() || null, type_lien: $('#tl').value };
+    if (edit) { if (logo_path) v.logo_path = logo_path; check(await sb.from('partenaires').update(v).eq('id', edit.id)); }
+    else check(await sb.from('partenaires').insert({ ...v, logo_path }));
+  }, edit ? 'Modifications enregistrées.' : 'Partenaire ajouté.'); };
+  box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+    const p = (data || []).find(x => x.id === id(b)); if (!p) return; edit = p;
+    $('#no').value = p.nom || ''; if (![...$('#ca').options].some(o => o.value === p.categorie)) $('#ca').insertAdjacentHTML('beforeend', `<option>${esc(p.categorie)}</option>`); $('#ca').value = p.categorie; $('#de').value = p.description || ''; $('#li').value = p.lien || ''; $('#tl').value = p.type_lien || 'Site web'; $('#lo').value = '';
+    modeEdition(box, 'Modifier « ' + p.nom + ' »', 'Logo (laisser vide pour garder l’actuel)');
+  });
   box.querySelectorAll('[data-k]').forEach(b => b.onclick = () => action(async () => check(await sb.from('partenaires').update({ [b.dataset.k]: b.dataset.v === '1' }).eq('id', id(b)))));
   box.querySelectorAll('[data-logo]').forEach(i => i.onchange = () => i.files[0] && action(async () => { const logo_path = await uploadPublic(i.files[0], 'partenaires'); check(await sb.from('partenaires').update({ logo_path }).eq('id', id(i))); }, 'Logo mis à jour.'));
-  box.querySelectorAll('[data-lien]').forEach(b => b.onclick = () => { const l = prompt('Lien du partenaire (https://…)'); if (l !== null) action(async () => check(await sb.from('partenaires').update({ lien: l.trim() || null }).eq('id', id(b)))); });
 }
 
 // ---------- Avis (§8) ----------

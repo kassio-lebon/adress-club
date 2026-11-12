@@ -197,7 +197,7 @@ function activation() {
     <button class="btn block" style="margin-top:16px">Activer mon accès</button>
   </form>`}
   <p class="center" style="margin-top:14px"><a href="#" id="out" class="muted">Se déconnecter</a></p></div>`;
-  app.querySelector('#out').onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await chargerProfil(); router(); };
+  app.querySelector('#out').onclick = (e) => { e.preventDefault(); deconnecter(e.currentTarget); };
   const f = app.querySelector('#f');
   if (f) f.onsubmit = async (ev) => {
     ev.preventDefault();
@@ -224,6 +224,13 @@ const estInstallee = () => matchMedia('(display-mode: standalone)').matches || n
 const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 // Vidéos tutoriels (format vertical, hébergées avec l'application)
 const videoTuto = (os, auto) => `<video class="tuto-v" controls playsinline preload="none" ${auto ? 'autoplay muted' : ''} poster="videos/poster-${os}.jpg" src="videos/tuto-${os}.mp4"></video>`;
+// Déconnexion fiable : session effacée sur le téléphone même si le serveur ne répond pas, puis rechargement propre
+export async function deconnecter(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Déconnexion…'; }
+  try { await Promise.race([sb.auth.signOut({ scope: 'local' }), new Promise(r => setTimeout(r, 2500))]); } catch (_) {}
+  try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token/.test(k) || k === 'acl-sig').forEach(k => localStorage.removeItem(k)); } catch (_) {}
+  location.hash = '#/'; location.reload();
+}
 export async function installer() {
   if (!window._installPrompt && !estIOS()) await new Promise(r => { let n = 0; const t = setInterval(() => { if (window._installPrompt || ++n > 15) { clearInterval(t); r(); } }, 100); });
   if (window._installPrompt) {
@@ -720,7 +727,7 @@ function profil() {
     if (error) return toast(errMsg(error));
     await chargerProfil(); toast('Préférences enregistrées.');
   };
-  $('#out').onclick = async () => { await sb.auth.signOut(); await chargerProfil(); location.hash = '#/'; router(); };
+  $('#out').onclick = () => deconnecter($('#out'));
   if (!estInstallee()) { $('#install').hidden = false; $('#install').onclick = installer; }
 }
 
