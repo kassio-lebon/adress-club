@@ -46,22 +46,44 @@ export function barreRecherche(avant, items, placeholder) {
   avant.before(w); avant.after(vide); filtreLive(w.querySelector('input'), items, vide);
 }
 
+// Liens signés réutilisés 6 jours (même adresse = image servie par le cache du téléphone)
 const signedCache = new Map();
-async function photosUrls(paths) {
-  const need = paths.filter(p => p && !signedCache.has(p));
+const SIG_KEY = 'acl-sig', SIG_TTL = 7 * 86400;
+try { const s = JSON.parse(localStorage.getItem(SIG_KEY) || '{}'), now = Date.now(); for (const k in s) if (s[k][1] > now + 3600e3) signedCache.set(k, s[k]); } catch (_) {}
+const sauverSig = () => { try { const o = {}; signedCache.forEach((v, k) => { if (v[1]) o[k] = v; }); localStorage.setItem(SIG_KEY, JSON.stringify(o)); } catch (_) {} };
+async function signer(paths) {
+  const need = [...new Set(paths.filter(p => p && !signedCache.has(p)))];
   if (need.length) {
-    const { data } = await sb.storage.from('annonces').createSignedUrls(need, 3600);
-    (data || []).forEach(x => { if (x.signedUrl) signedCache.set(x.path, x.signedUrl); });
+    const { data } = await sb.storage.from('annonces').createSignedUrls(need, SIG_TTL);
+    const exp = Date.now() + SIG_TTL * 1000;
+    (data || []).forEach(x => signedCache.set(x.path, [x.signedUrl || '', x.signedUrl ? exp : 0]));
+    sauverSig();
   }
-  return paths.map(p => signedCache.get(p) || '');
+  return paths.map(p => (signedCache.get(p) || [''])[0]);
+}
+const vignette = (p) => p && p.endsWith('.jpg') && !p.endsWith('_t.jpg') ? p.replace(/\.jpg$/, '_t.jpg') : p;
+// Listes : vignette légère si elle existe, sinon la photo d'origine
+async function photosUrls(paths, petit = false) {
+  if (!petit) return signer(paths);
+  const [t, f] = await Promise.all([signer(paths.map(vignette)), signer(paths)]);
+  return paths.map((p, i) => t[i] || f[i]);
+}
+async function envoyerPhoto(uid, f) {
+  const id = crypto.randomUUID(), path = `${uid}/${id}.jpg`;
+  const [grand, petit] = await Promise.all([compress(f, 1280, 0.8), compress(f, 480, 0.72)]);
+  const o = { contentType: 'image/jpeg', cacheControl: '31536000' };
+  const { error } = await sb.storage.from('annonces').upload(path, grand, o);
+  if (error) throw error;
+  await sb.storage.from('annonces').upload(`${uid}/${id}_t.jpg`, petit, o);
+  return path;
 }
 
-export function compress(file, max = 1280) {
+export function compress(file, max = 1280, q = 0.82) {
   return new Promise((ok, ko) => {
     const img = new Image(); const u = URL.createObjectURL(file);
     img.onload = () => { const s = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas');
       c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      c.toBlob(b => { URL.revokeObjectURL(u); b ? ok(b) : ko(new Error('Image illisible')); }, 'image/jpeg', 0.82); };
+      c.toBlob(b => { URL.revokeObjectURL(u); b ? ok(b) : ko(new Error('Image illisible')); }, 'image/jpeg', q); };
     img.onerror = () => ko(new Error('Image illisible')); img.src = u;
   });
 }
@@ -237,7 +259,7 @@ async function accueil() {
   await majCompteurs();
   const nl = state.compteurs.demandes_non_lues || 0;
   const { data: recents } = await sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8);
-  const urls = await photosUrls((recents || []).map(a => a.photos[0]));
+  const urls = await photosUrls((recents || []).map(a => a.photos[0]), true);
   const res = state.profil.residence || {}; let ph = res.photo_path;
   if (!ph) { const { data: r1 } = await sb.from('residences').select('photo_path').eq('visible', true).not('photo_path', 'is', null).order('ordre').limit(1); ph = r1 && r1[0] && r1[0].photo_path; }
   const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
@@ -266,7 +288,7 @@ async function market() {
   const [{ data, error }, fav] = await Promise.all([req, sb.from('favoris').select('annonce_id')]);
   if (error) throw error;
   const favs = new Set((fav.data || []).map(f => f.annonce_id));
-  const urls = await photosUrls((data || []).map(a => a.photos[0]));
+  const urls = await photosUrls((data || []).map(a => a.photos[0]), true);
   const lien = (o) => '#/market?' + new URLSearchParams(Object.fromEntries(Object.entries({ type, q, vue, ...o }).filter(([, v]) => v))).toString();
   app.innerHTML = `
   <a class="back" href="#/">‹ Accueil</a><h1>Le Market</h1><p class="muted">Les objets à vendre ou à donner entre résidents</p>
@@ -390,14 +412,10 @@ async function modifier(id) {
     const go = $('#go'); go.disabled = true; go.textContent = files.length ? 'Envoi des photos…' : 'Enregistrement…';
     try {
       const uid = state.session.user.id, paths = [...gardees];
-      for (const f of files) {
-        const blob = await compress(f), path = `${uid}/${crypto.randomUUID()}.jpg`;
-        const { error } = await sb.storage.from('annonces').upload(path, blob, { contentType: 'image/jpeg' });
-        if (error) throw error; paths.push(path);
-      }
+      for (const f of files) paths.push(await envoyerPhoto(uid, f));
       const { error } = await sb.rpc('modifier_annonce', { p_id: a.id, p_titre: titre, p_categorie: $('#ca').value, p_etat: $('#et').value, p_description: $('#de').value.trim(), p_prix: px, p_photos: paths });
       if (error) throw (/schema cache|could not find/i.test(error.message) ? new Error('La modification sera disponible très bientôt (mise à jour du serveur en cours).') : error);
-      a.photos.filter(p => !paths.includes(p)).forEach(p => signedCache.delete(p));
+      a.photos.filter(p => !paths.includes(p)).forEach(p => { signedCache.delete(p); signedCache.delete(vignette(p)); }); sauverSig();
       toast('Annonce mise à jour.'); location.hash = `#/annonce/${a.id}`;
     } catch (e) { go.disabled = false; go.textContent = 'Enregistrer les modifications'; err(errMsg(e)); }
   };
@@ -445,11 +463,7 @@ function publier() {
     const go = $('#go'); go.disabled = true; go.textContent = 'Envoi des photos…';
     try {
       const uid = state.session.user.id, paths = [];
-      for (const f of files) {
-        const blob = await compress(f), path = `${uid}/${crypto.randomUUID()}.jpg`;
-        const { error } = await sb.storage.from('annonces').upload(path, blob, { contentType: 'image/jpeg' });
-        if (error) throw error; paths.push(path);
-      }
+      for (const f of files) paths.push(await envoyerPhoto(uid, f));
       go.textContent = 'Publication…';
       const { data, error } = await sb.from('annonces').insert({ type, titre, categorie, etat, description: description || null, prix_fcfa: type === 'vente' ? px : null, photos: paths }).select('id').single();
       if (error) throw error;
@@ -477,7 +491,7 @@ async function mesAnnonces() {
     sb.from('annonces').select('*').eq('vendeur_id', state.session.user.id).order('date_publication', { ascending: false }),
     sb.rpc('mes_demandes_recues')]);
   if (error) throw error;
-  const urls = await photosUrls((mes || []).map(a => a.photos[0]));
+  const urls = await photosUrls((mes || []).map(a => a.photos[0]), true);
   const parAnnonce = (id) => (dem || []).filter(d => d.annonce_id === id);
   const ouverte = (a) => ['disponible', 'reserve'].includes(a.statut) && !a.retiree_par_adress;
   const prol = state.params.duree_prolongation_jours || 30;
