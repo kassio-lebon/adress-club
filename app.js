@@ -260,11 +260,15 @@ async function accueil() {
   const nl = state.compteurs.demandes_non_lues || 0;
   const { data: recents } = await sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8);
   const urls = await photosUrls((recents || []).map(a => a.photos[0]), true);
-  const res = state.profil.residence || {}; let ph = res.photo_path;
-  if (!ph) { const { data: r1 } = await sb.from('residences').select('photo_path').eq('visible', true).not('photo_path', 'is', null).order('ordre').limit(1); ph = r1 && r1[0] && r1[0].photo_path; }
+  const res = state.profil.residence || {};
+  // photos d'arrière-plan : d'abord la résidence du locataire, puis les autres résidences ADRESS
+  const { data: rr } = await sb.from('residences').select('nom,photo_path,photos').eq('visible', true).order('ordre');
+  const pics = []; const ajout = (r) => [r.photo_path, ...(r.photos || [])].forEach(p => { if (p && !/test/i.test(p) && !pics.includes(p)) pics.push(p); });
+  (rr || []).filter(r => r.nom === res.nom).forEach(ajout); if (!pics.length && res.photo_path) pics.push(res.photo_path); (rr || []).forEach(ajout);
+  const ph = pics[0];
   const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
   app.innerHTML = '<div class="home">'
-    + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<img class="bgz" alt="" referrerpolicy="no-referrer" src="' + esc(publicUrl(ph)) + '">' : '')
+    + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz bgs">' + pics.slice(0, 12).map((p, i) => '<img alt="" referrerpolicy="no-referrer" ' + (i ? 'data-src' : 'class="on" src') + '="' + esc(publicUrl(p)) + '">').join('') + '</div>' : '')
     + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>Bonjour ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
     + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
     + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'
@@ -278,6 +282,24 @@ async function accueil() {
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
   brancherInstall(app);
+  fondDefilant(app.querySelector('.hero .bgs'));
+}
+// Arrière-plan de l'accueil : photos des résidences en fondu très lent (une photo n'apparaît qu'une fois prête)
+function fondDefilant(box) {
+  const imgs = box ? [...box.querySelectorAll('img')] : [];
+  if (imgs.length < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const charger = (im) => { if (!im.getAttribute('src')) im.src = im.dataset.src; return im.decode ? im.decode() : Promise.resolve(); };
+  let k = 0; charger(imgs[1]).catch(() => {});
+  const t = setInterval(async () => {
+    if (!box.isConnected) return clearInterval(t);
+    if (document.hidden) return;
+    const n = (k + 1) % imgs.length, im = imgs[n];
+    try { await charger(im); } catch (_) { imgs.splice(n, 1); if (imgs.length < 2) clearInterval(t); return; }
+    if (!box.isConnected) return;
+    imgs[k].classList.replace('on', 'off');
+    im.classList.remove('off'); void im.offsetWidth; im.classList.add('on'); k = n;
+    charger(imgs[(k + 1) % imgs.length]).catch(() => {});
+  }, 8000);
 }
 
 // ---------- Le Market (§3, §4) ----------
