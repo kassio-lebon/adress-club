@@ -129,7 +129,9 @@ function connexion() {
     <p class="err" id="err" hidden></p>
     <button class="btn block" style="margin-top:16px" id="go">Se connecter</button>
   </form>
-  <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p></div>`;
+  <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p>
+  ${estInstallee() ? '' : '<p class="center" style="margin-top:6px"><button class="linkbtn" type="button" id="inst">📲 Installer l’application sur mon téléphone</button></p>'}</div>`;
+  const ib = app.querySelector('#inst'); if (ib) ib.onclick = installer;
   let mode = 'login';
   app.querySelectorAll('[data-m]').forEach(c => c.onclick = () => {
     mode = c.dataset.m; app.querySelectorAll('[data-m]').forEach(x => x.classList.toggle('on', x === c));
@@ -195,6 +197,37 @@ const ICO = {
   chev: svg('m9 6 6 6-6 6'),
   arrow: svg('M5 12h14M13 6l6 6-6 6')
 };
+// ---------- Installer l'application sur le téléphone ----------
+const estInstallee = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+export async function installer() {
+  if (window._installPrompt) {
+    window._installPrompt.prompt();
+    const r = await window._installPrompt.userChoice.catch(() => null);
+    if (r && r.outcome === 'accepted') { window._installPrompt = null; toast('ADRESS CLUB est installée sur votre téléphone.'); document.querySelectorAll('.install-card').forEach(x => x.remove()); }
+    return;
+  }
+  const ios = estIOS();
+  const d = document.createElement('div'); d.className = 'sheet-bg';
+  d.innerHTML = `<div class="sheet" role="dialog" aria-label="Installer l'application"><img src="icon-192.png" alt="" width="56" height="56"><h3>Installer ADRESS CLUB</h3>
+    ${ios ? `<ol><li>Ouvrez cette page dans <b>Safari</b>.</li><li>Touchez le bouton <b>Partager</b> <span class="ico-share">⬆︎</span> en bas de l'écran.</li><li>Choisissez <b>« Sur l'écran d'accueil »</b>, puis <b>Ajouter</b>.</li></ol>`
+      : `<ol><li>Ouvrez cette page dans <b>Chrome</b>.</li><li>Touchez le menu <b>⋮</b> en haut à droite.</li><li>Choisissez <b>« Installer l'application »</b> ou <b>« Ajouter à l'écran d'accueil »</b>.</li></ol>`}
+    <p class="muted small">L'icône ADRESS CLUB apparaîtra sur votre écran d'accueil, comme une application.</p>
+    <button class="btn block" type="button">J'ai compris</button></div>`;
+  d.onclick = (e) => { if (e.target === d || e.target.tagName === 'BUTTON') d.remove(); };
+  document.body.appendChild(d);
+}
+function carteInstall() {
+  if (estInstallee()) return '';
+  let plusTard = 0; try { plusTard = +localStorage.getItem('acl-install-later') || 0; } catch (_) {}
+  if (Date.now() - plusTard < 7 * 864e5) return '';
+  return '<div class="card install-card"><img src="icon-192.png" alt="" width="44" height="44"><div><b>Installez ADRESS CLUB</b><small>Retrouvez l’application sur l’écran d’accueil de votre téléphone.</small></div><div class="ic-act"><button class="btn sm" type="button" data-inst>Installer</button><button class="btn sm ghost" type="button" data-later>Plus tard</button></div></div>';
+}
+function brancherInstall(root) {
+  root.querySelectorAll('[data-inst]').forEach(b => b.onclick = installer);
+  root.querySelectorAll('[data-later]').forEach(b => b.onclick = () => { try { localStorage.setItem('acl-install-later', String(Date.now())); } catch (_) {} b.closest('.install-card').remove(); });
+}
+
 async function accueil() {
   await majCompteurs();
   const nl = state.compteurs.demandes_non_lues || 0;
@@ -210,13 +243,14 @@ async function accueil() {
     + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
-    + '</section><section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
+    + '</section>' + carteInstall() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
     + lien('#/residences', ICO.residences, 'Nos résidences', 'Photos et contact')
     + lien('#/flip-immo', ICO.flip, 'Le Flip Immo', 'Le magazine ADRESS')
     + lien('#/nouveautes', ICO.news, 'Les nouveautés', 'Programmes et actualités')
     + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Les bons plans</b><small>La sélection ADRESS pour vivre Abidjan</small></span>' + ICO.arrow + '</a>'
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
+  brancherInstall(app);
 }
 
 // ---------- Le Market (§3, §4) ----------
@@ -564,7 +598,7 @@ function profil() {
     <button class="btn block" style="margin-top:12px">Enregistrer</button>
   </form>
   <div class="card" style="margin-top:12px"><p class="muted small">Résidence : ${esc(p.residence?.nom || '—')}<br>Compte activé le ${dateFr(p.date_activation)}</p>
-  <div class="row"><a class="btn ghost" href="#/avis">Donner mon avis</a><button class="btn ghost" id="install" hidden>Installer l'application</button><button class="btn danger" id="out">Se déconnecter</button></div></div>`;
+  <div class="row"><a class="btn ghost" href="#/avis">Donner mon avis</a><button class="btn ghost" id="install" hidden>📲 Installer sur mon téléphone</button><button class="btn danger" id="out">Se déconnecter</button></div></div>`;
   const $ = (s) => app.querySelector(s);
   $('#f').onsubmit = async (e) => {
     e.preventDefault();
@@ -573,7 +607,7 @@ function profil() {
     await chargerProfil(); toast('Préférences enregistrées.');
   };
   $('#out').onclick = async () => { await sb.auth.signOut(); await chargerProfil(); location.hash = '#/'; router(); };
-  if (window._installPrompt) { $('#install').hidden = false; $('#install').onclick = () => window._installPrompt.prompt(); }
+  if (!estInstallee()) { $('#install').hidden = false; $('#install').onclick = installer; }
 }
 
 // ---------- Avis (§8) ----------
@@ -599,6 +633,7 @@ function avis() {
 
 // ---------- démarrage ----------
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window._installPrompt = e; });
+window.addEventListener('appinstalled', () => { window._installPrompt = null; document.querySelectorAll('.install-card').forEach(x => x.remove()); });
 window.addEventListener('hashchange', router);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } });
