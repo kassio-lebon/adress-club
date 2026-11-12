@@ -334,7 +334,7 @@ async function annonce(id) {
   app.innerHTML = `
   <a class="back" href="#/market">‹ Le Market</a>
   <div class="detail"><div class="detail-media"><div class="gal">${urls.map(u => `<img src="${esc(u)}" alt="${esc(a.titre)}">`).join('')}</div>
-  ${urls.length > 1 ? `<p class="muted small">${urls.length} photos, faites glisser</p>` : ''}</div><div class="detail-info">
+  ${urls.length > 1 ? `<p class="muted small">${urls.length} photos : utilisez les flèches ou faites glisser</p>` : ''}</div><div class="detail-info">
   <div class="tags">${a.statut === 'reserve' ? '<span class="badge warn">Réservé : nouvelles demandes suspendues</span>' : ''}${a.is_adress ? '<span class="badge">ADRESS IMMOBILIER</span>' : ''}</div>
   <h1>${esc(a.titre)}</h1>
   <h2 style="margin-top:4px">${prix(a)}</h2>

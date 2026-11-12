@@ -120,8 +120,17 @@ new MutationObserver(() => {
   const d = document.createElement('div'); d.className = 'dots';
   d.innerHTML = [...gal.children].map((_, i) => '<i' + (i ? '' : ' class="on"') + '></i>').join('');
   gal.after(d);
-  let last = 0;
-  gal.addEventListener('scroll', () => { const i = Math.round(gal.scrollLeft / gal.clientWidth); if (i !== last) { last = i; buzz(5); d.querySelectorAll('i').forEach((x, k) => x.classList.toggle('on', k === i)); } }, { passive: true });
+  // flèches précédent / suivant + points cliquables
+  const n = gal.children.length, w = document.createElement('div'); w.className = 'gal-w';
+  gal.before(w); w.appendChild(gal);
+  w.insertAdjacentHTML('beforeend', '<button type="button" class="gal-nav prev" aria-label="Photo précédente">‹</button><button type="button" class="gal-nav next" aria-label="Photo suivante">›</button><span class="gal-n">1 / ' + n + '</span>');
+  const aller = (i) => gal.scrollTo({ left: Math.max(0, Math.min(n - 1, i)) * gal.clientWidth, behavior: reduce ? 'auto' : 'smooth' });
+  w.querySelector('.prev').onclick = () => aller(last - 1);
+  w.querySelector('.next').onclick = () => aller(last + 1);
+  d.querySelectorAll('i').forEach((x, k) => x.onclick = () => aller(k));
+  const maj = () => { w.querySelector('.prev').disabled = last === 0; w.querySelector('.next').disabled = last === n - 1; w.querySelector('.gal-n').textContent = (last + 1) + ' / ' + n; };
+  let last = 0; maj();
+  gal.addEventListener('scroll', () => { const i = Math.round(gal.scrollLeft / gal.clientWidth); if (i !== last) { last = i; buzz(5); d.querySelectorAll('i').forEach((x, k) => x.classList.toggle('on', k === i)); maj(); } }, { passive: true });
 }).observe(app, { childList: true });
 
 if (touch && !reduce) {
