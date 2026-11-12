@@ -62,6 +62,9 @@ function photos() {
   app.querySelectorAll('.gal img:not(.ld)').forEach(im => { if (im.complete) im.classList.add('ld'); else im.addEventListener('load', () => im.classList.add('ld'), { once: true }); });
 }
 new MutationObserver(photos).observe(app, { childList: true, subtree: true });
+// page de connexion : emblème animé en fond
+const loginFx = () => { const l = app.querySelector('.login'); if (l && !l.querySelector('.login-mark')) l.insertAdjacentHTML('afterbegin', markSvg('login-mark') + markSvg('login-mark lm2')); };
+loginFx(); new MutationObserver(loginFx).observe(app, { childList: true, subtree: true });
 
 function decorate() {
   if (shared) { const g = app.querySelector('.gal img'); if (g) g.style.viewTransitionName = 'photo'; }
