@@ -590,3 +590,7 @@ details.adv summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--in
 @media (min-width:700px){.sheet-bg{align-items:center}.sheet{border-radius:20px}}
 @keyframes sheet-up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* v23 */
+.inst-url{word-break:break-all;background:#F4F4F6;border-radius:10px;padding:10px;margin:8px 0}
+.sheet>p{margin:6px 0;line-height:1.5}

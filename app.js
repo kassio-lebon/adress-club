@@ -207,18 +207,22 @@ export async function installer() {
     if (r && r.outcome === 'accepted') { window._installPrompt = null; toast('ADRESS CLUB est installée sur votre téléphone.'); document.querySelectorAll('.install-card').forEach(x => x.remove()); }
     return;
   }
-  const ios = estIOS();
+  const ua = navigator.userAgent, mobile = estIOS() || /android|mobile/i.test(ua);
+  let etapes;
+  if (!mobile) etapes = `<p>L’installation se fait sur votre <b>téléphone</b>. Ouvrez ce lien sur votre téléphone :</p><p class="inst-url"><b>${esc(location.origin + location.pathname)}</b></p><p>puis touchez « Installer sur mon téléphone ».</p>`;
+  else if (estIOS()) etapes = `<ol><li>Touchez le bouton <b>Partager</b> <span class="ico-share">⬆︎</span> (en bas de l’écran sur iPhone).</li><li>Faites défiler et choisissez <b>« Sur l’écran d’accueil »</b>.</li><li>Touchez <b>Ajouter</b>.</li></ol><p class="muted small">Sur iPhone, l’ajout se fait depuis Safari.</p>`;
+  else if (/SamsungBrowser/i.test(ua)) etapes = `<ol><li>Touchez le menu <b>☰</b> en bas à droite de l’écran.</li><li>Choisissez <b>« Ajouter la page à »</b>.</li><li>Puis <b>« Écran d’accueil »</b> et confirmez <b>Ajouter</b>.</li></ol>`;
+  else etapes = `<ol><li>Touchez le menu du navigateur <b>⋮</b> (en haut ou en bas de l’écran).</li><li>Choisissez <b>« Installer l’application »</b> ou <b>« Ajouter à l’écran d’accueil »</b>.</li><li>Confirmez avec <b>Installer</b> ou <b>Ajouter</b>.</li></ol>`;
   const d = document.createElement('div'); d.className = 'sheet-bg';
-  d.innerHTML = `<div class="sheet" role="dialog" aria-label="Installer l'application"><img src="icon-192.png" alt="" width="56" height="56"><h3>Installer ADRESS CLUB</h3>
-    ${ios ? `<ol><li>Ouvrez cette page dans <b>Safari</b>.</li><li>Touchez le bouton <b>Partager</b> <span class="ico-share">⬆︎</span> en bas de l'écran.</li><li>Choisissez <b>« Sur l'écran d'accueil »</b>, puis <b>Ajouter</b>.</li></ol>`
-      : `<ol><li>Ouvrez cette page dans <b>Chrome</b>.</li><li>Touchez le menu <b>⋮</b> en haut à droite.</li><li>Choisissez <b>« Installer l'application »</b> ou <b>« Ajouter à l'écran d'accueil »</b>.</li></ol>`}
-    <p class="muted small">L'icône ADRESS CLUB apparaîtra sur votre écran d'accueil, comme une application.</p>
+  d.innerHTML = `<div class="sheet" role="dialog" aria-label="Installer l'application"><img src="icon-192.png" alt="" width="56" height="56"><h3>Installer ADRESS CLUB sur votre téléphone</h3>
+    ${etapes}
+    ${mobile ? '<p class="muted small">L’icône ADRESS CLUB apparaîtra sur l’écran d’accueil de votre téléphone, comme une application.</p>' : ''}
     <button class="btn block" type="button">J'ai compris</button></div>`;
   d.onclick = (e) => { if (e.target === d || e.target.tagName === 'BUTTON') d.remove(); };
   document.body.appendChild(d);
 }
 function carteInstall() {
-  if (estInstallee()) return '';
+  if (estInstallee() || !(estIOS() || /android|mobile/i.test(navigator.userAgent))) return '';
   let plusTard = 0; try { plusTard = +localStorage.getItem('acl-install-later') || 0; } catch (_) {}
   if (Date.now() - plusTard < 7 * 864e5) return '';
   return '<div class="card install-card"><img src="icon-192.png" alt="" width="44" height="44"><div><b>Installez ADRESS CLUB</b><small>Retrouvez l’application sur l’écran d’accueil de votre téléphone.</small></div><div class="ic-act"><button class="btn sm" type="button" data-inst>Installer</button><button class="btn sm ghost" type="button" data-later>Plus tard</button></div></div>';
