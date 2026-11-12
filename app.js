@@ -222,6 +222,8 @@ const ICO = {
 // ---------- Installer l'application sur le téléphone ----------
 const estInstallee = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Vidéos tutoriels (format vertical, hébergées avec l'application)
+const videoTuto = (os, auto) => `<video class="tuto-v" controls playsinline preload="none" ${auto ? 'autoplay muted' : ''} poster="videos/poster-${os}.jpg" src="videos/tuto-${os}.mp4"></video>`;
 export async function installer() {
   if (!window._installPrompt && !estIOS()) await new Promise(r => { let n = 0; const t = setInterval(() => { if (window._installPrompt || ++n > 15) { clearInterval(t); r(); } }, 100); });
   if (window._installPrompt) {
@@ -237,11 +239,14 @@ export async function installer() {
   else if (/SamsungBrowser/i.test(ua)) etapes = `<ol><li>Touchez le menu <b>☰</b> en bas à droite de l’écran.</li><li>Choisissez <b>« Ajouter la page à »</b>.</li><li>Puis <b>« Écran d’accueil »</b> et confirmez <b>Ajouter</b>.</li></ol>`;
   else etapes = `<ol><li>Touchez le menu du navigateur <b>⋮</b> (en haut ou en bas de l’écran).</li><li>Choisissez <b>« Installer l’application »</b> ou <b>« Ajouter à l’écran d’accueil »</b>.</li><li>Confirmez avec <b>Installer</b> ou <b>Ajouter</b>.</li></ol>`;
   const d = document.createElement('div'); d.className = 'sheet-bg';
+  const osv = estIOS() ? 'ios' : 'android';
   d.innerHTML = `<div class="sheet" role="dialog" aria-label="Installer l'application"><img src="icon-192.png" alt="" width="56" height="56"><h3>Installer ADRESS CLUB sur votre téléphone</h3>
+    <div class="tuto-box" data-os="${osv}">${videoTuto(osv)}<a href="#" class="tuto-sw small">Voir la vidéo ${osv === 'ios' ? 'Android' : 'iPhone'}</a></div>
     ${etapes}
     ${mobile ? '<p class="muted small">L’icône ADRESS CLUB apparaîtra sur l’écran d’accueil de votre téléphone, comme une application.</p>' : ''}
     <button class="btn block" type="button">J'ai compris</button></div>`;
   d.onclick = (e) => { if (e.target === d || e.target.tagName === 'BUTTON') d.remove(); };
+  d.querySelector('.tuto-sw').onclick = (e) => { e.preventDefault(); const b = d.querySelector('.tuto-box'), o = b.dataset.os === 'ios' ? 'android' : 'ios'; b.dataset.os = o; b.querySelector('video').outerHTML = videoTuto(o, true); e.target.textContent = 'Voir la vidéo ' + (o === 'ios' ? 'Android' : 'iPhone'); };
   document.body.appendChild(d);
 }
 function carteInstall() {
@@ -680,6 +685,8 @@ function profil() {
     <label class="check"><input id="ni" type="checkbox" ${p.notif_interet ? 'checked' : ''}> M'alerter quand un résident est intéressé par mon annonce</label>
     <button class="btn block" style="margin-top:12px">Enregistrer</button>
   </form>
+  <div class="card" style="margin-top:12px"><h2 style="margin-top:0">Installer l'appli : les vidéos</h2><p class="muted small">À regarder ou à montrer à un voisin : 40 secondes pour avoir ADRESS CLUB sur l'écran d'accueil.</p>
+    <div class="tuto-grid"><div><b>Android</b>${videoTuto('android')}</div><div><b>iPhone</b>${videoTuto('ios')}</div></div></div>
   <div class="card" style="margin-top:12px"><p class="muted small">Résidence : ${esc(p.residence?.nom || '—')}<br>Compte activé le ${dateFr(p.date_activation)}</p>
   <div class="row"><a class="btn ghost" href="#/avis">Donner mon avis</a><button class="btn ghost" id="install" hidden>📲 Installer sur mon téléphone</button><button class="btn danger" id="out">Se déconnecter</button></div></div>`;
   const $ = (s) => app.querySelector(s);
