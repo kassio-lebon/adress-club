@@ -281,7 +281,7 @@ async function annonce(id) {
   ${a.description ? `<p style="white-space:pre-line">${esc(a.description)}</p>` : ''}
   <p class="muted">Publié par ${esc(a.vendeur)} le ${dateFr(a.date_publication)}</p>
   ${a.est_a_moi ? `<div class="row"><a class="btn block" href="#/modifier/${a.id}">Modifier</a><a class="btn ghost block" href="#/mes-annonces">Gérer (réservé, vendu…)</a></div>`
-    : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'Demande envoyée ✓' : 'Je suis intéressé'}</button>
+    : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'C’est zooo ! Demande envoyée ✓' : 'Ça m’intéresse, ça m’enjaille !'}</button><div id="zoo"></div>
       <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
     : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
   ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}</div></div>`;
@@ -289,10 +289,11 @@ async function annonce(id) {
   if (b && !dejaDemande) b.onclick = async () => {
     b.disabled = true; b.textContent = 'Envoi…';
     const { data: rang, error } = await sb.rpc('je_suis_interesse', { p_annonce: a.id });
-    if (error) { b.disabled = false; b.textContent = 'Je suis intéressé'; return toast(errMsg(error)); }
-    b.textContent = 'Demande envoyée ✓';
-    toast(`Demande enregistrée (n° ${rang}). Le vendeur a été prévenu.`);
-    if (!state.profil.consentement_contact) setTimeout(() => toast('Astuce : autorisez le partage de votre téléphone dans « Mon compte » pour que le vendeur puisse vous joindre.', 6000), 3800);
+    if (error) { b.disabled = false; b.textContent = 'Ça m’intéresse, ça m’enjaille !'; return toast(errMsg(error)); }
+    b.textContent = 'C’est zooo ! Demande envoyée ✓';
+    const tel = state.profil.consentement_contact && state.profil.telephone;
+    app.querySelector('#zoo').innerHTML = `<div class="zoo"><b>C’est zooo ! 🎉</b><p>Le vendeur a reçu votre demande n° ${rang}. ${tel ? `Il vous contactera au <b>${esc(state.profil.telephone)}</b>.` : 'Pour qu’il puisse vous joindre, <a href="#/profil">ajoutez votre numéro dans Mon compte</a> et autorisez son partage.'}</p><p class="muted">Merci !</p></div>`;
+    try { navigator.vibrate && navigator.vibrate([12, 40, 18]); } catch (_) {}
   };
   const s = app.querySelector('#sig');
   if (s) s.onclick = async (e) => {
@@ -556,7 +557,7 @@ function profil() {
   <form id="f" class="card" style="margin-top:12px">
     <label for="nom">Nom d'affichage (visible des autres résidents)</label><input id="nom" type="text" maxlength="40" value="${esc(p.nom_affichage)}">
     <label for="tel">Téléphone (privé)</label><input id="tel" type="tel" value="${esc(p.telephone || '')}" placeholder="+225 07 00 00 00 00">
-    <label class="check"><input id="cons" type="checkbox" ${p.consentement_contact ? 'checked' : ''}> J'accepte que mon téléphone soit communiqué uniquement aux vendeurs des objets pour lesquels je clique « Je suis intéressé ».</label>
+    <label class="check"><input id="cons" type="checkbox" ${p.consentement_contact ? 'checked' : ''}> J'accepte que mon téléphone soit communiqué uniquement aux vendeurs des objets pour lesquels je clique « Ça m’intéresse ».</label>
     <h2>Alertes</h2>
     <label class="check"><input id="nq" type="checkbox" ${p.notif_quotidienne ? 'checked' : ''}> Résumé quotidien des nouvelles annonces (une fois par jour au maximum)</label>
     <label class="check"><input id="ni" type="checkbox" ${p.notif_interet ? 'checked' : ''}> M'alerter quand un résident est intéressé par mon annonce</label>
