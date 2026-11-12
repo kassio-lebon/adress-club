@@ -675,3 +675,9 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 .rs-s:not([src]){visibility:hidden}
 @keyframes rsFade2{from{opacity:0}to{opacity:1}}
 .rs-s.on{opacity:1}
+
+/* v32 : emblème — les deux anneaux bougent d'un seul bloc (entrelacement du logo respecté) */
+.mark-anim path,.login-mark path,.intro-mark path{transform-box:view-box;transform-origin:50% 50%}
+.hero .mark-anim .mg{animation:mk-in2 1.1s .35s cubic-bezier(.16,1,.3,1) both,mk-sway 9s 1.3s ease-in-out infinite alternate}
+.hero .mark-anim .mr{animation:mk-in 1.1s .2s cubic-bezier(.16,1,.3,1) both,mk-sway 9s 1.3s ease-in-out infinite alternate}
+.fc-cover .mark-anim .mr,.fc-cover .mark-anim .mg{animation:mk-sway 8s ease-in-out infinite alternate}
