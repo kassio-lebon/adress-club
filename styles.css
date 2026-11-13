@@ -901,3 +901,5 @@ a.back[href="#/"]{display:none}
 .combo-st.occ{background:var(--sunken);color:var(--muted)}
 .combo-vide{padding:12px;color:var(--muted);font-size:14px}
 @media (min-width:760px){.tabs.chips{flex-wrap:wrap;overflow:visible;margin-left:0;margin-right:0;padding-left:0;padding-right:0;row-gap:8px}}
+.combo-haut{position:relative;z-index:50}
+.combo-list{z-index:60}

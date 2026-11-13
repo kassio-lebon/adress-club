@@ -105,12 +105,14 @@ async function invitations(box) {
     if (v === '+') $('#nb').focus();
   };
   const lst = () => $('#lgc .combo-list');
-  const fermer = () => { lst().hidden = true; $('#lgq').setAttribute('aria-expanded', 'false'); };
+  // La liste passe au-dessus du bouton : on surélève toute la branche (les animations créent des couches)
+  const hausser = (on) => { for (let e = $('#lgc'); e && e !== document.body; e = e.parentElement) e.classList.toggle('combo-haut', on); };
+  const fermer = () => { lst().hidden = true; hausser(false); $('#lgq').setAttribute('aria-expanded', 'false'); };
   const ouvrir = (q = '') => {
     const t = norm(q).split(/\s+/).filter(Boolean);
     const vis = items.filter(i => !t.length || t.every(w => i.cle.includes(w)));
     lst().innerHTML = vis.length ? vis.map(i => `<div class="combo-it${i.off ? ' off' : ''}${i.v === $('#lg').value ? ' sel' : ''}" role="option" data-v="${i.v}"><span><b>${esc(i.label)}</b>${i.nom ? ` <span class="muted">— ${esc(i.nom)}</span>` : ''}</span>${i.st ? `<span class="combo-st ${i.st[0]}">${i.st[1]}</span>` : ''}</div>`).join('') : '<div class="combo-vide">Aucun logement ne correspond.</div>';
-    lst().hidden = false; $('#lgq').setAttribute('aria-expanded', 'true');
+    lst().hidden = false; hausser(true); $('#lgq').setAttribute('aria-expanded', 'true');
     lst().querySelectorAll('.combo-it:not(.off)').forEach(d => d.onmousedown = (ev) => { ev.preventDefault(); choisir(d.dataset.v); });
   };
   const majLogements = () => {
