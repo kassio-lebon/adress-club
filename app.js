@@ -601,14 +601,84 @@ function publier() {
 
 // ---------- Mes annonces et demandes (§4, §5) ----------
 async function mesAnnonces() {
-  const onglet = qs().get('o') || 'annonces';
-  const tabs = `<div class="chips"><a class="chip ${onglet === 'annonces' ? 'on' : ''}" href="#/mes-annonces">Mes annonces</a><a class="chip ${onglet === 'envoyees' ? 'on' : ''}" href="#/mes-annonces?o=envoyees">Mes demandes envoyées</a></div>`;
-  if (onglet === 'envoyees') {
-    const { data } = await sb.from('demandes').select('id, rang, created_at, statut, lue, annonce_id').eq('demandeur_id', state.session.user.id).order('created_at', { ascending: false });
-    const ids = (data || []).map(d => d.annonce_id);
+  // Trois onglets : « À traiter » (une chose à faire à la fois), « Mes annonces » (épurées), « Mes demandes » (suivi)
+  const uid = state.session.user.id;
+  const [{ data: mes, error }, { data: dem }, { data: env }] = await Promise.all([
+    sb.from('annonces').select('*').eq('vendeur_id', uid).order('date_publication', { ascending: false }),
+    sb.rpc('mes_demandes_recues'),
+    sb.from('demandes').select('id, rang, created_at, statut, lue, annonce_id').eq('demandeur_id', uid).order('created_at', { ascending: false })]);
+  if (error) throw error;
+  const ouverte = (a) => ['disponible', 'reserve'].includes(a.statut) && !a.retiree_par_adress;
+  const prol = state.params.duree_prolongation_jours || 30;
+  const parAnnonce = (id) => (dem || []).filter(d => d.annonce_id === id).sort((x, y) => x.rang - y.rang);
+  const urls = await photosUrls((mes || []).map(a => a.photos[0]), true);
+  const photo = new Map((mes || []).map((a, i) => [a.id, urls[i] || '']));
+  const J = 864e5, now = Date.now();
+  const depuis = (d) => { const m = Math.round((now - new Date(d)) / 6e4); return m < 60 ? `il y a ${Math.max(1, m)} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
+  const fin = (a) => a.type === 'don' ? ['don_effectue', 'Don effectué'] : ['vendu', 'Vendu'];
+  const wa = (d, a) => `https://wa.me/${intl(d.contact)}?text=${encodeURIComponent('Bonjour ' + (d.demandeur || '') + ', je vous contacte au sujet de votre demande pour « ' + a.titre + ' » sur ADRESS CLUB.')}`;
+
+  // ---- ce qui demande une action, du plus urgent au moins urgent
+  const taches = [];
+  (mes || []).forEach(a => {
+    if (a.retiree_par_adress) return;
+    const ds = parAnnonce(a.id), att = ds.filter(d => d.statut !== 'contactee');
+    if (a.statut === 'disponible' && att.length) taches.push({ k: 'contact', a, d: att.find(d => d.contact) || att[0], reste: att.length - 1, o: 0, t: +new Date(att[0].created_at) });
+    else if (a.statut === 'reserve') taches.push({ k: 'conclure', a, o: 1, t: 0 });
+    if (ouverte(a)) { const j = (new Date(a.date_expiration) - now) / J; if (j <= 7) taches.push({ k: 'expire', a, j: Math.max(0, Math.ceil(j)), o: 2, t: j }); }
+    else if (a.statut === 'expire' && now - new Date(a.date_expiration) < 14 * J) taches.push({ k: 'expiree', a, o: 3, t: 0 });
+  });
+  taches.sort((x, y) => x.o - y.o || x.t - y.t);
+
+  let onglet = qs().get('o');
+  if (!['traiter', 'annonces', 'envoyees'].includes(onglet)) onglet = taches.length ? 'traiter' : 'annonces';
+  const tabs = `<div class="seg" role="tablist">${[['traiter', 'À traiter'], ['annonces', 'Publiées'], ['envoyees', 'Mes demandes']].map(([k, l]) =>
+    `<a role="tab" class="${onglet === k ? 'on' : ''}" href="#/mes-annonces?o=${k}">${l}${k === 'traiter' && taches.length ? `<b>${taches.length}</b>` : ''}</a>`).join('')}</div>`;
+  const vignette = (a, stamp) => `<${ouverte(a) ? `a href="#/annonce/${a.id}"` : 'div'} class="ph vg" style="background-image:url('${esc(photo.get(a.id))}')">${stamp ? '<span class="stamp">Réservé</span>' : ''}</${ouverte(a) ? 'a' : 'div'}>`;
+
+  let corps = '';
+  if (onglet === 'traiter') {
+    corps = taches.map(x => {
+      const a = x.a, tete = (k) => `<div class="tk-top">${vignette(a, a.statut === 'reserve')}<div style="min-width:0"><div class="tk-k">${k}</div><b>${esc(a.titre)}</b></div></div>`;
+      if (x.k === 'contact') { const d = x.d; return `<div class="card tache" data-id="${a.id}">${tete(d.lue ? 'À contacter' : 'Nouvel intéressé')}
+        <p class="tk-msg"><b>${esc(d.demandeur || 'Un résident')}</b> attend votre appel <span class="muted">· demande n° ${d.rang}, ${depuis(d.created_at)}</span></p>
+        ${d.contact ? `<div class="row tk-act"><a class="btn" data-ct="${d.id}" target="_blank" rel="noopener" href="${wa(d, a)}">WhatsApp</a><a class="btn ghost" data-ct="${d.id}" href="tel:+${intl(d.contact)}">Appeler</a></div>`
+          : '<p class="muted small">Son numéro n’est pas encore partagé : il apparaîtra ici dès qu’il l’ajoutera.</p>'}
+        ${x.reste ? `<p class="muted small tk-next">Ensuite : ${x.reste} autre${x.reste > 1 ? 's' : ''} intéressé${x.reste > 1 ? 's' : ''} en attente.</p>` : ''}</div>`; }
+      if (x.k === 'conclure') { const [st, lb] = fin(a); return `<div class="card tache card-res" data-id="${a.id}">${tete('Réservée')}
+        <p class="tk-msg">L’affaire s’est conclue ?</p>
+        <div class="row tk-act"><button class="btn" data-act="${st}">Oui, ${lb.toLowerCase()}</button><button class="btn ghost" data-act="disponible">Non, remettre disponible</button></div></div>`; }
+      if (x.k === 'expire') return `<div class="card tache" data-id="${a.id}">${tete(x.j ? `Expire dans ${x.j} jour${x.j > 1 ? 's' : ''}` : 'Expire aujourd’hui')}
+        <p class="tk-msg">Toujours disponible ? Gardez-la en ligne.</p>
+        <div class="row tk-act"><button class="btn" data-act="prolonger">Prolonger de ${prol} jours</button></div></div>`;
+      return `<div class="card tache" data-id="${a.id}">${tete('Expirée')}
+        <p class="tk-msg">Elle n’est plus visible sur le Market depuis le ${dateFr(a.date_expiration)}.</p>
+        <div class="row tk-act"><button class="btn" data-act="prolonger">Remettre en ligne ${prol} jours</button></div></div>`;
+    }).join('') || `<div class="card center pad tk-vide"><div class="tk-ok"></div><b>Tout est à jour</b><p class="muted">Aucune demande en attente. Vous serez prévenu dès qu’un résident s’intéresse à l’une de vos annonces.</p></div>`;
+  } else if (onglet === 'annonces') {
+    corps = (mes || []).map(a => {
+      const ds = parAnnonce(a.id), att = ds.filter(d => d.statut !== 'contactee').length, res = a.statut === 'reserve' && !a.retiree_par_adress, [st, lb] = fin(a);
+      const gerable = ouverte(a) || (a.statut === 'expire' && !a.retiree_par_adress);
+      const resume = !ouverte(a) ? (a.retiree_par_adress ? 'Retirée par ADRESS' : `Terminée${a.date_cloture ? ' le ' + dateFr(a.date_cloture) : ''}`)
+        : ds.length ? `${ds.length} intéressé${ds.length > 1 ? 's' : ''}${att ? ` · <a class="tk-lien" href="#/mes-annonces?o=traiter">${att} à contacter</a>` : ''}` : 'Pas encore d’intéressé';
+      return `<div class="card ann${res ? ' card-res' : ''}${ouverte(a) ? '' : ' fermee'}" data-id="${a.id}">
+        <div style="display:flex;gap:12px;align-items:center">${vignette(a, res)}
+        <div style="min-width:0;flex:1"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(a.titre)}</a>` : esc(a.titre)}</b>
+          <div class="muted small"><span class="pill ${a.retiree_par_adress ? 'off' : a.statut}">${a.retiree_par_adress ? 'Retirée' : STATUTS[a.statut]}</span> · ${prix(a)}</div>
+          <div class="small an-res">${resume}</div></div></div>
+        ${gerable ? `<details class="gerer"><summary>Gérer</summary><div class="gerer-in">
+          ${ouverte(a) ? `<div class="row"><button class="btn sm" data-act="${st}">${lb}</button><button class="btn sm ghost" data-act="${res ? 'disponible' : 'reserve'}">${res ? 'Remettre disponible' : 'Réserver'}</button></div>
+          <div class="row"><a class="btn sm soft" href="#/modifier/${a.id}">Modifier</a><button class="btn sm soft" data-act="prolonger">Prolonger de ${prol} j</button><button class="btn sm soft" data-act="retire">Retirer</button></div>`
+          : `<div class="row"><button class="btn sm" data-act="prolonger">Remettre en ligne ${prol} jours</button></div>`}
+          ${ouverte(a) ? `<p class="muted small" style="margin:8px 0 0">En ligne jusqu’au ${dateFr(a.date_expiration)}.${res ? ' Réservée : les nouvelles demandes sont suspendues.' : ''}</p>` : ''}
+          ${ds.length ? `<div class="dem-list">${ds.map(d => `<div class="dem"><b>n° ${d.rang}</b> ${esc(d.demandeur)} ${d.statut === 'contactee' ? '<span class="badge ok">contacté</span>' : ''}<div class="muted small">${depuis(d.created_at)}</div>
+            ${d.contact ? `<div class="row" style="margin-top:6px"><a class="btn sm soft" data-ct="${d.id}" target="_blank" rel="noopener" href="${wa(d, a)}">WhatsApp</a><a class="btn sm soft" data-ct="${d.id}" href="tel:+${intl(d.contact)}">Appeler</a></div>` : ''}</div>`).join('')}</div>` : ''}
+        </div></details>` : ''}</div>`;
+    }).join('') || '<div class="card center pad">Vous n\'avez encore publié aucune annonce.<br><br><a class="btn" href="#/publier">+ Publier</a></div>';
+  } else {
+    const ids = (env || []).map(d => d.annonce_id);
     const { data: ouvertes } = ids.length ? await sb.from('v_market').select('id,titre,statut').in('id', ids) : { data: [] };
     const m = new Map((ouvertes || []).map(o => [o.id, o]));
-    // Suivi en 3 étapes : envoyée → vue par le vendeur → le vendeur vous a contacté
     const suivi = (d, o) => {
       const vue = d.lue || d.statut === 'contactee', ct = d.statut === 'contactee';
       const et = [['Envoyée', true], ['Vue par le vendeur', vue], ['Vous a contacté', ct]];
@@ -619,43 +689,26 @@ async function mesAnnonces() {
         : '<div class="sv-etat">Votre demande est bien arrivée. Le vendeur ne l’a pas encore ouverte.</div>';
       return `<ol class="suivi">${et.map(([l, f], k) => `<li class="${f ? 'fait' : ''}" style="--k:${k}"><i></i><span>${l}</span></li>`).join('')}</ol>${etat}`;
     };
-    app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes demandes</h1>${tabs}<div class="list" id="lst">${(data || []).map(d => { const o = m.get(d.annonce_id); return `
+    corps = (env || []).map(d => { const o = m.get(d.annonce_id); return `
       <div class="card"><b>${o ? `<a href="#/annonce/${d.annonce_id}">${esc(o.titre)}</a>` : 'Annonce terminée'}</b>
-      <div class="muted small">Demande n° ${d.rang} du ${dateFr(d.created_at, true)}</div>${suivi(d, o)}</div>`; }).join('') || '<div class="card center pad">Vous n\'avez envoyé aucune demande.</div>'}</div>`;
-    if ((data || []).length) barreRecherche(app.querySelector('#lst'), () => app.querySelectorAll('#lst > .card'), 'Rechercher une demande…');
-    return;
+      <div class="muted small">Demande n° ${d.rang} du ${dateFr(d.created_at, true)}</div>${suivi(d, o)}</div>`; }).join('')
+      || '<div class="card center pad">Vous n\'avez envoyé aucune demande.<br><br><a class="btn" href="#/market">Voir le Market</a></div>';
   }
-  const [{ data: mes, error }, { data: dem }] = await Promise.all([
-    sb.from('annonces').select('*').eq('vendeur_id', state.session.user.id).order('date_publication', { ascending: false }),
-    sb.rpc('mes_demandes_recues')]);
-  if (error) throw error;
-  const urls = await photosUrls((mes || []).map(a => a.photos[0]), true);
-  const parAnnonce = (id) => (dem || []).filter(d => d.annonce_id === id);
-  const ouverte = (a) => ['disponible', 'reserve'].includes(a.statut) && !a.retiree_par_adress;
-  const prol = state.params.duree_prolongation_jours || 30;
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes annonces</h1>${tabs}
-  <p class="muted">Contactez les intéressés dans l'ordre d'arrivée des demandes.</p>
-  <div class="list" id="lst">${(mes || []).map((a, i) => { const ds = parAnnonce(a.id), nl = ds.filter(d => !d.lue).length; return `
-  <div class="card${a.statut === 'reserve' && !a.retiree_par_adress ? ' card-res' : ''}" data-id="${a.id}">
-    <div style="display:flex;gap:12px"><div class="ph" style="width:72px;height:72px;flex:none;border-radius:10px;background-image:url('${esc(urls[i])}')">${a.statut === 'reserve' && !a.retiree_par_adress ? '<span class="stamp">Réservé</span>' : ''}</div>
-    <div style="min-width:0"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(a.titre)}</a>` : esc(a.titre)}</b>
-      <div class="muted small"><span class="pill ${a.retiree_par_adress ? 'off' : a.statut}">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUTS[a.statut]}</span> · ${prix(a)}</div>
-      <div class="muted small">${ouverte(a) ? `Expire le ${dateFr(a.date_expiration)}` : `Clôturée${a.date_cloture ? ' le ' + dateFr(a.date_cloture) : ''} · archivée`}</div></div></div>
-    ${a.statut === 'reserve' && !a.retiree_par_adress ? `<div class="res-note"><b>Annonce réservée.</b> Sur le Market, elle porte le tampon « Réservé » et personne ne peut plus envoyer de demande. Une fois l'affaire conclue, touchez « ${a.type === 'don' ? 'Don effectué' : 'Vendu'} » ; sinon, « Remettre disponible ».</div>` : ''}
-    ${ds.length ? `<details ${ouverte(a) ? 'open' : ''} data-lire="${nl ? a.id : ''}"><summary style="margin-top:10px">${ds.length} demande${ds.length > 1 ? 's' : ''}${nl ? ` · <span class="badge">${nl} nouvelle${nl > 1 ? 's' : ''}</span>` : ''}</summary>
-      ${ds.map(d => `<div class="dem"><b>n° ${d.rang}</b> ${esc(d.demandeur)} ${d.statut === 'contactee' ? '<span class="badge ok">contacté</span>' : ''}
-        <div class="muted small">Le ${dateFr(d.created_at, true)}</div>
-        ${d.contact ? `<div class="row" style="margin-top:6px"><a class="btn sm soft" data-ct="${d.id}" target="_blank" rel="noopener" href="https://wa.me/${intl(d.contact)}?text=${encodeURIComponent('Bonjour ' + (d.demandeur || '') + ', je vous contacte au sujet de votre demande pour « ' + a.titre + ' » sur ADRESS CLUB.')}">WhatsApp</a><a class="btn sm soft" data-ct="${d.id}" href="tel:+${intl(d.contact)}">Appeler</a></div>`
-          : `<div class="muted small">Numéro pas encore partagé : il s'affichera ici dès que ce résident l'ajoutera.</div>`}</div>`).join('')}</details>` : ''}
-    ${ouverte(a) ? `<div class="row" style="margin-top:12px">
-      <button class="btn sm ghost" data-act="${a.statut === 'reserve' ? 'disponible' : 'reserve'}">${a.statut === 'reserve' ? 'Remettre disponible' : 'Réservé'}</button>
-      <button class="btn sm" data-act="${a.type === 'don' ? 'don_effectue' : 'vendu'}">${a.type === 'don' ? 'Don effectué' : 'Vendu'}</button>
-      <button class="btn sm ghost" data-act="retire">Retirer</button></div>` : ''}
-    ${(ouverte(a) || a.statut === 'expire') && !a.retiree_par_adress ? `<div class="row" style="margin-top:8px">${ouverte(a) ? `<a class="btn sm soft" href="#/modifier/${a.id}">Modifier</a>` : ''}<button class="btn sm soft" data-act="prolonger">Prolonger de ${prol} jours</button></div>` : ''}
-  </div>`; }).join('') || '<div class="card center pad">Vous n\'avez encore publié aucune annonce.<br><br><a class="btn" href="#/publier">+ Publier</a></div>'}</div>`;
-  if ((mes || []).length) { barreRecherche(app.querySelector('#lst'), () => app.querySelectorAll('#lst > .card[data-id]'), 'Rechercher dans mes annonces…'); const qs0 = app.querySelector('.live-search input'); if (qs0 && mesAnnonces._q) { qs0.value = mesAnnonces._q; qs0.dispatchEvent(new Event('input')); } if (qs0) qs0.addEventListener('input', () => mesAnnonces._q = qs0.value); }
-  app.querySelectorAll('details[data-lire]').forEach(d => { if (d.dataset.lire) sb.rpc('marquer_demandes_lues', { p_annonce: d.dataset.lire }).then(majCompteurs); });
-  app.querySelectorAll('[data-ct]').forEach(l => l.addEventListener('click', () => sb.rpc('marquer_contactee', { p_demande: l.dataset.ct })));
+  const aide = { traiter: taches.length ? 'Une chose à la fois : contactez les intéressés dans l’ordre d’arrivée.' : '', annonces: '', envoyees: 'Suivez les demandes que vous avez envoyées aux vendeurs.' };
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes annonces</h1>${tabs}${aide[onglet] ? `<p class="muted">${aide[onglet]}</p>` : ''}<div class="list" id="lst">${corps}</div>`;
+  const n = app.querySelectorAll('#lst > .card[data-id]').length;
+  if (onglet === 'annonces' && n > 5) { barreRecherche(app.querySelector('#lst'), () => app.querySelectorAll('#lst > .card[data-id]'), 'Rechercher dans mes annonces…'); const qs0 = app.querySelector('.live-search input'); if (qs0 && mesAnnonces._q) { qs0.value = mesAnnonces._q; qs0.dispatchEvent(new Event('input')); } if (qs0) qs0.addEventListener('input', () => mesAnnonces._q = qs0.value); }
+  // demandes affichées = lues par le vendeur (le suivi de l'intéressé passe à « Vue par le vendeur »)
+  const aLire = new Set(); if (onglet === 'traiter') taches.forEach(x => { if (x.k === 'contact' && parAnnonce(x.a.id).some(d => !d.lue)) aLire.add(x.a.id); });
+  aLire.forEach(id => sb.rpc('marquer_demandes_lues', { p_annonce: id }).then(majCompteurs));
+  app.querySelectorAll('details.gerer').forEach(dt => dt.addEventListener('toggle', () => { const id = dt.closest('[data-id]').dataset.id; if (dt.open && parAnnonce(id).some(d => !d.lue)) sb.rpc('marquer_demandes_lues', { p_annonce: id }).then(majCompteurs); }));
+  // après un appel ou un message WhatsApp, au retour dans l'appli : la carte passe à l'intéressé suivant
+  app.querySelectorAll('[data-ct]').forEach(l => l.addEventListener('click', () => {
+    sb.rpc('marquer_contactee', { p_demande: l.dataset.ct }).then(() => {
+      const h = location.hash, go = () => { if (document.visibilityState !== 'visible' || location.hash !== h) return; document.removeEventListener('visibilitychange', go); const y = scrollY; mesAnnonces().then(() => scrollTo(0, y)); };
+      document.addEventListener('visibilitychange', go); setTimeout(go, 2500);
+    });
+  }));
   app.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
     const id = b.closest('[data-id]').dataset.id, act = b.dataset.act;
     if (['vendu', 'don_effectue', 'retire'].includes(act) && !confirm(act === 'retire' ? 'Retirer cette annonce du Market ?' : 'Confirmer ? L\'annonce sera immédiatement retirée du Market et archivée.')) return;
@@ -664,7 +717,7 @@ async function mesAnnonces() {
     if (r.error) { b.disabled = false; return toast(errMsg(r.error)); }
     if (act === 'vendu' || act === 'don_effectue') { location.hash = `#/avis?annonce=${id}`; return; }
     const titre = b.closest('[data-id]').querySelector('b').textContent.trim();
-    const msg = { prolonger: `« ${titre} » prolongée jusqu'au ${dateFr(r.data)}.`, reserve: `« ${titre} » est marquée réservée.`, disponible: `« ${titre} » est de nouveau disponible.`, retire: `« ${titre} » a été retirée du Market.` };
+    const msg = { prolonger: `« ${titre} » est en ligne jusqu'au ${dateFr(r.data)}.`, reserve: `« ${titre} » est marquée réservée.`, disponible: `« ${titre} » est de nouveau disponible.`, retire: `« ${titre} » a été retirée du Market.` };
     toast(msg[act] || 'Annonce mise à jour.');
     const y = scrollY; await mesAnnonces(); scrollTo(0, y);
     const c = app.querySelector(`[data-id="${id}"]`);
@@ -676,13 +729,13 @@ async function mesAnnonces() {
 async function residences() {
   const { data } = await sb.from('residences').select('*').eq('visible', true).order('ordre');
   const imgs = (r) => [...new Set([r.photo_path, ...(r.photos || [])].filter(Boolean).map(publicUrl))];
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos résidences</h1><p class="muted">Les résidences ADRESS IMMOBILIER</p>
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos résidences</h1>
   <div class="list" style="margin-top:12px">${(data || []).map((r, k) => { const im = imgs(r); return `<div class="card item res-card" style="--k:${k}">
     ${im.length ? `<div class="rs" data-imgs="${esc(JSON.stringify(im))}" role="img" aria-label="Photos de ${esc(r.nom)}">
       ${im.length > 1 ? `<div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div>` : ''}
       ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}</div>` : ''}
     <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc(r.quartier || '')}${r.type_bien ? ' · ' + esc(r.type_bien) : ''}</div>
-    ${r.description ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">Découvrir la résidence ↗</a>` : ''}</div></div>`; }).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
+    ${r.description && !/^résidence adress immobilier\.?$/i.test(r.description.trim()) ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">Découvrir la résidence ↗</a>` : ''}</div></div>`; }).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
   (data || []).forEach(r => track('vue_residence', r.id));
   app.querySelectorAll('[data-r]').forEach(a => a.addEventListener('click', () => track('clic_residence', a.dataset.r)));
   app.querySelectorAll('.rs').forEach(diaporama);
@@ -736,7 +789,7 @@ async function nouveautes() {
 async function flip() {
   const { data } = await sb.from('contenus').select('*').eq('visible', true).eq('type', 'Flip Immo').order('date_parution', { ascending: false }).limit(1);
   const f = data?.[0];
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Le Flip Immo</h1><p class="muted">Le magazine ADRESS IMMOBILIER</p>
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Le Flip Immo</h1>
   ${f ? `<div class="card center" style="margin-top:12px">${f.image_path ? `<img src="${esc(publicUrl(f.image_path))}" alt="Couverture du Flip Immo" style="margin:0 auto;max-height:520px;border-radius:10px">` : ''}
     <h2>${esc(f.titre)}${f.numero ? ' – n° ' + esc(f.numero) : ''}</h2>${f.lien ? `<a class="btn block" id="lire" href="${esc(estFlip(f.lien) ? lienFlip(f.lien, f.titre) : sur(f.lien))}" ${estFlip(f.lien) ? '' : 'target="_blank" rel="noopener"'}>Lire le magazine</a>` : ''}</div>`
   : '<div class="card center pad" style="margin-top:12px">Le prochain numéro arrive bientôt.</div>'}`;

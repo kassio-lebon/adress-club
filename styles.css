@@ -783,3 +783,40 @@ h1.wd .w>span{display:inline-block;animation:wordUp .7s cubic-bezier(.16,1,.3,1)
 .sv-etat.ok{background:var(--ok-tint);color:var(--ok);font-weight:600}
 .sv-etat.res{background:var(--warn-tint);color:var(--warn)}
 .sv-etat.off{color:var(--muted)}
+
+/* v50 : « À traiter » — une chose à faire à la fois */
+.seg{display:flex;gap:4px;padding:4px;margin:4px 0 14px;background:var(--sunken);border-radius:14px}
+.seg a{flex:1 1 0;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:6px 4px;border-radius:10px;font-weight:600;font-size:13.5px;color:var(--ink-2);text-decoration:none;text-align:center;line-height:1.15;transition:background .25s,color .25s,box-shadow .25s}
+.seg a.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(17,18,20,.12)}
+.seg a b{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--red);color:#fff;font-size:12px;line-height:20px}
+.tache{padding:16px}
+.tk-top{display:flex;gap:12px;align-items:center}
+.vg{width:64px;height:64px;flex:none;border-radius:12px;aspect-ratio:auto;display:block}
+.tk-k{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--red);margin-bottom:2px}
+.card-res .tk-k{color:var(--warn)}
+.tk-msg{margin:12px 0 0;font-size:15.5px;line-height:1.45}
+.tk-act{margin-top:12px}
+.tk-act .btn{flex:1;min-height:46px}
+.tk-next{margin:10px 0 0}
+.tk-vide .tk-ok{width:52px;height:52px;margin:0 auto 10px;border-radius:50%;background:var(--ok-tint);position:relative;animation:pop .45s cubic-bezier(.2,1.5,.4,1) both}
+.tk-vide .tk-ok::after{content:"";position:absolute;left:19px;top:13px;width:11px;height:20px;border:solid var(--ok);border-width:0 3px 3px 0;transform:rotate(45deg)}
+.an-res{margin-top:2px;color:var(--ink-2)}
+.tk-lien{color:var(--red);font-weight:600}
+.ann.fermee{opacity:.7}
+details.gerer{margin-top:12px;border-top:1px solid var(--line)}
+details.gerer>summary{list-style:none;cursor:pointer;padding:10px 0 0;font-weight:600;font-size:14px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+details.gerer>summary::-webkit-details-marker{display:none}
+.gerer-in{padding-top:10px;animation:rise .35s var(--ease) both}
+.gerer-in .row{margin-top:8px}
+.dem-list{margin-top:6px}
+
+/* v51 : intro avec le logo officiel ADRESS IMMOBILIER, CLUB en dessous */
+.intro2 .nl{display:block;clip-path:none;width:min(80vw,400px);height:auto;margin-bottom:20px;opacity:0;animation:nlIn 1s .15s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes nlIn{from{opacity:0;transform:scale(.94);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+.intro2 .intro-stage>.nl~.intro-in{margin-top:0}
+.intro2 .intro-stage>.nl~.intro-in i{animation-delay:1.05s}
+.intro2 .intro-stage>.nl~.intro-in span{animation-delay:1.2s}
+.intro2.out .nl{transform:scale(1.06);opacity:0;transition:transform .8s cubic-bezier(.7,0,.3,1),opacity .6s ease}
+
+/* v52 : moins de répétitions — « ‹ Accueil » déjà dans la navigation */
+a.back[href="#/"]{display:none}
