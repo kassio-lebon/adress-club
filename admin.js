@@ -603,7 +603,11 @@ async function residences(box) {
   box.querySelectorAll('[data-ann]').forEach(a => a.onclick = () => { annuaire._rid = rid(a); });
   box.querySelectorAll('[data-supr]').forEach(b => b.onclick = () => { const r = D.find(x => x.id === rid(b)); if (!r) return;
     if (nbM(r.id)) return toast(`${r.nom} a ${nbM(r.id)} membre(s) du Club : retirez-les d’abord, ou masquez la résidence.`);
-    if (!confirm(`Supprimer définitivement ${r.nom} ?\n\n• Ses ${nbL(r.id)} logement(s) et leurs locataires sont effacés de Nos locataires\n• Les codes d’invitation en attente sont annulés\n\nCette action est irréversible. Pour la cacher sans rien perdre, utilisez « Masquer ».`)) return;
+    // Double confirmation : 1) l'impact, 2) saisie du nom de la résidence
+    if (!confirm(`⚠ Supprimer définitivement ${r.nom} ?\n\nCe qui sera effacé, sans retour possible :\n• la résidence (fiche, photo, description)\n• ses ${nbL(r.id)} logement(s) et leurs locataires dans Nos locataires\n• les codes d’invitation en attente\n\nAucune sauvegarde n’est conservée. Pour la cacher sans rien perdre, utilisez plutôt « Masquer ».`)) return;
+    const saisi = prompt(`Dernière confirmation — action irréversible.\n\nTapez le nom de la résidence pour la supprimer :\n${r.nom}`);
+    if (saisi == null) return;
+    if (norm(saisi) !== norm(r.nom)) return toast('Nom différent : suppression annulée.');
     action(async () => check(await sb.rpc('admin_supprimer_residence', { p_id: r.id })), `${r.nom} supprimée.`); });
   box.querySelectorAll('[data-photo]').forEach(i => i.onchange = () => i.files[0] && action(async () => { toast('Envoi de la photo…'); const photo_path = await uploadPublic(i.files[0], 'residences'); check(await sb.from('residences').update({ photo_path }).eq('id', rid(i))); }, 'Photo mise à jour.'));
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {

@@ -981,7 +981,19 @@ window.addEventListener('acl-photo-ko', (e) => {
   if (!state.reessai || Date.now() - state.reessai > 60000) { state.reessai = Date.now(); clearTimeout(state.reessaiT); state.reessaiT = setTimeout(router, 400); }
 });
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } if (ev === 'PASSWORD_RECOVERY') { state.recup = true; setTimeout(router, 0); } });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// Mise à jour automatique : dès qu'une nouvelle version est publiée, l'application la récupère et se recharge une fois
+if ('serviceWorker' in navigator) {
+  const avait = !!navigator.serviceWorker.controller; let fait = false;
+  // Jamais en pleine saisie : si l'écran est affiché, le rechargement attend que l'utilisateur quitte puis revienne
+  let attente = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!avait || fait) return; fait = true; if (document.visibilityState === 'hidden') location.reload(); else attente = true; });
+  document.addEventListener('visibilitychange', () => { if (attente && document.visibilityState === 'hidden') location.reload(); });
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    const verifier = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verifier(); });
+    setInterval(verifier, 30 * 60 * 1000);
+  }).catch(() => {});
+}
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });
 await chargerProfil();
 router();
