@@ -1,7 +1,7 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
 import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES, FILTRES_BP, compress, barreRecherche } from './app.js';
 
-const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
+const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['annuaire','Annuaire'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
 const TYPES_BIEN = ['Appartements','Villas en résidence','Villas individuelles','Mixte'];
 
@@ -11,7 +11,7 @@ export async function renderAdmin(app, ong) {
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Espace ADRESS</h1>
   <div class="tabs chips">${ONGLETS.map(([k, l]) => `<a class="chip ${k === ong ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div><div id="adm"></div>`;
   const box = app.querySelector('#adm');
-  await ({ stats, invitations, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
+  await ({ stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
   if (ong !== 'parametres') {
     box.querySelectorAll('table.adm').forEach(t => { if (t.querySelectorAll('tr').length > 3) barreRecherche(t.parentElement.matches('div[style*="overflow"]') ? t.parentElement : t, () => [...t.querySelectorAll('tr')].slice(1), 'Rechercher…'); });
     box.querySelectorAll('.list').forEach(l => { if (l.children.length > 3) barreRecherche(l, () => [...l.children], 'Rechercher…'); });
@@ -48,28 +48,31 @@ async function stats(box) {
 }
 
 // ---------- Invitations et logements (§2) ----------
+const EMAIL_OK = (m) => /^[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(m || '');
 async function invitations(box) {
   const [res, log, inv, occ] = await Promise.all([
     sb.from('residences').select('id,nom').order('nom'),
-    sb.from('logements').select('id,code,numero,residence_id').eq('actif', true).order('code'),
+    sb.from('logements').select('id,code,numero,residence_id,bloc,etage,appartement,locataire,email').eq('actif', true).order('code'),
     sb.from('invitations').select('*, logements(code,numero,residences(nom))').order('created_at', { ascending: false }).limit(200),
     sb.from('profiles').select('logement_id,nom_affichage').eq('statut', 'actif').not('logement_id', 'is', null)]);
   const R = res.data || [], Lg = log.data || [];
   const occupant = new Map((occ.data || []).map(p => [p.logement_id, p.nom_affichage || 'occupé']));
   const enAttente = new Map((inv.data || []).filter(i => !i.utilisee_par && new Date(i.expire_le) > new Date() && i.logement_id).map(i => [i.logement_id, i.nom_affichage || 'code envoyé']));
   const lienApp = location.origin + location.pathname;
-  const message = (i) => `Bonjour${i.nom_affichage ? ' ' + i.nom_affichage : ''},\n\nBienvenue dans ADRESS CLUB, l'espace privé des résidents ADRESS IMMOBILIER.\n\n1. Ouvrez ${lienApp}\n2. Touchez « J'ai un code d'invitation »\n3. Saisissez votre code : ${i.code}\n\nCe code est personnel et valable jusqu'au ${dateFr(i.expire_le)}.`;
+  const message = (i) => `Bonjour${i.nom_affichage ? ' ' + i.nom_affichage : ''},\n\nBienvenue dans ADRESS CLUB, l'espace privé des résidents ADRESS IMMOBILIER.\n\n1. Ouvrez ${lienApp}\n2. Touchez « J'ai un code d'invitation »\n3. Saisissez votre code : ${i.code}${i.email ? `\n4. Utilisez obligatoirement votre adresse e-mail : ${i.email}` : ''}\n\nCe code est personnel et valable jusqu'au ${dateFr(i.expire_le)}.`;
   const etat = (i) => i.utilisee_par ? `<span class="badge ok">Activé le ${dateFr(i.utilisee_le)}</span>` : new Date(i.expire_le) < new Date() ? '<span class="badge soft">Expiré</span>' : '<span class="badge warn">En attente</span>';
   if (!R.length) { box.innerHTML = '<div class="card center pad">Ajoutez d’abord une résidence dans l’onglet <a href="#/admin/residences">Résidences</a>.</div>'; return; }
   box.innerHTML = `
-  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Un logement = une seule personne. Les logements occupés ou avec un code en attente sont grisés.</p>
-  <form id="fi">
+  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Choisissez la résidence puis le logement : le nom et l’e-mail du locataire se remplissent depuis l’<a href="#/admin/annuaire">annuaire</a>. Le locataire devra créer son compte avec <b>cet e-mail</b>.</p>
+  <form id="fi" novalidate>
     <div class="grid2">
       <div><label for="ir">Résidence</label><select id="ir">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
       <div><label for="lg">Logement</label><select id="lg"></select></div>
     </div>
-    <div id="nvBox" hidden><label for="nv">N° du nouveau logement</label><input id="nv" type="text" placeholder="ex : A12" autocomplete="off"></div>
-    <label for="na">Nom du locataire</label><input id="na" type="text" placeholder="ex : M. Koné" autocomplete="off">
+    <div id="nvBox" hidden><div class="g3f"><div><label for="nb">Bloc</label><input id="nb" type="text" placeholder="A"></div><div><label for="ne">Étage</label><input id="ne" type="text" placeholder="RDJ"></div><div><label for="nap">Appartement</label><input id="nap" type="text" placeholder="A001"></div></div></div>
+    <label for="na">Nom du locataire</label><input id="na" type="text" placeholder="ex : Aminata Kouassi" autocomplete="off">
+    <label for="em">E-mail du locataire (obligatoire pour se connecter)</label><input id="em" type="email" placeholder="prenom.nom@exemple.com" autocomplete="off">
+    <p class="hint" id="emHint" hidden></p>
     <details class="adv"><summary>Options (entreprise, fin de bail, compte ADRESS)</summary>
       <div class="grid2"><div><label for="to">Type d'occupant</label><select id="to"><option>Particulier</option><option>Entreprise / organisme</option></select></div><div><label for="fo">Fin d'occupation</label><input id="fo" type="date"></div></div>
       <label for="rp">Responsable (si entreprise)</label><input id="rp" type="text">
@@ -80,23 +83,29 @@ async function invitations(box) {
     <button class="btn block" id="go" style="margin-top:14px">Créer l'invitation</button></form>
     <div id="res" hidden></div></div>
   <h2>Invitations</h2><div style="overflow-x:auto"><table class="adm"><tr><th>Locataire</th><th>Logement</th><th>Code</th><th>État</th><th></th></tr>
-  ${(inv.data || []).map(i => `<tr data-code="${esc(i.code)}"><td><b>${esc(i.nom_affichage || '—')}</b>${i.is_admin ? ' <span class="badge soft">admin</span>' : ''}</td><td>${esc(i.logements?.residences?.nom || '')}<div class="muted small">${esc(i.logements?.numero || i.logements?.code || '—')}</div></td>
+  ${(inv.data || []).map(i => `<tr data-code="${esc(i.code)}"><td><b>${esc(i.nom_affichage || '—')}</b>${i.is_admin ? ' <span class="badge soft">admin</span>' : ''}${i.email ? `<div class="muted small">${esc(i.email)}</div>` : ''}</td><td>${esc(i.logements?.residences?.nom || '')}<div class="muted small">${esc(i.logements?.numero || i.logements?.code || '—')}</div></td>
     <td><b>${esc(i.code)}</b></td><td>${etat(i)}</td>
     <td>${i.utilisee_par ? '' : `<div class="row" style="flex-wrap:nowrap"><button class="btn sm soft" data-wa>WhatsApp</button><button class="btn sm ghost" data-cp>Copier</button><button class="btn sm ghost" data-del aria-label="Supprimer">×</button></div>`}</td></tr>`).join('')}</table></div>`;
   const $ = (s) => box.querySelector(s);
   const err = (m) => { $('#err').textContent = m; $('#err').hidden = !m; };
+  const logSel = () => Lg.find(x => x.id === $('#lg').value);
+  const remplir = () => {
+    const v = $('#lg').value; $('#nvBox').hidden = v !== '+';
+    const l = logSel(); $('#na').value = l?.locataire || ''; $('#em').value = l?.email || '';
+    const h = $('#emHint'); h.hidden = !l || !!l.email; h.textContent = 'Pas d’e-mail dans l’annuaire pour ce logement : saisissez-le, il sera enregistré dans l’annuaire.';
+  };
   const majLogements = () => {
     const l = Lg.filter(x => x.residence_id === $('#ir').value);
-    const etiq = (x) => occupant.has(x.id) ? ` — occupé (${occupant.get(x.id)})` : enAttente.has(x.id) ? ` — code en attente (${enAttente.get(x.id)})` : ' — libre';
-    $('#lg').innerHTML = l.map(x => `<option value="${x.id}" ${occupant.has(x.id) || enAttente.has(x.id) ? 'disabled' : ''}>${esc((x.numero || x.code) + etiq(x))}</option>`).join('') + '<option value="+">＋ Nouveau logement…</option><option value="0">Sans logement (équipe ADRESS)</option>';
+    const etiq = (x) => occupant.has(x.id) ? ` — occupé (${occupant.get(x.id)})` : enAttente.has(x.id) ? ` — code en attente (${enAttente.get(x.id)})` : x.locataire ? ` — ${x.locataire}` : ' — libre';
+    $('#lg').innerHTML = l.map(x => `<option value="${x.id}" ${occupant.has(x.id) || enAttente.has(x.id) ? 'disabled' : ''}>${esc((x.code || x.numero) + etiq(x))}</option>`).join('') + '<option value="+">＋ Nouveau logement…</option><option value="0">Sans logement (équipe ADRESS)</option>';
     const libre = [...$('#lg').options].find(o => !o.disabled); if (libre) $('#lg').value = libre.value;
-    $('#nvBox').hidden = $('#lg').value !== '+';
+    remplir();
   };
-  $('#ir').onchange = majLogements; $('#lg').onchange = () => { $('#nvBox').hidden = $('#lg').value !== '+'; if ($('#lg').value === '+') $('#nv').focus(); };
+  $('#ir').onchange = majLogements; $('#lg').onchange = () => { remplir(); if ($('#lg').value === '+') $('#nb').focus(); };
   majLogements();
   const partager = (i) => {
     const r = $('#res'); r.hidden = false;
-    r.innerHTML = `<div class="inv-ok"><small>Code de ${esc(i.nom_affichage || 'ce locataire')}</small><b>${esc(i.code)}</b>
+    r.innerHTML = `<div class="inv-ok"><small>Code de ${esc(i.nom_affichage || 'ce locataire')}${i.email ? ' · ' + esc(i.email) : ''}</small><b>${esc(i.code)}</b>
       <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(message(i))}">Envoyer par WhatsApp</a><button class="btn ghost" type="button" id="cpm">Copier le message</button></div></div>`;
     $('#cpm').onclick = async () => { try { await navigator.clipboard.writeText(message(i)); toast('Message copié.'); } catch (_) { toast(i.code); } };
     r.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -106,16 +115,22 @@ async function invitations(box) {
     const go = $('#go'); go.disabled = true;
     try {
       let logement = $('#lg').value; if (logement === '0') logement = null;
+      const nom = $('#na').value.trim(), email = $('#em').value.trim().toLowerCase();
+      if (logement && !EMAIL_OK(email)) { go.disabled = false; return err('Indiquez l’adresse e-mail du locataire : il devra l’utiliser pour créer son compte.'); }
+      if (email && !EMAIL_OK(email)) { go.disabled = false; return err('Cette adresse e-mail n’est pas valide (pas d’accent ni d’espace).'); }
       if (logement === '+') {
-        const num = $('#nv').value.trim().toUpperCase(); if (!num) { go.disabled = false; return err('Indiquez le numéro du logement.'); }
-        const pref = (R.find(r => r.id === $('#ir').value)?.nom || 'RES').normalize('NFD').replace(/[^A-Za-z ]/g, '').split(' ').filter(w => w.length > 2 && !/^(residence|les|des)$/i.test(w)).map(w => w[0]).join('').toUpperCase().slice(0, 4) || 'RES';
-        const d = check(await sb.from('logements').insert({ residence_id: $('#ir').value, code: `${pref}-${num}-${Date.now().toString(36).slice(-3).toUpperCase()}`, numero: num, type_logement: 'Appartement' }).select('id,code,numero,residence_id').single());
+        const b = $('#nb').value.trim(), et = $('#ne').value.trim(), ap = $('#nap').value.trim();
+        if (!b && !et && !ap) { go.disabled = false; return err('Indiquez au moins le bloc, l’étage ou l’appartement.'); }
+        const d = check(await sb.from('logements').insert({ residence_id: $('#ir').value, code: 'tmp-' + Date.now(), bloc: b, etage: et, appartement: ap, locataire: nom || null, email: email || null, type_logement: 'Appartement' }).select('id,code,numero,residence_id,bloc,etage,appartement,locataire,email').single());
         Lg.push(d); logement = d.id;
+      } else if (logement) {
+        const l = logSel();
+        if (l && ((nom && nom !== (l.locataire || '')) || email !== (l.email || ''))) { check(await sb.from('logements').update({ locataire: nom || l.locataire, email }).eq('id', logement)); l.locataire = nom || l.locataire; l.email = email; }
       }
-      const i = check(await sb.from('invitations').insert({ logement_id: logement, nom_affichage: $('#na').value.trim() || null, type_occupant: $('#to').value, responsable: $('#rp').value.trim() || null, date_fin_occupation: $('#fo').value || null, is_adress: $('#ia').checked, is_admin: $('#ad').checked }).select('*').single());
+      const i = check(await sb.from('invitations').insert({ logement_id: logement, nom_affichage: nom || null, email: email || null, type_occupant: $('#to').value, responsable: $('#rp').value.trim() || null, date_fin_occupation: $('#fo').value || null, is_adress: $('#ia').checked, is_admin: $('#ad').checked }).select('*').single());
       toast('Invitation créée.'); partager(i);
       if (logement) enAttente.set(logement, i.nom_affichage || 'code envoyé');
-      $('#na').value = ''; $('#nv').value = ''; majLogements(); $('#nvBox').hidden = true;
+      ['#nb', '#ne', '#nap'].forEach(s => $(s).value = ''); majLogements();
     } catch (ex) { err(errMsg(ex)); }
     go.disabled = false;
   };
@@ -123,6 +138,78 @@ async function invitations(box) {
   box.querySelectorAll('[data-wa]').forEach(b => b.onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(message(trouve(b))), '_blank', 'noopener'));
   box.querySelectorAll('[data-cp]').forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(message(trouve(b))); toast('Message copié.'); } catch (_) { toast(trouve(b).code); } });
   box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirm('Supprimer cette invitation ?') && action(async () => check(await sb.from('invitations').delete().eq('code', trouve(b).code)), 'Invitation supprimée.'));
+}
+
+// ---------- Annuaire des locataires : Bloc-Étage-Appartement + e-mail, import Excel ----------
+const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const chargerXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, ko) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = () => ok(window.XLSX); s.onerror = () => ko(new Error('Lecture Excel indisponible (réseau).')); document.head.appendChild(s); });
+const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+async function annuaire(box) {
+  const [res, log, occ, inv] = await Promise.all([
+    sb.from('residences').select('id,nom').order('nom'),
+    sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email,actif').eq('actif', true).order('code'),
+    sb.from('profiles').select('logement_id,nom_affichage').eq('statut', 'actif').not('logement_id', 'is', null),
+    sb.from('invitations').select('logement_id,expire_le,utilisee_par').is('utilisee_par', null)]);
+  const R = res.data || [], L = log.data || [];
+  const occupant = new Map((occ.data || []).map(p => [p.logement_id, p.nom_affichage || 'actif']));
+  const attente = new Set((inv.data || []).filter(i => i.logement_id && new Date(i.expire_le) > new Date()).map(i => i.logement_id));
+  let rid = annuaire._rid && R.some(r => r.id === annuaire._rid) ? annuaire._rid : (R.find(r => L.some(l => l.residence_id === r.id && l.bloc)) || R[0])?.id;
+  const statut = (l) => occupant.has(l.id) ? '<span class="badge ok">Compte actif</span>' : attente.has(l.id) ? '<span class="badge warn">Code envoyé</span>' : '<span class="badge soft">Pas encore invité</span>';
+  const dessiner = () => {
+    annuaire._rid = rid;
+    const l = L.filter(x => x.residence_id === rid).sort((a, b) => (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true }));
+    const sansMail = l.filter(x => !EMAIL_OK(x.email)).length;
+    box.innerHTML = `
+    <div class="card"><h3>Annuaire des locataires</h3><p class="muted small">Seules les personnes de l’annuaire peuvent recevoir un code : le code ne fonctionne qu’avec l’e-mail indiqué ici. Logement = <b>Bloc-Étage-Appartement</b> (ex : A-RDJ-A001).</p>
+      <div class="grid2"><div><label for="ar">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
+      <div><label>Mettre à jour depuis Excel</label><label class="btn ghost block" for="xl" style="margin:0">Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
+      <p class="muted small" style="margin:8px 0 0">Une feuille par résidence (nom de la feuille = nom de la résidence), colonnes : BLOC, Etage, Appartement, Email, Locataire.</p>
+      <div id="imp"></div></div>
+    ${sansMail ? `<div class="card res-note" style="margin-top:12px">${sansMail} logement${sansMail > 1 ? 's' : ''} sans e-mail valide : ${sansMail > 1 ? 'ils ne peuvent' : 'il ne peut'} pas encore être invité${sansMail > 1 ? 's' : ''}.</div>` : ''}
+    <h2>${l.length} logement${l.length > 1 ? 's' : ''}</h2>
+    <div style="overflow-x:auto"><table class="adm"><tr><th>Logement</th><th>Locataire</th><th>Accès</th><th></th></tr>
+    ${l.map(x => `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b><div class="muted small">${esc([x.bloc && 'Bloc ' + x.bloc, x.etage, x.appartement].filter(Boolean).join(' · '))}</div></td><td>${esc(x.locataire || '—')}<div class="small ${EMAIL_OK(x.email) ? 'muted' : 'err'}">${esc(x.email || 'e-mail manquant')}</div></td><td>${statut(x)}</td><td><button class="btn sm ghost" data-ed>Modifier</button></td></tr>`).join('')}</table></div>
+    <div class="card" style="margin-top:14px"><h3>Ajouter un logement</h3><form id="fa" novalidate><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae" placeholder="RDJ"></div><div><label for="aa">Appartement</label><input type="text" id="aa" placeholder="A001"></div></div>
+      <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
+      <button class="btn block" style="margin-top:12px">Ajouter</button></form></div>`;
+    const $ = (s) => box.querySelector(s);
+    $('#ar').onchange = () => { rid = $('#ar').value; dessiner(); };
+    $('#fa').onsubmit = (e) => { e.preventDefault(); if (!$('#ab').value.trim() && !$('#ae').value.trim() && !$('#aa').value.trim()) return toast('Indiquez le bloc, l’étage ou l’appartement.'); const m = $('#am').value.trim().toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide.'); action(async () => check(await sb.from('logements').insert({ residence_id: rid, code: 'tmp-' + Date.now(), bloc: $('#ab').value, etage: $('#ae').value, appartement: $('#aa').value, locataire: $('#an').value || null, email: m || null, type_logement: 'Appartement' })), 'Logement ajouté.'); };
+    box.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => {
+      const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id);
+      tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>Appartement</label><input type="text" name="appartement" value="${esc(x.appartement || '')}"></div></div>
+        <div class="grid2"><div><label>Locataire</label><input type="text" name="locataire" value="${esc(x.locataire || '')}"></div><div><label>E-mail</label><input name="email" type="email" value="${esc(x.email || '')}"></div></div>
+        <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Retirer de l’annuaire</button></div></form></td>`;
+      const f = tr.querySelector('form'), v = (n) => f.elements[n].value.trim();
+      f.querySelector('[data-x]').onclick = dessiner;
+      f.querySelector('[data-off]').onclick = () => { if (occupant.has(x.id)) return toast('Ce logement a un compte actif : retirez d’abord le compte (onglet Comptes).'); if (confirm('Retirer ' + x.code + ' de l’annuaire ? (il pourra être réimporté)')) action(async () => check(await sb.from('logements').update({ actif: false }).eq('id', x.id)), 'Logement retiré.'); };
+      f.onsubmit = (e) => { e.preventDefault(); const m = v('email').toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide (pas d’accent ni d’espace).'); action(async () => check(await sb.from('logements').update({ bloc: v('bloc'), etage: v('etage'), appartement: v('appartement'), locataire: v('locataire') || null, email: m || null }).eq('id', x.id)), 'Annuaire mis à jour.'); };
+    });
+    $('#xl').onchange = async (e) => {
+      const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+      const imp = $('#imp'); imp.innerHTML = '<p class="muted small">Lecture du fichier…</p>';
+      try {
+        const X = await chargerXlsx(); const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+        const feuilles = wb.SheetNames.map(n => {
+          const rows = X.utils.sheet_to_json(wb.Sheets[n], { defval: '' });
+          const lignes = rows.map(r => { const g = (k) => { const c = Object.keys(r).find(h => norm(h) === k); return c ? String(r[c]).trim() : ''; }; return { bloc: g('bloc'), etage: g('etage'), appartement: g('appartement'), email: g('email').toLowerCase(), locataire: g('locataire') }; }).filter(x => x.bloc || x.etage || x.appartement);
+          return { nom: n.trim(), lignes, connue: R.some(r => norm(r.nom) === norm(n)), invalides: lignes.filter(x => x.email && !EMAIL_OK(x.email)).length, sans: lignes.filter(x => !x.email).length };
+        }).filter(f => f.lignes.length);
+        if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue : vérifiez les colonnes BLOC, Etage, Appartement, Email, Locataire.</p>'; return; }
+        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} logements${f.connue ? '' : ' <span class="badge warn">nouvelle résidence</span>'}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}</li>`).join('')}</ul>
+          <label class="check"><input type="checkbox" id="off"> Retirer de l’annuaire les logements absents du fichier (sauf comptes actifs)</label>
+          <div class="row" style="margin-top:10px"><button class="btn" type="button" id="ok">Importer</button><button class="btn ghost" type="button" id="no">Annuler</button></div></div>`;
+        imp.querySelector('#no').onclick = () => imp.innerHTML = '';
+        imp.querySelector('#ok').onclick = async (ev) => {
+          ev.target.disabled = true; const bilan = [];
+          try { for (const f of feuilles) { const r = check(await sb.rpc('admin_importer_annuaire', { p_residence: f.nom, p_lignes: f.lignes, p_desactiver_absents: imp.querySelector('#off').checked })); bilan.push(`${f.nom} : ${r.crees} ajouté(s), ${r.mis_a_jour} mis à jour${r.desactives ? `, ${r.desactives} retiré(s)` : ''}`); } toast('Annuaire importé.'); annuaire._msg = bilan.join(' — '); await annuaire(box); }
+          catch (ex) { ev.target.disabled = false; toast(errMsg(ex)); }
+        };
+      } catch (ex) { imp.innerHTML = `<p class="err">${esc(errMsg(ex))}</p>`; }
+    };
+    if (annuaire._msg) { $('#imp').innerHTML = `<p class="inv-ok" style="text-align:left">${esc(annuaire._msg)}</p>`; annuaire._msg = ''; }
+  };
+  dessiner();
 }
 
 // ---------- Comptes (§2) ----------

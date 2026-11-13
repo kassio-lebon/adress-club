@@ -878,3 +878,11 @@ a.back[href="#/"]{display:none}
 .fl-grid{align-items:start}
 .fl-une .fl-c{width:auto;max-width:min(66vw,260px)}
 .fl-une .fl-c img{width:auto;max-width:100%;max-height:min(56vh,440px)}
+
+/* v60 : annuaire des locataires */
+.g3f{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.g3f input{width:100%}
+.imp-prev{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--sunken)}
+.imp-prev ul{margin:8px 0;padding-left:18px;line-height:1.6}
+.ann-ed{padding:6px 0}
+.adm .err{color:var(--red);font-weight:600}

@@ -161,7 +161,8 @@ function connexion() {
       <label for="code">Code d'invitation</label><input id="code" type="text" autocomplete="off" placeholder="Remis par ADRESS IMMOBILIER" style="text-transform:uppercase">
       <label for="nom">Nom d'affichage (visible des autres résidents)</label><input id="nom" type="text" maxlength="40" placeholder="Awa K.">
     </div>
-    <label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required>
+    <label for="email" id="emailLbl">E-mail</label><input id="email" type="email" autocomplete="email" required>
+    <p class="hint" id="emailHint" hidden>Utilisez l’adresse e-mail que vous avez communiquée à ADRESS IMMOBILIER : le code ne fonctionne qu’avec elle.</p>
     <label for="mdp">Mot de passe</label><input id="mdp" type="password" autocomplete="current-password" minlength="8" required>
     <p class="hint" id="mdpHint" hidden>8 caractères minimum.</p>
     <p class="err" id="err" hidden></p>
@@ -178,6 +179,7 @@ function connexion() {
     app.querySelector('#go').textContent = mode === 'signup' ? 'Créer mon accès' : 'Se connecter';
     app.querySelector('#mdp').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
     app.querySelector('#oubliP').hidden = mode === 'signup';
+    app.querySelector('#emailHint').hidden = mode !== 'signup'; app.querySelector('#emailLbl').textContent = mode === 'signup' ? 'Votre e-mail (celui communiqué à ADRESS)' : 'E-mail';
   });
   app.querySelector('#oubli').onclick = (e) => { e.preventDefault(); motDePasseOublie(app.querySelector('#email').value.trim()); };
   app.querySelector('#f').onsubmit = async (ev) => {
@@ -193,6 +195,8 @@ function connexion() {
     } else {
       const code = app.querySelector('#code').value.trim(), nom = app.querySelector('#nom').value.trim();
       if (!code || !nom) return show('Le code d\'invitation et le nom d\'affichage sont obligatoires.');
+      const vf = await sb.rpc('verifier_invitation', { p_code: code, p_email: email });
+      if (vf.error || vf.data !== 'ok') return show(vf.data || errMsg(vf.error));
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) return show(error.message.includes('registered') ? 'Un compte existe déjà avec cet e-mail : connectez-vous.' : errMsg(error));
       if (!data.session) { try { localStorage.setItem('acl-inv', JSON.stringify({ code, nom })); } catch (_) {} return show('Dernière étape : ouvrez l’e-mail ADRESS CLUB reçu à ' + email + ' et touchez « Confirmer mon adresse ».'); }
