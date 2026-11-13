@@ -300,13 +300,15 @@ async function annuaire(box) {
   const suggestion = (m) => { const s = String(m || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase(); return s !== m && EMAIL_OK(s) ? s : ''; };
   const memeNom = (a, b) => { const t = (s) => norm(s).split(/[^a-z0-9]+/).filter(w => w.length > 1); const A = t(a), B = t(b); return !A.length || !B.length || A.some(w => B.includes(w)); };
   const etat = (x) => occupant.has(x.id) ? 'actif' : vivant(x.id) ? 'code' : codes.has(x.id) ? 'expire' : 'libre';
+  // Un seul message par problème : l'e-mail et le nom manquants s'affichent à leur place (en rouge), pas une seconde fois dessous
   const problemes = (x) => {
     const p = [];
     if (!x.locataire && !x.email && !occupant.has(x.id)) return p; // logement libre : rien à corriger
-    if (!x.email) p.push({ t: 'E-mail manquant' });
-    else if (!EMAIL_OK(x.email)) p.push({ t: 'E-mail invalide', fix: suggestion(x.email) });
+    if (!x.bloc) return [{ t: 'Ancien code : rattachez ce compte au bon appartement (Comptes › Logement)' }];
+    if (!x.email) p.push({ k: 'mail' });
+    else if (!EMAIL_OK(x.email)) p.push({ k: 'mail', fix: suggestion(x.email) });
     else if (parMail.get(x.email) > 1) p.push({ t: `Même e-mail sur ${parMail.get(x.email)} logements : une seule personne pourra se connecter` });
-    if (!x.locataire) p.push({ t: 'Nom du locataire manquant' });
+    if (!x.locataire) p.push({ k: 'nom' });
     if (occupant.has(x.id) && x.locataire && occupant.get(x.id) && !memeNom(occupant.get(x.id), x.locataire)) p.push({ t: `Compte actif au nom de « ${occupant.get(x.id)} » : nouveau locataire ? Retirez l’ancien compte dans Comptes` });
     return p;
   };
@@ -317,12 +319,12 @@ async function annuaire(box) {
     return e === 'actif' ? `<span class="st-l actif">Compte actif</span>${occupant.get(x.id) ? `<div class="muted small">${esc(occupant.get(x.id))}</div>` : ''}`
       : e === 'code' ? `<span class="st-l code">Code envoyé</span><div class="muted small">valable jusqu’au ${dateFr(i.expire_le)}</div>`
       : e === 'expire' ? '<span class="st-l">Code expiré</span>'
-      : x.locataire ? '<span class="st-l">Pas encore invité</span>' : '<span class="st-l">Logement libre</span>';
+      : x.locataire || x.email ? '<span class="st-l">Pas encore invité</span>' : '<span class="st-l">Logement libre</span>';
   };
   const dessiner = () => {
     annuaire._rid = rid; annuaire._f = filtre;
     const l = L.filter(x => x.residence_id === rid).sort(triLog);
-    const nb = { tous: l.length, pb: l.filter(x => problemes(x).length).length, libre: l.filter(x => x.locataire && ['libre', 'expire'].includes(etat(x))).length, vide: l.filter(x => !x.locataire && !occupant.has(x.id)).length, code: l.filter(x => etat(x) === 'code').length, actif: l.filter(x => etat(x) === 'actif').length };
+    const nb = { tous: l.length, pb: l.filter(x => problemes(x).length).length, libre: l.filter(x => (x.locataire || x.email) && ['libre', 'expire'].includes(etat(x))).length, vide: l.filter(x => !x.locataire && !x.email && !occupant.has(x.id)).length, code: l.filter(x => etat(x) === 'code').length, actif: l.filter(x => etat(x) === 'actif').length };
     if (filtre === 'pb' && !nb.pb) filtre = 'tous';
     const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', 'Logements libres']];
     box.innerHTML = `
@@ -331,20 +333,21 @@ async function annuaire(box) {
       <div><label>Mettre à jour depuis Excel</label><label class="btn xl block" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <p class="muted small" style="margin:8px 0 0">Une feuille par résidence (nom de la feuille = nom de la résidence), colonnes : BLOC, ETAGE, APP., LOCATAIRE, MAIL. Plusieurs lignes pour un même appartement = historique : la dernière remplie est gardée.</p>
       <div id="imp"></div></div>
+    <details class="card" style="margin-top:12px"><summary>Ajouter un logement</summary><form id="fa" novalidate style="margin-top:10px"><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae" placeholder="RDJ"></div><div><label for="aa">Appartement</label><input type="text" id="aa" placeholder="A001"></div></div>
+      <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
+      <button class="btn block" style="margin-top:12px">Ajouter</button></form></details>
     <div class="ann-bar"><h2>${l.length} logement${l.length > 1 ? 's' : ''}</h2><input type="search" id="aq" placeholder="Rechercher un logement, un nom, un e-mail…" autocomplete="off"></div>
     <div class="chips ann-f">${FILTRES.filter(([k]) => k === 'tous' || nb[k]).map(([k, t]) => `<button type="button" class="chip ${k === filtre ? 'on' : ''}${k === 'pb' ? ' pb' : ''}" data-f="${k}">${t} <span>${nb[k]}</span></button>`).join('')}</div>
     <div tabindex="0" style="overflow-x:auto"><table class="adm no-q"><thead><tr><th>Logement</th><th>Locataire</th><th>Accès</th><th></th></tr></thead><tbody id="atb"></tbody></table></div>
     <p class="muted center" id="avide" hidden>Aucun logement ne correspond.</p>
-    <div class="card" style="margin-top:14px"><h3>Ajouter un logement</h3><form id="fa" novalidate><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae" placeholder="RDJ"></div><div><label for="aa">Appartement</label><input type="text" id="aa" placeholder="A001"></div></div>
-      <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
-      <button class="btn block" style="margin-top:12px">Ajouter</button></form></div>`;
+`;
     const $ = (s) => box.querySelector(s);
     const lignes = () => {
       const t = norm(q).split(/\s+/).filter(Boolean);
-      const vis = l.filter(x => (filtre === 'tous' || (filtre === 'pb' ? problemes(x).length : filtre === 'libre' ? x.locataire && ['libre', 'expire'].includes(etat(x)) : filtre === 'vide' ? !x.locataire && !occupant.has(x.id) : etat(x) === filtre))
+      const vis = l.filter(x => (filtre === 'tous' || (filtre === 'pb' ? problemes(x).length : filtre === 'libre' ? (x.locataire || x.email) && ['libre', 'expire'].includes(etat(x)) : filtre === 'vide' ? !x.locataire && !x.email && !occupant.has(x.id) : etat(x) === filtre))
         && t.every(w => norm([x.code, x.locataire, x.email, occupant.get(x.id)].join(' ')).includes(w)));
-      $('#atb').innerHTML = vis.map(x => { const p = problemes(x), e = etat(x); return `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b><div class="muted small">${esc([x.bloc && 'Bloc ' + x.bloc, x.etage, x.appartement].filter(Boolean).join(' · '))}</div></td>
-        <td>${esc(x.locataire || '—')}<div class="small ${x.email && EMAIL_OK(x.email) ? 'muted' : 'a-bad'}">${esc(x.email || 'e-mail manquant')}</div>${p.map(o => `<div class="a-pb">${esc(o.t)}${o.fix ? ` · <button type="button" class="lnk" data-fix="${esc(o.fix)}">Corriger en ${esc(o.fix)}</button>` : ''}</div>`).join('')}</td>
+      $('#atb').innerHTML = vis.map(x => { const p = problemes(x), e = etat(x); return `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b></td>
+        <td>${!x.bloc ? '<span class="muted">—</span>' : p.some(o => o.k === 'nom') ? '<span class="a-bad">Nom manquant</span>' : esc(x.locataire || '—')}${!x.bloc ? '' : x.email && EMAIL_OK(x.email) ? `<div class="small muted">${esc(x.email)}</div>` : `<div class="small a-bad">${x.email ? esc(x.email) + ' (invalide)' : 'E-mail manquant'}${p.find(o => o.fix) ? ` · <button type="button" class="lnk" data-fix="${esc(p.find(o => o.fix).fix)}">Corriger en ${esc(p.find(o => o.fix).fix)}</button>` : ''}</div>`}${p.filter(o => o.t).map(o => alerte(o.t)).join('')}</td>
         <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button></div></td></tr>`; }).join('');
       $('#avide').hidden = !!vis.length;
       brancher();
