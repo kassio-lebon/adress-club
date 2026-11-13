@@ -3,12 +3,22 @@ import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES
 
 // Navigation en 4 groupes (au lieu de 11 onglets à plat) : on choisit d'abord le domaine, puis l'écran
 const GROUPES = [
-  ['Locataires', [['annuaire', 'Nos locataires'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
+  ['Aujourd’hui', [['jour', 'Aujourd’hui']]],
+  ['Locataires', [['plan', 'Plan des résidences'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
   ['Le Market', [['annonces', 'Annonces'], ['moderation', 'Signalements']]],
   ['Vitrine', [['residences', 'Résidences'], ['contenus', 'Actualités'], ['partenaires', 'Bons plans']]],
   ['Pilotage', [['stats', 'Indicateurs'], ['avis', 'Avis'], ['parametres', 'Paramètres']]]];
 // Aide de chaque écran : une phrase « à quoi ça sert » toujours visible, le pas-à-pas replié
 const AIDE = {
+  plan: ['Chaque résidence vue comme un immeuble : un carré par appartement, sa couleur dit où en est le locataire.', [
+    'Choisissez la résidence en haut.',
+    'Touchez un appartement : sa fiche s’ouvre (nom, e-mail, historique).',
+    'Complétez la fiche puis « Enregistrer et inviter par WhatsApp » : le message part avec son code.',
+    'Départ d’un locataire : « Libérer le logement ».']],
+  express: ['Envoyer les invitations à la suite, sans rien saisir : un message WhatsApp prêt par locataire.', [
+    'Touchez « Ouvrir WhatsApp avec ce message », choisissez le contact, envoyez.',
+    'Revenez ici : l’envoi est coché et le locataire suivant s’affiche.',
+    '« Passer » laisse un locataire pour plus tard ; « À relancer » renvoie les codes qui vont expirer.']],
   annuaire: ['La liste officielle des locataires de chaque résidence : un logement, un locataire, une adresse e-mail. Les invitations partent de cette liste.', [
     'Choisissez la résidence en haut de l’écran.',
     'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
@@ -52,7 +62,7 @@ const TYPES_BIEN = ['Appartements','Villas en résidence','Villas individuelles'
 
 export async function renderAdmin(app, ong) {
   if (!state.profil?.is_admin) { app.innerHTML = '<div class="card">Accès réservé à ADRESS IMMOBILIER.</div>'; return; }
-  ong = ong || 'annuaire';
+  ong = ong || 'jour';
   const g = GROUPES.find(([, o]) => o.some(([k]) => k === ong)) || GROUPES[0];
   const titre = g[1].find(([k]) => k === ong)?.[1] || '';
   const [but, etapes] = AIDE[ong] || ['', []];
@@ -62,8 +72,8 @@ export async function renderAdmin(app, ong) {
   ${but ? `<div class="aide"><p><b>${esc(titre)}</b> — ${esc(but)}</p>${etapes.length ? `<details><summary>Comment faire ?</summary><ol>${etapes.map(e => `<li>${esc(e)}</li>`).join('')}</ol></details>` : ''}</div>` : ''}
   <div id="adm"></div>`;
   const box = app.querySelector('#adm');
-  await ({ stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
-  if (ong !== 'parametres') {
+  await ({ jour, plan, express, stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
+  if (!['parametres', 'jour', 'plan', 'express'].includes(ong)) {
     box.querySelectorAll('table.adm:not(.no-q)').forEach(t => { if (t.querySelectorAll('tr').length > 3) barreRecherche(t.parentElement.matches('div[style*="overflow"]') ? t.parentElement : t, () => [...t.querySelectorAll('tr')].slice(1), 'Rechercher…'); });
     box.querySelectorAll('.list:not(.no-q)').forEach(l => { if (l.children.length > 3) barreRecherche(l, () => [...l.children], 'Rechercher…'); });
   }
@@ -747,4 +757,242 @@ async function parametres(box) {
     i.oninput = verif;
     b.onclick = () => verif() && action(async () => check(await sb.from('parametres').update({ valeur: String(+i.value) }).eq('cle', c.dataset.k)));
   });
+}
+
+// =====================================================================
+// Écrans pilotés par les tâches : Aujourd'hui · Plan des résidences · Invitation express
+// =====================================================================
+// Une seule lecture commune : logements, comptes actifs, codes en attente → l'état de chaque logement
+async function base() {
+  const [res, log, pro, inv] = await Promise.all([
+    sb.from('residences').select('id,nom').order('nom'),
+    sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email').eq('actif', true),
+    sb.from('profiles').select('id,nom_affichage,logement_id,statut,date_activation,date_fin_occupation').eq('statut', 'actif'),
+    sb.from('invitations').select('code,logement_id,nom_affichage,email,expire_le,utilisee_par,utilisee_le,created_at,type_occupant,is_adress,is_admin').order('created_at', { ascending: false }).limit(2000)]);
+  const R = res.data || [], L = log.data || [], P = pro.data || [], I = inv.data || [];
+  const compte = new Map(P.filter(p => p.logement_id).map(p => [p.logement_id, p]));
+  const code = new Map(); I.forEach(i => { if (i.logement_id && !i.utilisee_par && new Date(i.expire_le) > Date.now() && !code.has(i.logement_id)) code.set(i.logement_id, i); });
+  const etat = (x) => compte.has(x.id) ? 'inscrit' : code.has(x.id) ? 'code' : !x.locataire && !x.email ? 'libre' : !x.bloc || !x.locataire || !EMAIL_OK(x.email) ? 'completer' : 'inviter';
+  const nomRes = new Map(R.map(r => [r.id, r.nom]));
+  return { R, L, P, I, compte, code, etat, nomRes };
+}
+const fixMail = (m) => { const s = String(m || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '').toLowerCase(); return s !== m && EMAIL_OK(s) ? s : ''; };
+const ETATS_LOG = { inscrit: 'Inscrit', code: 'Code envoyé', inviter: 'À inviter', completer: 'À compléter', libre: 'Libre' };
+const msgInvit = (i) => `Bonjour${i.nom_affichage ? ' ' + i.nom_affichage : ''},\n\nBienvenue dans ADRESS CLUB, l'espace privé des résidents ADRESS IMMOBILIER.\n\n1. Ouvrez ${location.origin + location.pathname}\n2. Touchez « J'ai un code d'invitation »\n3. Saisissez votre code : ${i.code}${i.email ? `\n4. Utilisez obligatoirement votre adresse e-mail : ${i.email}` : ''}\n\nCe code est personnel et valable jusqu'au ${dateFr(i.expire_le)}.`;
+const creerInvit = async (x) => check(await sb.from('invitations').insert({ logement_id: x.id, nom_affichage: x.locataire || null, email: (x.email || '').toLowerCase() || null }).select('*').single());
+// WhatsApp s'ouvre dans l'onglet réservé au moment du clic (sinon le navigateur bloque la fenêtre après l'attente du code)
+const ongletWa = () => { const w = window.open('', '_blank'); if (w) w.opener = null; return w; };
+const envoyerWa = (w, texte) => { const u = 'https://wa.me/?text=' + encodeURIComponent(texte); if (w && !w.closed) w.location.href = u; else window.open(u, '_blank', 'noopener'); };
+const ilYa = (d) => { const m = (Date.now() - new Date(d)) / 6e4; return m < 60 ? `il y a ${Math.max(1, Math.round(m))} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : m < 2880 ? 'hier' : dateFr(d); };
+const plur = (n, s, p = s + 's') => `${n} ${n > 1 ? p : s}`;
+document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { const i = document.getElementById('jq'); if (i) { e.preventDefault(); i.focus(); i.select(); } } });
+
+// ---------- Aujourd'hui ----------
+async function jour(box) {
+  const [B, sig, ann] = await Promise.all([base(),
+    sb.from('signalements').select('id,created_at,motif,decision,annonces(titre)').order('created_at', { ascending: false }).limit(50),
+    sb.from('annonces').select('id,titre,created_at,profiles(nom_affichage)').order('created_at', { ascending: false }).limit(10)]);
+  const { R, L, P, I, compte, code, etat, nomRes } = B;
+  const S = sig.data || [], A = ann.data || [];
+  const parEtat = (e) => L.filter(x => etat(x) === e);
+  const repartition = (l) => { const m = new Map(); l.forEach(x => m.set(x.residence_id, (m.get(x.residence_id) || 0) + 1)); return [...m].sort((a, b) => b[1] - a[1]); };
+  const detailRes = (l) => { const r = repartition(l); return r.slice(0, 3).map(([id, n]) => `${nomRes.get(id) || '?'} ${n}`).join(' · ') + (r.length > 3 ? ` · ${r.length - 3} autre${r.length > 4 ? 's' : ''}` : ''); };
+  const aInviter = parEtat('inviter'), aCompleter = parEtat('completer');
+  const J7 = Date.now() + 7 * J_MS;
+  const relances = I.filter(i => i.logement_id && !i.utilisee_par && new Date(i.expire_le) > Date.now() && new Date(i.expire_le) <= J7 && code.get(i.logement_id) === i && !compte.has(i.logement_id));
+  const departs = P.filter(p => { const d = dans(p.date_fin_occupation); return d != null && d >= 0 && d <= 30; }).sort((a, b) => new Date(a.date_fin_occupation) - new Date(b.date_fin_occupation));
+  const sigAtt = S.filter(s => s.decision === 'en_attente');
+  const noms = (l, f) => { const t = l.slice(0, 2).map(f).filter(Boolean); return t.join(' et ') + (l.length > 2 ? ` et ${l.length - 2} autre${l.length > 3 ? 's' : ''}` : ''); };
+  const cartes = [
+    aInviter.length && { k: 'inviter', tag: 'À inviter', when: plur(repartition(aInviter).length, 'résidence'), n: aInviter.length, label: aInviter.length > 1 ? 'locataires sans code' : 'locataire sans code', detail: detailRes(aInviter) + '. Un message WhatsApp prêt pour chacun.', cta: aInviter.length > 1 ? `Inviter les ${aInviter.length}` : 'Inviter', fort: true },
+    aCompleter.length && { k: 'completer', tag: 'À compléter', when: 'bloquant', n: aCompleter.length, label: aCompleter.length > 1 ? 'fiches incomplètes' : 'fiche incomplète', detail: `${detailRes(aCompleter)}. E-mail ou nom manquant, ou e-mail mal écrit : impossible d’inviter sans eux.`, cta: 'Compléter', rouge: true },
+    relances.length && { k: 'relance', tag: 'À relancer', when: 'sous 7 jours', n: relances.length, label: relances.length > 1 ? 'codes vont expirer' : 'code va expirer', detail: `${noms(relances, i => i.nom_affichage)} n’${relances.length > 1 ? 'ont' : 'a'} pas encore créé ${relances.length > 1 ? 'leur' : 'son'} compte.`, cta: 'Relancer par WhatsApp' },
+    departs.length && { k: 'depart', tag: 'Départs', when: 'sous 30 jours', n: departs.length, label: departs.length > 1 ? 'fins d’occupation' : 'fin d’occupation', detail: `${noms(departs, p => `${p.nom_affichage || 'un compte'} le ${dateFr(p.date_fin_occupation)}`)}. L’accès sera retiré automatiquement.`, cta: 'Voir les comptes' },
+    sigAtt.length && { k: 'signal', tag: 'Market', when: 'à examiner', n: sigAtt.length, label: sigAtt.length > 1 ? 'annonces signalées' : 'annonce signalée', detail: noms(sigAtt, s => `« ${s.annonces?.titre || 'annonce'} »`) + '.', cta: 'Examiner', rouge: true }].filter(Boolean);
+  const prenom = (state.profil?.nom_affichage || '').trim().split(/\s+/)[0];
+  const occ = (rid) => L.filter(x => x.residence_id === rid && (x.locataire || x.email || compte.has(x.id)));
+  const adh = R.map(r => { const o = occ(r.id); const m = o.filter(x => compte.has(x.id)).length; return { r, o: o.length, m, pct: o.length ? Math.round(100 * m / o.length) : 0 }; }).filter(a => a.o).sort((a, b) => b.pct - a.pct || b.o - a.o);
+  // Fil d'activité : comptes créés, codes envoyés (regroupés par jour), signalements, annonces publiées
+  const ev = [];
+  P.filter(p => p.date_activation).forEach(p => { const l = L.find(x => x.id === p.logement_id); ev.push({ d: p.date_activation, ini: (p.nom_affichage || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), cls: 'f', who: p.nom_affichage || 'Un résident', what: `a créé son compte${l ? ` (${nomRes.get(l.residence_id) || ''} ${l.code})` : ''}` }); });
+  const parJour = new Map(); I.filter(i => i.logement_id).forEach(i => { const k = new Date(i.created_at).toDateString(); const g = parJour.get(k) || { d: i.created_at, n: 0, res: new Set() }; g.n++; const l = L.find(x => x.id === i.logement_id); if (l) g.res.add(nomRes.get(l.residence_id)); parJour.set(k, g); });
+  parJour.forEach(g => ev.push({ d: g.d, ini: 'AD', cls: '', who: 'ADRESS', what: `${plur(g.n, 'code créé', 'codes créés')}${g.res.size ? ' pour ' + [...g.res].filter(Boolean).slice(0, 3).join(', ') : ''}` }));
+  S.forEach(s => ev.push({ d: s.created_at, ini: '!', cls: 'r', who: 'Signalement', what: `sur « ${s.annonces?.titre || 'une annonce'} » : ${s.motif || ''}` }));
+  A.forEach(a => ev.push({ d: a.created_at, ini: (a.profiles?.nom_affichage || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), cls: '', who: a.profiles?.nom_affichage || 'Un résident', what: `a publié « ${a.titre} »` }));
+  const fil = ev.filter(e => e.d).sort((a, b) => new Date(b.d) - new Date(a.d)).slice(0, 7);
+  const jourTxt = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  box.innerHTML = `
+  <div class="j-head"><div><span class="j-date">${esc(jourTxt)}</span>
+    <h2 class="j-titre">${prenom ? `Bonjour ${esc(prenom)}, ` : ''}${cartes.length ? `${plur(cartes.length, 'chose')} à faire aujourd’hui` : 'tout est à jour'}</h2></div>
+    <div class="j-q"><label class="j-qbox" for="jq"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="jq" type="search" placeholder="Locataire, logement, e-mail, code…" aria-label="Rechercher un locataire, un logement, un code" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="jqr"><kbd>Ctrl K</kbd></label><div class="j-qr" id="jqr" role="listbox" hidden></div></div></div>
+  ${cartes.length ? `<section class="j-cartes" aria-label="Actions du jour">${cartes.map(c => `<article class="j-c">
+    <div class="j-c1"><span class="j-tag${c.rouge ? ' r' : ''}">${c.tag}</span><span class="muted small">${c.when}</span></div>
+    <div class="j-c2"><span class="j-n">${c.n}</span><b>${c.label}</b></div>
+    <p>${esc(c.detail)}</p>
+    <button type="button" class="btn sm ${c.fort ? '' : 'soft'} block" data-go="${c.k}">${c.cta}</button></article>`).join('')}</section>`
+    : '<div class="card center pad"><b>Rien en attente.</b><p class="muted">Tous les locataires connus ont leur code ou leur compte. Pensez à importer la liste à jour quand des locataires arrivent.</p></div>'}
+  <div class="j-bas">
+    <section class="card j-adh" aria-labelledby="jadh"><div class="j-sh"><h3 id="jadh">Adhésion au Club par résidence</h3><span class="muted small">inscrits / logements occupés</span></div>
+      ${adh.length ? adh.map(a => `<a href="#/admin/plan" data-r="${a.r.id}"><b>${esc(a.r.nom)}</b><span class="jauge"><i style="width:${a.pct}%"></i></span><span class="j-v">${a.m} / ${a.o}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>`).join('') : '<p class="muted">Aucun locataire enregistré.</p>'}
+      <p class="muted small">Touchez une résidence pour ouvrir son plan.</p></section>
+    <section class="card j-fil" aria-labelledby="jfil"><h3 id="jfil">Ce qui s’est passé</h3>
+      ${fil.length ? fil.map(e => `<div class="j-ev"><span class="j-av ${e.cls}" aria-hidden="true">${esc(e.ini)}</span><div><span><b>${esc(e.who)}</b> ${esc(e.what)}</span><span class="muted small">${ilYa(e.d)}</span></div></div>`).join('') : '<p class="muted">Rien pour l’instant.</p>'}</section>
+  </div>`;
+  const $ = (s) => box.querySelector(s);
+  const resMax = (l) => repartition(l)[0]?.[0];
+  const GO = {
+    inviter: () => { express._mode = 'nouveau'; express._rid = null; location.hash = '#/admin/express'; },
+    relance: () => { express._mode = 'relance'; express._rid = null; location.hash = '#/admin/express'; },
+    completer: () => { plan._rid = resMax(aCompleter); plan._sel = aCompleter.find(x => x.residence_id === plan._rid)?.id; location.hash = '#/admin/plan'; },
+    depart: () => { MEMO_F.comptes = 'depart'; location.hash = '#/admin/comptes'; },
+    signal: () => { location.hash = '#/admin/moderation'; } };
+  box.querySelectorAll('[data-go]').forEach(b => b.onclick = () => GO[b.dataset.go]());
+  box.querySelectorAll('[data-r]').forEach(a => a.onclick = () => { plan._rid = a.dataset.r; plan._sel = null; });
+  // Recherche globale : logement, nom, e-mail, code d'invitation
+  const q = $('#jq'), out = $('#jqr');
+  const idx = L.map(x => ({ x, cle: norm([x.code, x.locataire, x.email, nomRes.get(x.residence_id), compte.get(x.id)?.nom_affichage, code.get(x.id)?.code].join(' ')) }));
+  const fermer = () => { out.hidden = true; q.setAttribute('aria-expanded', 'false'); };
+  q.oninput = () => {
+    const t = norm(q.value).split(/\s+/).filter(Boolean); if (!t.length) return fermer();
+    const v = idx.filter(o => t.every(w => o.cle.includes(w))).slice(0, 8);
+    out.innerHTML = v.length ? v.map(({ x }) => { const e = etat(x); return `<a href="#/admin/plan" role="option" data-l="${x.id}" data-rr="${x.residence_id}"><span><b>${esc(x.code)}</b> <span class="muted">${esc(nomRes.get(x.residence_id) || '')}</span><span class="j-qn">${esc(compte.get(x.id)?.nom_affichage || x.locataire || 'Libre')}</span></span><span class="pl-pill ${e}">${ETATS_LOG[e]}</span></a>`; }).join('') : '<p class="muted small">Aucun résultat.</p>';
+    out.hidden = false; q.setAttribute('aria-expanded', 'true');
+    out.querySelectorAll('[data-l]').forEach(a => a.onmousedown = () => { plan._rid = a.dataset.rr; plan._sel = a.dataset.l; });
+  };
+  q.onkeydown = (e) => { if (e.key === 'Escape') fermer(); if (e.key === 'Enter') { const a = out.querySelector('[data-l]'); if (a) { e.preventDefault(); plan._rid = a.dataset.rr; plan._sel = a.dataset.l; location.hash = '#/admin/plan'; } } };
+  q.onblur = () => setTimeout(fermer, 150);
+}
+
+// ---------- Plan des résidences ----------
+async function plan(box) {
+  const B = await base(); const { R, L, compte, code, etat, nomRes, I } = B;
+  if (!R.length) { box.innerHTML = '<div class="card center pad">Ajoutez d’abord une résidence dans <a href="#/admin/residences">Résidences</a>.</div>'; return; }
+  const avecLog = R.filter(r => L.some(x => x.residence_id === r.id));
+  let rid = plan._rid && R.some(r => r.id === plan._rid) ? plan._rid : (avecLog[0] || R[0]).id;
+  let sel = plan._sel && L.some(x => x.id === plan._sel && x.residence_id === rid) ? plan._sel : null;
+  const dessiner = () => {
+    plan._rid = rid; plan._sel = sel;
+    const l = L.filter(x => x.residence_id === rid);
+    const nb = (e) => l.filter(x => etat(x) === e).length;
+    const blocs = [...new Set(l.map(x => x.bloc || ''))].sort((a, b) => (a === '') - (b === '') || a.localeCompare(b, 'fr', { numeric: true }));
+    const tuile = (x) => { const e = etat(x), nom = compte.get(x.id)?.nom_affichage || x.locataire || ''; return `<button type="button" class="pl-t ${e}${x.id === sel ? ' sel' : ''}" data-l="${x.id}" aria-pressed="${x.id === sel}" aria-label="${esc(x.code)}, ${ETATS_LOG[e]}${nom ? ', ' + esc(nom) : ''}"><b>${esc(x.appartement || x.code)}</b><span>${esc(nom ? nom.split(/\s+/).slice(0, 2).join(' ') : 'Libre')}</span></button>`; };
+    const bloc = (b) => { const lb = l.filter(x => (x.bloc || '') === b); const et = [...new Set(lb.map(x => x.etage || ''))].sort((p, q) => RANG_ET(q) - RANG_ET(p));
+      return `<section class="pl-b"><h3>${b ? 'Bloc ' + esc(b) : 'Anciens codes'}</h3>${et.map(e => `<div class="pl-e"><span class="pl-el">${esc(e || '—')}</span><div class="pl-ts">${lb.filter(x => (x.etage || '') === e).sort(triLog).map(tuile).join('')}</div></div>`).join('')}</section>`; };
+    box.innerHTML = `
+    <div class="pl-top"><div class="chips pl-res" role="tablist" aria-label="Résidence">${R.map(r => `<button type="button" role="tab" aria-selected="${r.id === rid}" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)}</button>`).join('')}</div>
+      ${nb('inviter') ? `<button type="button" class="btn sm" id="plx">Inviter les ${nb('inviter')} de ${esc(nomRes.get(rid))}</button>` : ''}</div>
+    <div class="pl-leg">${['inscrit', 'code', 'inviter', 'completer', 'libre'].map(e => `<span><i class="pl-sw ${e}"></i>${ETATS_LOG[e]} <b>${nb(e)}</b></span>`).join('')}</div>
+    <div class="pl-wrap"><div class="pl-plan">${l.length ? blocs.map(bloc).join('') : '<div class="card center pad">Aucun logement : importez la liste dans <a href="#/admin/annuaire">Nos locataires</a>.</div>'}</div>
+      <aside class="pl-f card" id="plf" aria-live="polite">${sel ? '' : '<p class="muted center">Touchez un appartement pour ouvrir sa fiche.</p>'}</aside></div>`;
+    box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { rid = b.dataset.r; sel = null; dessiner(); });
+    box.querySelectorAll('.pl-t').forEach(b => b.onclick = () => { sel = b.dataset.l; box.querySelectorAll('.pl-t').forEach(t => { t.classList.toggle('sel', t === b); t.setAttribute('aria-pressed', t === b); }); fiche(true); });
+    const x = box.querySelector('#plx'); if (x) x.onclick = () => { express._mode = 'nouveau'; express._rid = rid; location.hash = '#/admin/express'; };
+    if (sel) fiche(false);
+  };
+  const fiche = (defiler) => {
+    plan._sel = sel;
+    const x = L.find(y => y.id === sel), f = box.querySelector('#plf'); if (!x) return;
+    const e = etat(x), c = compte.get(x.id), i = code.get(x.id);
+    const envoye = c ? I.find(v => v.utilisee_par === c.id) || I.find(v => v.logement_id === x.id) : i;
+    const etape = (fait, t, s) => `<li class="${fait ? 'fait' : ''}"><b>${t}</b>${s ? `<span class="muted small">${s}</span>` : ''}</li>`;
+    const mailKo = x.email && !EMAIL_OK(x.email);
+    f.innerHTML = `<div class="pl-fh"><div><span class="muted small">${esc(nomRes.get(x.residence_id) || '')}</span><h3>${esc(x.code)}</h3></div><span class="pl-pill ${e}">${ETATS_LOG[e]}</span></div>
+      ${c ? `<p class="pl-ok">Compte actif de <b>${esc(c.nom_affichage || '')}</b>${c.date_activation ? ` depuis le ${dateFr(c.date_activation)}` : ''}.</p>` : ''}
+      <form id="plform" novalidate>
+        <label for="pln">Locataire</label><input id="pln" type="text" value="${esc(x.locataire || '')}" placeholder="Prénom et nom" ${!x.locataire && e !== 'libre' ? 'aria-invalid="true"' : ''}>
+        <label for="plm">E-mail (pour se connecter)</label><input id="plm" type="email" value="${esc(x.email || '')}" placeholder="prenom.nom@exemple.com" ${(!x.email && e !== 'libre') || mailKo ? 'aria-invalid="true"' : ''}>
+        ${e === 'libre' || c ? '' : !x.locataire && !x.email ? '' : !x.email ? '<p class="a-pb">E-mail manquant : sans lui, le locataire ne peut pas créer son compte.</p>' : mailKo ? `<p class="a-pb">E-mail mal écrit (accent ou espace)${fixMail(x.email) ? ` · <button type="button" class="lnk" id="plfix">Corriger en ${esc(fixMail(x.email))}</button>` : ''}</p>` : ''}
+        <p class="err small" id="plerr" hidden></p>
+        ${!x.bloc ? '<p class="a-pb">Ancien code : rattachez ce compte au bon appartement dans Comptes › Logement.</p>' : ''}
+        <ol class="pl-tl">${etape(!!(x.locataire || c), 'Dans la liste', x.locataire ? esc(x.locataire) : 'nom à saisir')}${etape(!!(envoye || c), 'Code envoyé', envoye ? `${esc(envoye.code)} · ${c ? 'utilisé' : 'valable jusqu’au ' + dateFr(envoye.expire_le)}` : '')}${etape(!!c, 'Inscrit au Club', c?.date_activation ? 'le ' + dateFr(c.date_activation) : '')}</ol>
+        <div class="pl-act">
+          ${c ? '<a class="btn sm soft block" href="#/admin/comptes">Voir dans Comptes</a>' : `<button class="btn block" id="plgo">${i ? 'Renvoyer le code par WhatsApp' : 'Enregistrer et inviter par WhatsApp'}</button>`}
+          <button type="button" class="btn sm ghost block" id="plsave">Enregistrer</button>
+          ${e !== 'libre' ? '<button type="button" class="btn sm ghost rouge block" id="pllib">Libérer le logement</button>' : ''}
+        </div></form>`;
+    const $ = (s) => f.querySelector(s), err = (m) => { $('#plerr').textContent = m; $('#plerr').hidden = !m; };
+    const fx = $('#plfix'); if (fx) fx.onclick = () => { $('#plm').value = fixMail(x.email); $('#plm').removeAttribute('aria-invalid'); fx.parentElement.remove(); };
+    const lire = () => ({ locataire: $('#pln').value.trim() || null, email: $('#plm').value.trim().toLowerCase() || null });
+    const sauver = async () => { const v = lire();
+      if (v.email && !EMAIL_OK(v.email)) throw new Error('Cette adresse e-mail n’est pas valide (pas d’accent ni d’espace).');
+      if (v.locataire !== (x.locataire || null) || v.email !== (x.email || null)) { check(await sb.from('logements').update(v).eq('id', x.id)); Object.assign(x, v); } };
+    $('#plsave').onclick = async () => { err(''); try { await sauver(); toast('Fiche enregistrée.'); dessiner(); } catch (ex) { err(errMsg(ex)); } };
+    const go = $('#plgo'); if (go) $('#plform').onsubmit = async (ev) => {
+      ev.preventDefault(); err(''); const v = lire();
+      if (!v.locataire) return err('Saisissez le nom du locataire.');
+      if (!v.email || !EMAIL_OK(v.email)) return err('Saisissez une adresse e-mail valide : le locataire devra l’utiliser pour créer son compte.');
+      const w = ongletWa(); go.disabled = true;
+      try { await sauver(); const inv = i || await creerInvit(x); if (!i) { code.set(x.id, inv); I.unshift(inv); } envoyerWa(w, msgInvit(inv)); toast(i ? 'Code renvoyé.' : 'Invitation créée.'); dessiner(); }
+      catch (ex) { if (w) w.close(); go.disabled = false; err(errMsg(ex)); } };
+    else $('#plform').onsubmit = (ev) => ev.preventDefault();
+    const lib = $('#pllib'); if (lib) lib.onclick = () => {
+      const nom = x.locataire || c?.nom_affichage || 'le locataire';
+      if (!confirm(`Libérer le logement ${x.code} ?\n\n• ${nom} est retiré de la liste${c ? '\n• Son accès à ADRESS CLUB est coupé et ses annonces sont mises en pause (rien n’est supprimé)' : ''}${i ? '\n• Son code d’invitation en attente est annulé' : ''}`)) return;
+      action(async () => {
+        if (c) check(await sb.from('profiles').update({ statut: 'desactive' }).eq('logement_id', x.id).eq('statut', 'actif'));
+        check(await sb.from('invitations').delete().eq('logement_id', x.id).is('utilisee_par', null));
+        check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
+      }, `${x.code} est maintenant libre.`);
+    };
+    if (defiler && matchMedia('(max-width: 899px)').matches) f.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+  dessiner();
+}
+
+// ---------- Invitation express : un message après l'autre ----------
+async function express(box) {
+  const B = await base(); const { R, L, I, compte, code, etat, nomRes } = B;
+  let mode = express._mode === 'relance' ? 'relance' : 'nouveau', rid = express._rid || null;
+  const J7 = Date.now() + 7 * J_MS;
+  const ordre = (a, b) => (nomRes.get(a.x.residence_id) || '').localeCompare(nomRes.get(b.x.residence_id) || '') || triLog(a.x, b.x);
+  const listes = {
+    nouveau: L.filter(x => etat(x) === 'inviter').map(x => ({ x, inv: null })).sort(ordre),
+    relance: L.filter(x => { const i = code.get(x.id); return i && !compte.has(x.id) && new Date(i.expire_le) <= J7; }).map(x => ({ x, inv: code.get(x.id) })).sort(ordre) };
+  const fait = new Map(); // id logement → 'envoye' | 'passe'
+  let cur = null;
+  const file = () => listes[mode].filter(o => !rid || o.x.residence_id === rid);
+  const prochain = () => { const f = file(); cur = (f.find(o => !fait.has(o.x.id)) || null)?.x.id ?? null; };
+  const dessiner = () => {
+    express._mode = mode; express._rid = rid;
+    const f = file(), n = f.length, env = f.filter(o => fait.get(o.x.id) === 'envoye').length;
+    if (cur && !f.some(o => o.x.id === cur)) cur = null;
+    if (!cur) prochain();
+    const o = f.find(v => v.x.id === cur), k = o ? f.indexOf(o) + 1 : 0;
+    const resCount = (r) => listes[mode].filter(v => v.x.residence_id === r).length;
+    const resAvec = R.filter(r => resCount(r.id));
+    const apercu = o ? msgInvit(o.inv || { nom_affichage: o.x.locataire, email: o.x.email, code: '••••••••', expire_le: new Date(Date.now() + 30 * J_MS) }) : '';
+    box.innerHTML = `
+    <div class="x-top">
+      <div class="chips x-mode" role="tablist" aria-label="Type d’envoi"><button type="button" role="tab" class="chip ${mode === 'nouveau' ? 'on' : ''}" aria-selected="${mode === 'nouveau'}" data-m="nouveau">À inviter <span>${listes.nouveau.length}</span></button><button type="button" role="tab" class="chip ${mode === 'relance' ? 'on' : ''}" aria-selected="${mode === 'relance'}" data-m="relance">À relancer <span>${listes.relance.length}</span></button></div>
+      ${n ? `<div class="x-prog"><b>${env} envoyé${env > 1 ? 's' : ''} sur ${n}</b><span class="jauge"><i style="width:${Math.round(100 * env / n)}%"></i></span></div>` : ''}
+    </div>
+    ${resAvec.length > 1 ? `<div class="chips ann-f x-res"><button type="button" class="chip ${!rid ? 'on' : ''}" data-r="">Toutes <span>${listes[mode].length}</span></button>${resAvec.map(r => `<button type="button" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)} <span>${resCount(r.id)}</span></button>`).join('')}</div>` : ''}
+    ${!n ? `<div class="card center pad"><b>${mode === 'nouveau' ? 'Personne à inviter.' : 'Aucun code à relancer.'}</b><p class="muted">${mode === 'nouveau' ? 'Tous les locataires complets ont déjà un code ou un compte. Les fiches incomplètes se corrigent dans le <a href="#/admin/plan">plan des résidences</a>.' : 'Aucun code n’expire dans les 7 jours.'}</p></div>`
+    : `<div class="x-wrap">
+      <section class="card x-file" aria-label="File d’envoi"><ol>${f.map(v => { const s = fait.get(v.x.id) || (v.x.id === cur ? 'cours' : 'att'); return `<li><button type="button" class="x-it ${s}" data-l="${v.x.id}" ${v.x.id === cur ? 'aria-current="true"' : ''}><i aria-hidden="true">${s === 'envoye' ? '<svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>' : ''}</i><span><b>${esc(v.x.locataire || '')}</b><span class="muted small">${rid ? '' : esc(nomRes.get(v.x.residence_id) || '') + ' · '}${esc(v.x.code)}</span></span><em>${s === 'envoye' ? 'Envoyé' : s === 'passe' ? 'Passé' : s === 'cours' ? 'En cours' : 'À envoyer'}</em></button></li>`; }).join('')}</ol></section>
+      ${o ? `<section class="card x-cur" aria-label="Message en cours"><div class="x-g">
+        <span class="x-k">Message ${k} sur ${n}</span>
+        <div><h3 class="x-nom">${esc(o.x.locataire || '')}</h3><span class="muted">${esc(nomRes.get(o.x.residence_id) || '')} ${esc(o.x.code)} · ${esc(o.x.email || '')}</span></div>
+        <div class="x-code"><span class="muted small">Code personnel</span>${o.inv ? `<b>${esc(o.inv.code)}</b>` : '<b class="x-pend">créé au moment de l’envoi</b>'}${o.inv ? `<span class="muted small">Valable jusqu’au ${dateFr(o.inv.expire_le)}</span>` : ''}</div>
+        <button type="button" class="btn block" id="xwa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>Ouvrir WhatsApp avec ce message</button>
+        <div class="row"><button type="button" class="btn sm ghost" id="xcp">Copier le message</button><button type="button" class="btn sm ghost" id="xps">Passer</button></div>
+        <p class="muted small">Au retour de WhatsApp, l’envoi est coché et le locataire suivant s’affiche.</p></div>
+        <figure class="x-wa" aria-label="Aperçu du message"><figcaption>Ce que reçoit le locataire</figcaption><div class="x-bulle">${esc(apercu)}</div></figure></section>`
+      : `<section class="card x-cur x-fin"><h3>${env ? `C’est fait : ${plur(env, 'message envoyé', 'messages envoyés')}.` : 'File terminée.'}</h3><p class="muted">${f.some(v => fait.get(v.x.id) === 'passe') ? 'Les locataires passés restent dans la liste pour la prochaine fois.' : 'Les inscriptions s’afficheront dans Aujourd’hui.'}</p><a class="btn sm soft" href="#/admin/jour">Retour à Aujourd’hui</a></section>`}
+    </div>`}`;
+    box.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; cur = null; dessiner(); });
+    box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { rid = b.dataset.r || null; cur = null; dessiner(); });
+    box.querySelectorAll('.x-it').forEach(b => b.onclick = () => { cur = b.dataset.l; dessiner(); });
+    if (!o) return;
+    const obtenir = async () => { if (!o.inv) { o.inv = await creerInvit(o.x); code.set(o.x.id, o.inv); I.unshift(o.inv); } return o.inv; };
+    const suivant = (etatFin) => { fait.set(o.x.id, etatFin); cur = null; dessiner(); box.querySelector('.x-cur')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+    box.querySelector('#xwa').onclick = async (ev) => { const w = ongletWa(), bt = ev.currentTarget; bt.disabled = true;
+      try { const inv = await obtenir(); envoyerWa(w, msgInvit(inv)); toast(`Message prêt pour ${o.x.locataire}.`); suivant('envoye'); }
+      catch (ex) { if (w) w.close(); bt.disabled = false; toast(errMsg(ex)); } };
+    box.querySelector('#xcp').onclick = async (ev) => { const bt = ev.currentTarget; bt.disabled = true;
+      try { const inv = await obtenir(); try { await navigator.clipboard.writeText(msgInvit(inv)); toast('Message copié : collez-le dans WhatsApp.'); } catch (_) { toast('Code : ' + inv.code); } suivant('envoye'); }
+      catch (ex) { bt.disabled = false; toast(errMsg(ex)); } };
+    box.querySelector('#xps').onclick = () => suivant('passe');
+  };
+  dessiner();
 }
