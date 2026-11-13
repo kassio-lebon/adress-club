@@ -23,7 +23,7 @@ const AIDE = {
     'Choisissez la résidence en haut de l’écran.',
     'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
     'Nouveau locataire sur un logement libre : « Affecter un locataire », puis « Affecter et inviter par WhatsApp ».',
-    'Départ d’un locataire : « Retirer », le logement reste et redevient libre. « Supprimer » efface la ligne entière de la base (double confirmation).',
+    'Le locataire déménage : « Retirer » (compte suspendu, il peut revenir). Il quitte définitivement la résidence : « Supprimer ». Dans les deux cas le logement reste et redevient libre.',
     'Mise à jour de toute une résidence : « Importer un fichier Excel » (fichier BASE RÉSIDENCE, une feuille par résidence).']],
   invitations: ['Envoyer à un locataire son code personnel pour qu’il crée son compte ADRESS CLUB.', [
     'Choisissez la résidence, puis tapez le logement ou le nom du locataire : son nom et son e-mail se remplissent seuls.',
@@ -371,13 +371,13 @@ const li = (t) => `<li>${t}</li>`;
 // Retirer le locataire d'un logement : le logement reste, sans locataire
 async function retirerLocataire(x, { compte, codeEnAttente }) {
   const nom = x.locataire || compte || 'le locataire';
-  const r = await dialogue({ titre: `Retirer ${nom} du logement ${x.code} ?`, ok: 'Retirer le locataire', danger: true, extra: 'Supprimer plutôt le locataire et le logement de la base…',
+  const r = await dialogue({ titre: `Retirer ${nom} du logement ${x.code} ?`, ok: 'Retirer le locataire', danger: true, extra: 'Il quitte définitivement la résidence ? Supprimer le locataire…',
     corps: `<p>À utiliser quand le locataire <b>quitte le logement</b>.</p><ul>
       ${li(`Le logement <b>${esc(x.code)}</b> reste dans la liste et devient <b>libre</b>.`)}
       ${li(`Le nom et l’e-mail de <b>${esc(nom)}</b> sont effacés de cette fiche.`)}
       ${compte ? li('Son accès à ADRESS CLUB est coupé et ses annonces sont mises en pause. <b>Rien n’est supprimé</b> : avec un nouveau code, il retrouve tout.') : ''}
       ${codeEnAttente ? li('Son code d’invitation en attente est annulé.') : ''}</ul>` });
-  if (r === 'x') return supprimerLogement(x);
+  if (r === 'x') return supprimerLocataire(x);
   if (!r) return;
   action(async () => {
     if (compte) check(await sb.from('profiles').update({ statut: 'desactive' }).eq('logement_id', x.id).eq('statut', 'actif'));
@@ -385,7 +385,28 @@ async function retirerLocataire(x, { compte, codeEnAttente }) {
     check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
   }, `${x.code} est maintenant libre.`);
 }
-// Supprimer de la base : le logement et son locataire disparaissent de la liste (deux confirmations).
+// Supprimer le locataire : il quitte définitivement la résidence. Le logement reste (libre) ; deux confirmations.
+async function supprimerLocataire(x) {
+  const { data: P } = await sb.from('profiles').select('id,nom_affichage,statut').eq('logement_id', x.id);
+  const comptes = P || [], actif = comptes.some(p => p.statut === 'actif');
+  const nom = x.locataire || comptes[0]?.nom_affichage || x.email || 'ce locataire';
+  const r1 = await dialogue({ titre: `Supprimer ${nom} ?`, ok: 'Continuer', danger: true,
+    corps: `<p>À utiliser quand ${esc(nom)} <b>quitte définitivement la résidence</b>. Le logement <b>${esc(x.code)}</b> reste et redevient libre.</p><ul>
+      ${li(`Son nom et son e-mail sont effacés de Nos locataires.`)}
+      ${comptes.length ? li(`Son compte ADRESS CLUB est <b>fermé</b> et détaché de la résidence : il ne peut plus se connecter, ses annonces sont retirées du Market.`) : li('Il n’avait pas encore de compte ADRESS CLUB.')}
+      ${li('Ses codes d’invitation non utilisés sont annulés.')}
+      ${li('<b>Différence avec « Retirer »</b> : il ne pourra revenir qu’avec une nouvelle invitation, comme un nouveau locataire.')}</ul>` });
+  if (!r1) return;
+  const r2 = await dialogue({ titre: 'Dernière confirmation', ok: 'Supprimer le locataire', danger: true,
+    corps: `<p>Pour confirmer le départ définitif de <b>${esc(nom)}</b>, tapez le code du logement : <b class="dlg-code">${esc(x.code)}</b></p>`, saisie: { label: 'Code du logement', attendu: x.code } });
+  if (!r2) return;
+  action(async () => {
+    if (comptes.length) check(await sb.from('profiles').update({ statut: 'desactive', logement_id: null, residence_id: null }).in('id', comptes.map(p => p.id)));
+    check(await sb.from('invitations').delete().eq('logement_id', x.id).is('utilisee_par', null));
+    check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
+  }, `${nom} a été supprimé. ${x.code} est libre.`);
+}
+// Supprimer le logement lui-même (ligne créée par erreur, logement qui n'existe plus) : depuis « Modifier », deux confirmations.
 // Un compte résident rattaché est désactivé et détaché, sans perdre ses annonces ni son historique.
 async function supprimerLogement(x) {
   const { data: P } = await sb.from('profiles').select('id,nom_affichage,statut').eq('logement_id', x.id);
@@ -510,7 +531,7 @@ async function annuaire(box) {
         && t.every(w => norm([x.code, x.locataire, x.email, occupant.get(x.id)].join(' ')).includes(w)));
       $('#atb').innerHTML = vis.map(x => { const p = problemes(x), e = etat(x); return `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b></td>
         <td>${!x.bloc ? '<span class="muted">—</span>' : p.some(o => o.k === 'nom') ? '<span class="a-bad">Nom manquant</span>' : esc(x.locataire || '—')}${!x.bloc || (!x.locataire && !x.email && !occupant.has(x.id)) ? '' : x.email && EMAIL_OK(x.email) ? `<div class="small muted">${esc(x.email)}</div>` : `<div class="small a-bad">${x.email ? esc(x.email) + ' (invalide)' : 'E-mail manquant'}${p.find(o => o.fix) ? ` · <button type="button" class="lnk" data-fix="${esc(p.find(o => o.fix).fix)}">Corriger en ${esc(p.find(o => o.fix).fix)}</button>` : ''}</div>`}${p.filter(o => o.t).map(o => alerte(o.t)).join('')}</td>
-        <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${!x.locataire && !x.email && !occupant.has(x.id) ? '<button class="btn sm" data-aff>Affecter un locataire</button>' : ''}${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button>${x.locataire || x.email || occupant.has(x.id) ? '<button class="btn sm ghost rouge" data-vider>Retirer</button>' : ''}<button class="btn sm ghost rouge btn-sup" data-sup aria-label="Supprimer ${esc(x.code)} de la base" title="Supprimer de la base"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Supprimer</button></div></td></tr>`; }).join('');
+        <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${!x.locataire && !x.email && !occupant.has(x.id) ? '<button class="btn sm" data-aff>Affecter un locataire</button>' : ''}${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button>${x.locataire || x.email || occupant.has(x.id) ? '<button class="btn sm ghost rouge" data-vider>Retirer</button>' : ''}${x.locataire || x.email || occupant.has(x.id) ? `<button class="btn sm ghost rouge btn-sup" data-sup aria-label="Supprimer le locataire de ${esc(x.code)}" title="Le locataire quitte définitivement la résidence"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Supprimer</button>` : ''}</div></td></tr>`; }).join('');
       $('#avide').hidden = !!vis.length;
       brancher();
     };
@@ -529,7 +550,7 @@ async function annuaire(box) {
       const x = L.find(y => y.id === b.closest('tr').dataset.id); if (!x) return;
       retirerLocataire(x, { compte: occupant.has(x.id) ? (occupant.get(x.id) || 'ce résident') : null, codeEnAttente: !!vivant(x.id) });
     });
-    box.querySelectorAll('[data-sup]').forEach(b => b.onclick = () => { const x = L.find(y => y.id === b.closest('tr').dataset.id); if (x) supprimerLogement(x); });
+    box.querySelectorAll('[data-sup]').forEach(b => b.onclick = () => { const x = L.find(y => y.id === b.closest('tr').dataset.id); if (x) supprimerLocataire(x); });
     // Logement libre : créer le locataire et l'affecter en une fois (puis, au choix, l'inviter tout de suite)
     box.querySelectorAll('[data-aff]').forEach(b => b.onclick = () => {
       const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id); if (!x) return;
@@ -560,7 +581,7 @@ async function annuaire(box) {
       const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id);
       tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>Appartement</label><input type="text" name="appartement" value="${esc(x.appartement || '')}"></div></div>
         <div class="grid2"><div><label>Locataire</label><input type="text" name="locataire" value="${esc(x.locataire || '')}"></div><div><label>E-mail</label><input name="email" type="email" value="${esc(x.email || '')}"></div></div>
-        <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Supprimer de la base</button></div></form></td>`;
+        <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Supprimer le logement</button></div></form></td>`;
       const f = tr.querySelector('form'), v = (n) => f.elements[n].value.trim();
       const etEd = listeEtages(f.elements.etage, l.map(y => y.etage)); majApp(f.elements.appartement); majBloc(f.elements.bloc);
       f.querySelector('[data-x]').onclick = dessiner;
