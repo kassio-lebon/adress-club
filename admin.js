@@ -231,6 +231,51 @@ async function invitations(box) {
   box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirm('Supprimer cette invitation ?') && action(async () => check(await sb.from('invitations').delete().eq('code', trouve(b).code)), 'Invitation supprimée.'));
 }
 
+// Lecture d'une feuille « SUIVI RÉSIDENCE » (base propre) : ligne d'en-tête BLOC…, colonnes BLOC / ETAGE / APP. ou APPARTEMENT / LOCATAIRE / MAIL.
+// Code = BLOC-ÉTAGE-APPARTEMENT normalisé (RDJ, RDC, 1ER, 2E…, PENTHOUSE). Plusieurs lignes pour un même logement = historique : la dernière remplie est gardée.
+const EMAIL_RE = /[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+function lireFeuille(rows) {
+  const hi = rows.findIndex(r => (r || []).some(c => norm(c) === 'bloc'));
+  if (hi < 0) return { lignes: [], doublons: [], autresMails: [] };
+  const H = rows[hi].map(norm);
+  const col = (...k) => H.findIndex(h => k.some(x => h === x || h.startsWith(x)));
+  const iB = col('bloc'), iE = col('etage'), iA = col('app', 'appartement'), iL = col('locataire'), iM = col('mail', 'email', 'e-mail');
+  const etage = (e) => { const s = norm(e).toUpperCase().replace(/\s+/g, ' ');
+    if (!s) return ''; if (/^PENT/.test(s)) return 'PENTHOUSE'; if (/^(RDJ|RDC)/.test(s)) return s.slice(0, 3);
+    const m = s.match(/\d+/); if (m) return +m[0] === 1 ? '1ER' : m[0] + 'E'; return s.replace(/\s+/g, ''); };
+  let bloc = '', vu = new Map(), ordre = [], autresMails = [];
+  for (const r of rows.slice(hi + 1)) {
+    const g = (i) => i < 0 || r?.[i] == null ? '' : String(r[i]).trim();
+    if (![iB, iE, iA, iL, iM].some(i => g(i))) continue;
+    let b = norm(g(iB)).toUpperCase().replace(/^BLOC\s*/, '').replace(/\s+/g, '');
+    if (b) bloc = b;
+    let e = etage(g(iE)), a = g(iA);
+    const gm = a.match(/\(\s*app\s*(\d+)\s*\)/i);
+    a = gm ? gm[1] : norm(a).toUpperCase().replace(/^APP[\s.,]*/, '').replace(/[\s.,]+/g, '');
+    if (/^PENT/.test(a)) { e = 'PENTHOUSE'; a = a.replace(/^PENT(HOUSE)?/, ''); }
+    const pl = norm(g(iE)).toUpperCase().match(/^PENTHOUSE\s+([A-Z])$/); if (pl) b = pl[1];
+    const la = a.match(/^([A-Z])\d/); const bl = la ? la[1] : (pl ? pl[1] : bloc);
+    if (!e && !a) continue;
+    const mails = (g(iM).match(EMAIL_RE) || []).map(m => m.toLowerCase());
+    const l = { bloc: bl, etage: e, appartement: a, locataire: g(iL).replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim(), email: mails[0] || '' };
+    const code = [l.bloc, l.etage, l.appartement].filter(Boolean).join('-');
+    if (mails.length > 1) autresMails.push({ code, autres: mails.slice(1) });
+    if (!vu.has(code)) { vu.set(code, []); ordre.push(code); }
+    vu.get(code).push(l);
+  }
+  const doublons = [];
+  // Appartement non identifié (vide ou égal à l'étage, ex. AYOKA « RDC ») répété : ce sont des logements distincts, numérotés 1, 2…
+  for (const code of [...ordre]) { const t = vu.get(code), x = t[0];
+    if (t.length > 1 && x.etage !== 'PENTHOUSE' && (!x.appartement || x.appartement === x.etage)) {
+      ordre.splice(ordre.indexOf(code), 1, ...t.map((l, i) => { l.appartement = String(i + 1); const c = [l.bloc, l.etage, l.appartement].join('-'); vu.set(c, [l]); return c; }));
+      vu.delete(code); } }
+  const lignes = ordre.map(code => { const t = vu.get(code); const pleins = t.filter(x => x.locataire || x.email);
+    const garde = pleins.length ? pleins[pleins.length - 1] : t[t.length - 1];
+    if (pleins.length > 1) doublons.push({ code, garde: garde.locataire, ignores: pleins.slice(0, -1).map(x => x.locataire) });
+    return garde; });
+  return { lignes, doublons, autresMails };
+}
+
 // ---------- Annuaire des locataires : Bloc-Étage-Appartement + e-mail, import Excel ----------
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const chargerXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, ko) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = () => ok(window.XLSX); s.onerror = () => ko(new Error('Lecture Excel indisponible (réseau).')); document.head.appendChild(s); });
@@ -278,7 +323,7 @@ async function annuaire(box) {
     <div class="card"><h3>Annuaire des locataires</h3><p class="muted small">Seules les personnes de l’annuaire peuvent recevoir un code : le code ne fonctionne qu’avec l’e-mail indiqué ici. Logement = <b>Bloc-Étage-Appartement</b> (ex : A-RDJ-A001).</p>
       <div class="grid2"><div><label for="ar">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
       <div><label>Mettre à jour depuis Excel</label><label class="btn xl block" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
-      <p class="muted small" style="margin:8px 0 0">Une feuille par résidence (nom de la feuille = nom de la résidence), colonnes : BLOC, Etage, Appartement, Email, Locataire.</p>
+      <p class="muted small" style="margin:8px 0 0">Une feuille par résidence (nom de la feuille = nom de la résidence), colonnes : BLOC, ETAGE, APP., LOCATAIRE, MAIL. Plusieurs lignes pour un même appartement = historique : la dernière remplie est gardée.</p>
       <div id="imp"></div></div>
     <div class="ann-bar"><h2>${l.length} logement${l.length > 1 ? 's' : ''}</h2><input type="search" id="aq" placeholder="Rechercher un logement, un nom, un e-mail…" autocomplete="off"></div>
     <div class="chips ann-f">${FILTRES.filter(([k]) => k === 'tous' || nb[k]).map(([k, t]) => `<button type="button" class="chip ${k === filtre ? 'on' : ''}${k === 'pb' ? ' pb' : ''}" data-f="${k}">${t} <span>${nb[k]}</span></button>`).join('')}</div>
@@ -323,12 +368,11 @@ async function annuaire(box) {
       try {
         const X = await chargerXlsx(); const wb = X.read(await file.arrayBuffer(), { type: 'array' });
         const feuilles = wb.SheetNames.map(n => {
-          const rows = X.utils.sheet_to_json(wb.Sheets[n], { defval: '' });
-          const lignes = rows.map(r => { const g = (k) => { const c = Object.keys(r).find(h => norm(h) === k); return c ? String(r[c]).trim() : ''; }; return { bloc: g('bloc'), etage: g('etage'), appartement: g('appartement'), email: g('email').toLowerCase(), locataire: g('locataire') }; }).filter(x => x.bloc || x.etage || x.appartement);
-          return { nom: n.trim(), lignes, connue: R.some(r => norm(r.nom) === norm(n)), invalides: lignes.filter(x => x.email && !EMAIL_OK(x.email)).length, sans: lignes.filter(x => !x.email).length };
+          const { lignes, doublons, autresMails } = lireFeuille(X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' }));
+          return { nom: n.trim(), lignes, doublons, autresMails, connue: R.some(r => norm(r.nom) === norm(n)), invalides: lignes.filter(x => x.email && !EMAIL_OK(x.email)).length, sans: lignes.filter(x => !x.email).length };
         }).filter(f => f.lignes.length);
-        if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue : vérifiez les colonnes BLOC, Etage, Appartement, Email, Locataire.</p>'; return; }
-        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} logements${f.connue ? '' : ' <span class="badge warn">nouvelle résidence</span>'}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}</li>`).join('')}</ul>
+        if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue : vérifiez les colonnes BLOC, ETAGE, APP., LOCATAIRE, MAIL.</p>'; return; }
+        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} logements${f.connue ? '' : ' <span class="badge warn">nouvelle résidence</span>'}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}</li>`).join('')}</ul>
           <label class="check"><input type="checkbox" id="off"> Retirer de l’annuaire les logements absents du fichier (sauf comptes actifs)</label>
           <div class="row" style="margin-top:10px"><button class="btn" type="button" id="ok">Importer</button><button class="btn ghost" type="button" id="no">Annuler</button></div></div>`;
         imp.querySelector('#no').onclick = () => imp.innerHTML = '';
@@ -367,13 +411,17 @@ const alerte = (t) => `<div class="a-pb">${esc(t)}</div>`;
 
 // ---------- Comptes (§2) ----------
 async function comptes(box) {
-  const { data } = await sb.from('profiles').select('id,nom_affichage,statut,date_activation,date_fin_occupation,type_occupant,is_admin,is_adress,logement_id,logements(code,numero,locataire),residences(nom)').order('created_at', { ascending: false });
-  const D = data || [];
+  const [{ data }, lg] = await Promise.all([
+    sb.from('profiles').select('id,nom_affichage,statut,date_activation,date_fin_occupation,type_occupant,is_admin,is_adress,logement_id,residence_id,logements(code,numero,locataire,bloc),residences(nom)').order('created_at', { ascending: false }),
+    sb.from('logements').select('id,code,residence_id,locataire,bloc,etage,appartement,residences(nom)').eq('actif', true)]);
+  const D = data || [], LG = (lg.data || []).filter(l => l.bloc).sort((a, b) => (a.residences?.nom || '').localeCompare(b.residences?.nom || '') || triLog(a, b));
+  const pris = new Set(D.filter(p => p.statut === 'actif' && p.logement_id).map(p => p.logement_id));
   const tags = (p) => { const d = dans(p.date_fin_occupation), t = [p.statut === 'actif' ? 'actif' : p.statut === 'desactive' ? 'retire' : 'attente'];
     if (p.statut === 'actif' && d != null && d <= 30) t.push('depart'); if (p.is_admin || p.is_adress) t.push('equipe'); if (problemes(p).length) t.push('pb'); return t.join(' '); };
   const problemes = (p) => { const r = [], d = dans(p.date_fin_occupation);
     if (p.statut === 'actif' && d != null && d < 0) r.push('Date de fin dépassée : le retrait automatique n’a pas encore eu lieu, retirez le compte');
-    if (p.statut === 'actif' && !p.logement_id && !p.is_adress && !p.is_admin) r.push('Aucun logement rattaché');
+    if (p.statut === 'actif' && !p.logement_id && !p.is_adress && !p.is_admin) r.push('Aucun logement rattaché : touchez « Logement »');
+    if (p.logement_id && p.logements && !p.logements.bloc) r.push('Ancien code hors annuaire : touchez « Logement » pour le rattacher au bon appartement');
     if (p.statut === 'en_attente' || (p.statut !== 'actif' && p.statut !== 'desactive')) r.push('Compte créé sans code valide : renvoyez-lui une invitation');
     return r; };
   const fin = (p) => { const d = dans(p.date_fin_occupation); return d == null ? '' : d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`; };
@@ -383,12 +431,26 @@ async function comptes(box) {
     <td>${p.logements ? `<b>${esc(p.logements.numero || p.logements.code)}</b>` : '—'}<div class="muted small">${esc(p.residences?.nom || '')}</div></td>
     <td><span class="st-l ${p.statut === 'actif' ? 'actif' : ''}">${p.statut === 'actif' ? 'Actif' : p.statut === 'desactive' ? 'Retiré' : 'En attente'}</span></td>
     <td><input type="date" data-fin value="${p.date_fin_occupation || ''}" style="min-width:140px"><div class="muted small">${fin(p)}</div></td>
-    <td>${p.id === state.session.user.id ? '<span class="muted small">vous</span>' : `<div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${p.statut === 'actif' ? '<button class="btn sm danger" data-st="desactive">Retirer</button>' : p.statut === 'desactive' ? '<span class="muted small">Nouveau code pour revenir</span>' : ''}<button class="btn sm soft" data-mdp title="Mot de passe oublié">Mot de passe</button></div>`}</td></tr>`).join('')}</tbody></table></div>
+    <td>${p.id === state.session.user.id ? '<span class="muted small">vous</span>' : `<div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${p.statut === 'actif' ? '<button class="btn sm danger" data-st="desactive">Retirer</button>' : p.statut === 'desactive' ? '<span class="muted small">Nouveau code pour revenir</span>' : ''}<button class="btn sm soft" data-lg>Logement</button><button class="btn sm soft" data-mdp title="Mot de passe oublié">Mot de passe</button></div>`}</td></tr>`).join('')}</tbody></table></div>
   <div id="mdpRes"></div>`;
   filtres(box.querySelector('#cpt'), [['pb', 'À vérifier', 1], ['actif', 'Actifs'], ['depart', 'Départ ≤ 30 j'], ['attente', 'En attente'], ['retire', 'Retirés'], ['equipe', 'Équipe ADRESS']], 'comptes', 'Rechercher un nom, un logement, une résidence…');
   box.querySelectorAll('[data-fin]').forEach(i => i.onchange = () => {
     if (i.value && new Date(i.value) < new Date(new Date().toDateString()) && !confirm('Cette date est déjà passée : le compte sera retiré automatiquement dans la nuit. Continuer ?')) { i.value = i.defaultValue; return; }
     action(async () => check(await sb.from('profiles').update({ date_fin_occupation: i.value || null }).eq('id', i.closest('tr').dataset.id)), 'Date enregistrée.');
+  });
+  // Rattacher un compte à un logement de l'annuaire (après changement de nomenclature, déménagement…)
+  box.querySelectorAll('[data-lg]').forEach(b => b.onclick = () => {
+    const tr = b.closest('tr'), p = D.find(x => x.id === tr.dataset.id); if (!p) return;
+    const groupes = [...new Set(LG.map(l => l.residences?.nom || ''))];
+    const cell = tr.children[1];
+    cell.innerHTML = `<select data-lgsel style="min-width:200px"><option value="">Choisir le logement…</option>${groupes.map(g => `<optgroup label="${esc(g)}">${LG.filter(l => (l.residences?.nom || '') === g).map(l => `<option value="${l.id}" ${pris.has(l.id) && l.id !== p.logement_id ? 'disabled' : ''}${l.id === p.logement_id ? ' selected' : ''}>${esc(l.code)}${l.locataire ? ' — ' + esc(l.locataire) : ''}${pris.has(l.id) && l.id !== p.logement_id ? ' (occupé)' : ''}</option>`).join('')}</optgroup>`).join('')}</select>`;
+    const sel = cell.querySelector('select'); sel.focus();
+    sel.onchange = () => { const l = LG.find(x => x.id === sel.value); if (!l) return;
+      if (!confirm(`Rattacher ${p.nom_affichage || 'ce compte'} au logement ${l.code} (${l.residences?.nom || ''}) ?`)) { rerender(); return; }
+      action(async () => { const ancien = p.logements && !p.logements.bloc ? p.logement_id : null;
+        check(await sb.from('profiles').update({ logement_id: l.id, residence_id: l.residence_id }).eq('id', p.id));
+        if (ancien && !D.some(x => x.id !== p.id && x.logement_id === ancien)) await sb.from('logements').update({ actif: false }).eq('id', ancien);
+      }, 'Compte rattaché à ' + l.code + '.'); };
   });
   box.querySelectorAll('[data-mdp]').forEach(b => b.onclick = async () => {
     const tr = b.closest('tr'), p = D.find(x => x.id === tr.dataset.id); if (!p) return;
