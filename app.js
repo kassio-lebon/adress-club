@@ -403,8 +403,8 @@ async function market() {
   </div>
   ${data.length ? `<div class="grid2 grid3">${data.map((a, i) => `
     <div class="card item${a.statut === 'reserve' ? ' is-res' : ''}">
-      <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urls[i])}')" role="img" aria-label="${esc(a.titre)}"></div>
-      ${a.statut === 'reserve' ? '<span class="badge st warn">Réservé</span>' : a.est_a_moi ? '<span class="badge st">Votre annonce</span>' : a.type === 'don' ? '<span class="badge st">À donner</span>' : ''}
+      <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urls[i])}')" role="img" aria-label="${esc(a.titre)}">${a.statut === 'reserve' ? '<span class="stamp">Réservé</span>' : ''}</div>
+      ${a.est_a_moi ? '<span class="badge st">Votre annonce</span>' : a.type === 'don' ? '<span class="badge st">À donner</span>' : ''}
       <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc([a.categorie, a.residence || (a.is_adress ? 'ADRESS IMMOBILIER' : '')].filter(Boolean).join(' · '))}</div></div></a>
       ${a.est_a_moi ? '' : `<button class="fav" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${favs.has(a.id) ? '♥' : '♡'}</button>`}
     </div>`).join('')}</div>`
@@ -625,11 +625,12 @@ async function mesAnnonces() {
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes annonces</h1>${tabs}
   <p class="muted">Contactez les intéressés dans l'ordre d'arrivée des demandes.</p>
   <div class="list" id="lst">${(mes || []).map((a, i) => { const ds = parAnnonce(a.id), nl = ds.filter(d => !d.lue).length; return `
-  <div class="card" data-id="${a.id}">
-    <div style="display:flex;gap:12px"><div class="ph" style="width:72px;height:72px;flex:none;border-radius:10px;background-image:url('${esc(urls[i])}')"></div>
+  <div class="card${a.statut === 'reserve' && !a.retiree_par_adress ? ' card-res' : ''}" data-id="${a.id}">
+    <div style="display:flex;gap:12px"><div class="ph" style="width:72px;height:72px;flex:none;border-radius:10px;background-image:url('${esc(urls[i])}')">${a.statut === 'reserve' && !a.retiree_par_adress ? '<span class="stamp">Réservé</span>' : ''}</div>
     <div style="min-width:0"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(a.titre)}</a>` : esc(a.titre)}</b>
       <div class="muted small"><span class="pill ${a.retiree_par_adress ? 'off' : a.statut}">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUTS[a.statut]}</span> · ${prix(a)}</div>
       <div class="muted small">${ouverte(a) ? `Expire le ${dateFr(a.date_expiration)}` : `Clôturée${a.date_cloture ? ' le ' + dateFr(a.date_cloture) : ''} · archivée`}</div></div></div>
+    ${a.statut === 'reserve' && !a.retiree_par_adress ? `<div class="res-note"><b>Annonce réservée.</b> Sur le Market, elle porte le tampon « Réservé » et personne ne peut plus envoyer de demande. Une fois l'affaire conclue, touchez « ${a.type === 'don' ? 'Don effectué' : 'Vendu'} » ; sinon, « Remettre disponible ».</div>` : ''}
     ${ds.length ? `<details ${ouverte(a) ? 'open' : ''} data-lire="${nl ? a.id : ''}"><summary style="margin-top:10px">${ds.length} demande${ds.length > 1 ? 's' : ''}${nl ? ` · <span class="badge">${nl} nouvelle${nl > 1 ? 's' : ''}</span>` : ''}</summary>
       ${ds.map(d => `<div class="dem"><b>n° ${d.rang}</b> ${esc(d.demandeur)} ${d.statut === 'contactee' ? '<span class="badge ok">contacté</span>' : ''}
         <div class="muted small">Le ${dateFr(d.created_at, true)}</div>
