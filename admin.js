@@ -155,7 +155,12 @@ async function invitations(box) {
   const RANG = (e) => { const s = norm(e); return s === 'rdj' || s === 'rdc' ? 0 : /^penthouse/.test(s) ? 99 : (parseInt(s, 10) || 50); };
   const tri = (a, b) => (a.bloc || '').localeCompare(b.bloc || '') || RANG(a.etage) - RANG(b.etage) || (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true });
   let items = [];
-  const etatLog = (x) => occupant.has(x.id) ? ['occ', 'Occupé', occupant.get(x.id)] : enAttente.has(x.id) ? ['att', 'Code envoyé', enAttente.get(x.id)] : !EMAIL_OK(x.email) ? ['mail', 'E-mail à corriger', x.locataire || ''] : ['lib', 'Libre', x.locataire || ''];
+  // Occupé = un locataire figure dans l'annuaire (ou un compte actif) ; Libre = aucun locataire. Le second mot dit où en est l'accès au Club.
+  const etatLog = (x) => occupant.has(x.id) ? ['occ', 'Occupé · inscrit', occupant.get(x.id)]
+    : enAttente.has(x.id) ? ['att', 'Occupé · code envoyé', enAttente.get(x.id)]
+    : !x.locataire ? ['lib', 'Libre', '']
+    : !EMAIL_OK(x.email) ? ['mail', 'Occupé · e-mail à corriger', x.locataire]
+    : ['inv', 'Occupé · à inviter', x.locataire];
   const choisir = (v) => {
     const it = items.find(i => i.v === v); if (!it) return;
     $('#lg').value = v; $('#lgq').value = it.label + (it.nom ? ' — ' + it.nom : ''); fermer(); remplir();
@@ -178,7 +183,7 @@ async function invitations(box) {
       .concat([{ v: '+', label: '＋ Nouveau logement…', cle: 'nouveau logement ajouter' }, { v: '0', label: 'Sans logement (équipe ADRESS)', cle: 'sans logement equipe adress admin' }]);
     $('#lg').value = ''; $('#lgq').value = '';
     const pre = items.find(i => i.v === invitations._pre && !i.off); invitations._pre = null;
-    const libre = pre || items.find(i => i.st && i.st[0] === 'lib') || items.find(i => !i.off && i.st); if (libre) choisir(libre.v); else remplir();
+    const libre = pre || items.find(i => i.st && i.st[0] === 'inv') || items.find(i => !i.off && i.st); if (libre) choisir(libre.v); else remplir();
   };
   $('#ir').onchange = majLogements;
   $('#lgq').onfocus = () => { $('#lgq').select(); ouvrir(''); };
@@ -297,6 +302,7 @@ async function annuaire(box) {
   const etat = (x) => occupant.has(x.id) ? 'actif' : vivant(x.id) ? 'code' : codes.has(x.id) ? 'expire' : 'libre';
   const problemes = (x) => {
     const p = [];
+    if (!x.locataire && !x.email && !occupant.has(x.id)) return p; // logement libre : rien à corriger
     if (!x.email) p.push({ t: 'E-mail manquant' });
     else if (!EMAIL_OK(x.email)) p.push({ t: 'E-mail invalide', fix: suggestion(x.email) });
     else if (parMail.get(x.email) > 1) p.push({ t: `Même e-mail sur ${parMail.get(x.email)} logements : une seule personne pourra se connecter` });
@@ -311,14 +317,14 @@ async function annuaire(box) {
     return e === 'actif' ? `<span class="st-l actif">Compte actif</span>${occupant.get(x.id) ? `<div class="muted small">${esc(occupant.get(x.id))}</div>` : ''}`
       : e === 'code' ? `<span class="st-l code">Code envoyé</span><div class="muted small">valable jusqu’au ${dateFr(i.expire_le)}</div>`
       : e === 'expire' ? '<span class="st-l">Code expiré</span>'
-      : '<span class="st-l">Pas encore invité</span>';
+      : x.locataire ? '<span class="st-l">Pas encore invité</span>' : '<span class="st-l">Logement libre</span>';
   };
   const dessiner = () => {
     annuaire._rid = rid; annuaire._f = filtre;
     const l = L.filter(x => x.residence_id === rid).sort(triLog);
-    const nb = { tous: l.length, pb: l.filter(x => problemes(x).length).length, libre: l.filter(x => ['libre', 'expire'].includes(etat(x))).length, code: l.filter(x => etat(x) === 'code').length, actif: l.filter(x => etat(x) === 'actif').length };
+    const nb = { tous: l.length, pb: l.filter(x => problemes(x).length).length, libre: l.filter(x => x.locataire && ['libre', 'expire'].includes(etat(x))).length, vide: l.filter(x => !x.locataire && !occupant.has(x.id)).length, code: l.filter(x => etat(x) === 'code').length, actif: l.filter(x => etat(x) === 'actif').length };
     if (filtre === 'pb' && !nb.pb) filtre = 'tous';
-    const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs']];
+    const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', 'Logements libres']];
     box.innerHTML = `
     <div class="card"><h3>Annuaire des locataires</h3><p class="muted small">Seules les personnes de l’annuaire peuvent recevoir un code : le code ne fonctionne qu’avec l’e-mail indiqué ici. Logement = <b>Bloc-Étage-Appartement</b> (ex : A-RDJ-A001).</p>
       <div class="grid2"><div><label for="ar">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
@@ -335,7 +341,7 @@ async function annuaire(box) {
     const $ = (s) => box.querySelector(s);
     const lignes = () => {
       const t = norm(q).split(/\s+/).filter(Boolean);
-      const vis = l.filter(x => (filtre === 'tous' || (filtre === 'pb' ? problemes(x).length : filtre === 'libre' ? ['libre', 'expire'].includes(etat(x)) : etat(x) === filtre))
+      const vis = l.filter(x => (filtre === 'tous' || (filtre === 'pb' ? problemes(x).length : filtre === 'libre' ? x.locataire && ['libre', 'expire'].includes(etat(x)) : filtre === 'vide' ? !x.locataire && !occupant.has(x.id) : etat(x) === filtre))
         && t.every(w => norm([x.code, x.locataire, x.email, occupant.get(x.id)].join(' ')).includes(w)));
       $('#atb').innerHTML = vis.map(x => { const p = problemes(x), e = etat(x); return `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b><div class="muted small">${esc([x.bloc && 'Bloc ' + x.bloc, x.etage, x.appartement].filter(Boolean).join(' · '))}</div></td>
         <td>${esc(x.locataire || '—')}<div class="small ${x.email && EMAIL_OK(x.email) ? 'muted' : 'a-bad'}">${esc(x.email || 'e-mail manquant')}</div>${p.map(o => `<div class="a-pb">${esc(o.t)}${o.fix ? ` · <button type="button" class="lnk" data-fix="${esc(o.fix)}">Corriger en ${esc(o.fix)}</button>` : ''}</div>`).join('')}</td>
