@@ -1137,3 +1137,12 @@ a.back[href="#/"]{display:none}
 @media (min-width:1400px){.pl-wrap{grid-template-columns:minmax(0,1fr) 380px}.x-wrap{grid-template-columns:minmax(0,380px) minmax(0,1fr)}}
 .pl-plan{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));align-items:start}
 .pl-plan>.card{grid-column:1/-1}
+/* v78 · largeur maîtrisée + bouton Ajouter visible */
+.wrap:has(.adm-nav){max-width:1320px}
+.ann-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.ann-top>div:first-child{flex:0 1 380px;min-width:220px}
+.ann-btns{display:flex;flex-wrap:wrap;gap:10px}
+.ann-btns .btn{min-height:46px;white-space:nowrap}
+.ann-add{margin-top:12px;border:1.5px solid var(--ink)}
+@media (max-width:560px){.ann-btns{width:100%}.ann-btns .btn{flex:1}}
+.ann-add .row .btn{flex:0 0 auto;min-width:160px}

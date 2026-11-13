@@ -391,11 +391,11 @@ async function annuaire(box) {
     box.innerHTML = `
     <div class="card">
       <div class="ann-top"><div><label for="ar" style="margin-top:0">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
-      <div><label class="btn xl block" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
+      <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un logement</button><label class="btn xl" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
-    <details class="card" style="margin-top:12px"><summary>Ajouter un logement</summary><form id="fa" novalidate style="margin-top:10px"><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae" placeholder="RDJ"></div><div><label for="aa">Appartement</label><input type="text" id="aa" placeholder="A001"></div></div>
+    <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae" placeholder="RDJ"></div><div><label for="aa">Appartement</label><input type="text" id="aa" placeholder="A001"></div></div>
       <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
-      <button class="btn block" style="margin-top:12px">Ajouter</button></form></details>
+      <div class="row" style="margin-top:12px"><button class="btn">Ajouter le logement</button><button type="button" class="btn ghost" id="faNo">Annuler</button></div></form></div>
     <div class="ann-bar"><h2>${l.length} logement${l.length > 1 ? 's' : ''}</h2><input type="search" id="aq" placeholder="Rechercher un logement, un nom, un e-mail…" autocomplete="off"></div>
     <div class="chips ann-f">${FILTRES.filter(([k]) => k === 'tous' || nb[k]).map(([k, t]) => `<button type="button" class="chip ${k === filtre ? 'on' : ''}${k === 'pb' ? ' pb' : ''}" data-f="${k}">${t} <span>${nb[k]}</span></button>`).join('')}</div>
     <div tabindex="0" style="overflow-x:auto"><table class="adm no-q"><thead><tr><th>Logement</th><th>Locataire</th><th>Accès</th><th></th></tr></thead><tbody id="atb"></tbody></table></div>
@@ -413,6 +413,9 @@ async function annuaire(box) {
       brancher();
     };
     $('#ar').onchange = () => { rid = $('#ar').value; dessiner(); };
+    const ouvrirAjout = (on) => { $('#faBox').hidden = !on; $('#addLog').setAttribute('aria-expanded', on); if (on) $('#ab').focus(); };
+    $('#addLog').onclick = () => ouvrirAjout($('#faBox').hidden);
+    $('#faNo').onclick = () => ouvrirAjout(false);
     $('#aq').oninput = () => { q = $('#aq').value; lignes(); };
     box.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtre = b.dataset.f; box.querySelectorAll('[data-f]').forEach(c => c.classList.toggle('on', c === b)); annuaire._f = filtre; lignes(); });
     $('#fa').onsubmit = (e) => { e.preventDefault(); if (!$('#ab').value.trim() && !$('#ae').value.trim() && !$('#aa').value.trim()) return toast('Indiquez le bloc, l’étage ou l’appartement.'); const m = $('#am').value.trim().toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide.'); action(async () => check(await sb.from('logements').insert({ residence_id: rid, code: 'tmp-' + Date.now(), bloc: $('#ab').value, etage: $('#ae').value, appartement: $('#aa').value, locataire: $('#an').value || null, email: m || null, type_logement: 'Appartement' })), 'Logement ajouté.'); };
