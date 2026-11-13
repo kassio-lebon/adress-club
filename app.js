@@ -479,7 +479,7 @@ async function annonce(id) {
     if (error) { b.disabled = false; b.textContent = 'Ça m’intéresse, ça m’enjaille !'; return toast(errMsg(error)); }
     b.textContent = 'C’est zooo ! Demande envoyée ✓';
     const tel = state.profil.consentement_contact && state.profil.telephone;
-    app.querySelector('#zoo').innerHTML = `<div class="zoo"><b>C’est zooo ! 🎉</b><p>Le vendeur a reçu votre demande n° ${rang}. ${tel ? `Il vous contactera au <b>${esc(state.profil.telephone)}</b>.` : 'Pour qu’il puisse vous joindre, <a href="#/profil">ajoutez votre numéro dans Mon compte</a> et autorisez son partage.'}</p><p class="muted">Merci !</p></div>`;
+    app.querySelector('#zoo').innerHTML = `<div class="zoo"><b>C’est zooo ! 🎉</b><p>Le vendeur a reçu votre demande n° ${rang}. ${tel ? `Il vous contactera au <b>${esc(state.profil.telephone)}</b>.` : 'Pour qu’il puisse vous joindre, <a href="#/profil">ajoutez votre numéro dans Mon compte</a> et autorisez son partage.'}</p><p class="muted">Suivez-la dans <a href="#/mes-annonces?o=envoyees">Mes annonces › Mes demandes envoyées</a> : vous verrez quand le vendeur l’a vue et quand il vous contacte. Une notification vous prévient aussi.</p></div>`;
     try { navigator.vibrate && navigator.vibrate([12, 40, 18]); } catch (_) {}
     fete();
   };
@@ -604,13 +604,24 @@ async function mesAnnonces() {
   const onglet = qs().get('o') || 'annonces';
   const tabs = `<div class="chips"><a class="chip ${onglet === 'annonces' ? 'on' : ''}" href="#/mes-annonces">Mes annonces</a><a class="chip ${onglet === 'envoyees' ? 'on' : ''}" href="#/mes-annonces?o=envoyees">Mes demandes envoyées</a></div>`;
   if (onglet === 'envoyees') {
-    const { data } = await sb.from('demandes').select('id, rang, created_at, statut, annonce_id').eq('demandeur_id', state.session.user.id).order('created_at', { ascending: false });
+    const { data } = await sb.from('demandes').select('id, rang, created_at, statut, lue, annonce_id').eq('demandeur_id', state.session.user.id).order('created_at', { ascending: false });
     const ids = (data || []).map(d => d.annonce_id);
     const { data: ouvertes } = ids.length ? await sb.from('v_market').select('id,titre,statut').in('id', ids) : { data: [] };
     const m = new Map((ouvertes || []).map(o => [o.id, o]));
+    // Suivi en 3 étapes : envoyée → vue par le vendeur → le vendeur vous a contacté
+    const suivi = (d, o) => {
+      const vue = d.lue || d.statut === 'contactee', ct = d.statut === 'contactee';
+      const et = [['Envoyée', true], ['Vue par le vendeur', vue], ['Vous a contacté', ct]];
+      const etat = !o ? '<div class="sv-etat off">Annonce terminée (vendue, donnée ou retirée)</div>'
+        : o.statut === 'reserve' ? '<div class="sv-etat res">Réservée : le vendeur discute avec un intéressé. Votre demande reste valable si ça ne se fait pas.</div>'
+        : ct ? '<div class="sv-etat ok">Le vendeur a ouvert WhatsApp ou vous a appelé : surveillez votre téléphone.</div>'
+        : vue ? '<div class="sv-etat">Le vendeur a vu votre demande. Il contacte les intéressés dans l’ordre d’arrivée.</div>'
+        : '<div class="sv-etat">Votre demande est bien arrivée. Le vendeur ne l’a pas encore ouverte.</div>';
+      return `<ol class="suivi">${et.map(([l, f], k) => `<li class="${f ? 'fait' : ''}" style="--k:${k}"><i></i><span>${l}</span></li>`).join('')}</ol>${etat}`;
+    };
     app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mes demandes</h1>${tabs}<div class="list" id="lst">${(data || []).map(d => { const o = m.get(d.annonce_id); return `
-      <div class="card"><b>${o ? `<a href="#/annonce/${d.annonce_id}">${esc(o.titre)}</a>` : 'Annonce clôturée'}</b>
-      <div class="muted small">Demande n° ${d.rang} du ${dateFr(d.created_at, true)}${o?.statut === 'reserve' ? ' · réservé par le vendeur' : ''}</div></div>`; }).join('') || '<div class="card center pad">Vous n\'avez envoyé aucune demande.</div>'}</div>`;
+      <div class="card"><b>${o ? `<a href="#/annonce/${d.annonce_id}">${esc(o.titre)}</a>` : 'Annonce terminée'}</b>
+      <div class="muted small">Demande n° ${d.rang} du ${dateFr(d.created_at, true)}</div>${suivi(d, o)}</div>`; }).join('') || '<div class="card center pad">Vous n\'avez envoyé aucune demande.</div>'}</div>`;
     if ((data || []).length) barreRecherche(app.querySelector('#lst'), () => app.querySelectorAll('#lst > .card'), 'Rechercher une demande…');
     return;
   }
@@ -766,7 +777,7 @@ function lire() {
 async function notifications() {
   const { data } = await sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Notifications</h1>
-  <div class="list" style="margin-top:12px">${(data || []).map(n => `<a class="card notif ${n.lue ? '' : 'unread'}" style="display:block;text-decoration:none" href="${n.type === 'interet' || n.type === 'rappel_j53' || n.type === 'expiration' ? '#/mes-annonces' : n.type === 'nouveautes' ? '#/market' : '#/'}">
+  <div class="list" style="margin-top:12px">${(data || []).map(n => `<a class="card notif ${n.lue ? '' : 'unread'}" style="display:block;text-decoration:none" href="${n.type === 'info' && n.annonce_id ? '#/mes-annonces?o=envoyees' : n.type === 'interet' || n.type === 'rappel_j53' || n.type === 'expiration' ? '#/mes-annonces' : n.type === 'nouveautes' ? '#/market' : '#/'}">
     <b>${esc(n.titre)}</b>${n.message ? `<div class="muted small">${esc(n.message)}</div>` : ''}<div class="muted small">${dateFr(n.created_at, true)}</div></a>`).join('') || '<div class="card center pad">Aucune notification.</div>'}</div>
   <p class="muted small center" style="margin-top:12px">Réglez vos alertes dans <a href="#/profil">Mon compte</a>.</p>`;
   const nonLues = (data || []).filter(n => !n.lue).map(n => n.id);
