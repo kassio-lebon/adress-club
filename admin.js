@@ -1,7 +1,7 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
 import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES, FILTRES_BP, compress, barreRecherche } from './app.js';
 
-const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['annuaire','Annuaire'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
+const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['annuaire','Nos clients'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
 const TYPES_BIEN = ['Appartements','Villas en résidence','Villas individuelles','Mixte'];
 
@@ -72,7 +72,7 @@ async function stats(box) {
   <h2 class="st-h">Résidences</h2>
   <div class="grid2 grid3">
     ${tuile(tx(pct(T.occ, T.total)), 'Taux d’occupation', `${T.occ} occupés sur ${T.total} logements`, pct(T.occ, T.total))}
-    ${tuile(T.libres, 'Logements libres', 'sans locataire dans l’annuaire')}
+    ${tuile(T.libres, 'Logements libres', 'sans locataire dans Nos clients')}
     ${tuile(T.dep, 'Départs prévus ≤ 30 j', 'selon les dates de fin d’occupation')}
   </div>
   <h2 class="st-h">ADRESS CLUB</h2>
@@ -84,7 +84,7 @@ async function stats(box) {
   </div>
   ${parRes.length ? `<div tabindex="0" style="overflow-x:auto;margin-top:14px"><table class="adm num no-q"><thead><tr><th>Résidence</th><th>Logements</th><th>Occupés</th><th>Libres</th><th>Occupation</th><th>Inscrits au Club</th><th>Adhésion</th><th>Codes en attente</th><th>Départs ≤ 30 j</th></tr></thead>
     <tbody>${parRes.map(r => `<tr><td><b>${esc(r.nom)}</b></td><td>${r.total}</td><td>${r.occ}</td><td>${r.libres}</td><td>${tx(pct(r.occ, r.total))}</td><td>${r.m}</td><td>${tx(pct(r.m, r.occ))}</td><td>${r.att}</td><td>${r.dep}</td></tr>`).join('')}</tbody></table></div>` : ''}
-  <p class="muted small">Occupé = un locataire est inscrit dans l’<a href="#/admin/annuaire">annuaire</a>. Les taux sont aussi justes que l’annuaire : pensez à le mettre à jour à chaque entrée ou sortie.</p>
+  <p class="muted small">Occupé = un locataire est inscrit dans <a href="#/admin/annuaire">Nos clients</a>. Les taux sont aussi justes que cette liste : pensez à la mettre à jour à chaque entrée ou sortie.</p>
   <h2 class="st-h">Le Market</h2>
   <div class="grid2 grid3">
     ${tuile(M('annonces_ouvertes'), 'Annonces en ligne', `${M('annonces_vente')} ventes · ${M('annonces_don')} dons`)}
@@ -120,7 +120,7 @@ async function invitations(box) {
   const etat = (i) => i.utilisee_par ? `<span class="badge ok">Activé le ${dateFr(i.utilisee_le)}</span>` : new Date(i.expire_le) < new Date() ? '<span class="badge soft">Expiré</span>' : '<span class="badge warn">En attente</span>';
   if (!R.length) { box.innerHTML = '<div class="card center pad">Ajoutez d’abord une résidence dans l’onglet <a href="#/admin/residences">Résidences</a>.</div>'; return; }
   box.innerHTML = `
-  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Choisissez la résidence puis le logement : le nom et l’e-mail du locataire se remplissent depuis l’<a href="#/admin/annuaire">annuaire</a>. Le locataire devra créer son compte avec <b>cet e-mail</b>.</p>
+  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Choisissez la résidence puis le logement : le nom et l’e-mail du locataire se remplissent depuis <a href="#/admin/annuaire">Nos clients</a>. Le locataire devra créer son compte avec <b>cet e-mail</b>.</p>
   <form id="fi" novalidate>
     <div class="grid2">
       <div><label for="ir">Résidence</label><select id="ir">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
@@ -149,7 +149,7 @@ async function invitations(box) {
   const remplir = () => {
     const v = $('#lg').value; $('#nvBox').hidden = v !== '+';
     const l = logSel(); $('#na').value = l?.locataire || ''; $('#em').value = l?.email || '';
-    const h = $('#emHint'); h.hidden = !l || !!l.email; h.textContent = 'Pas d’e-mail dans l’annuaire pour ce logement : saisissez-le, il sera enregistré dans l’annuaire.';
+    const h = $('#emHint'); h.hidden = !l || !!l.email; h.textContent = 'Pas d’e-mail dans Nos clients pour ce logement : saisissez-le, il y sera enregistré.';
   };
   // Liste de logements avec recherche (code, locataire) et statut : libre / code envoyé / occupé
   const RANG = (e) => { const s = norm(e); return s === 'rdj' || s === 'rdc' ? 0 : /^penthouse/.test(s) ? 99 : (parseInt(s, 10) || 50); };
@@ -326,7 +326,7 @@ async function annuaire(box) {
     if (filtre === 'pb' && !nb.pb) filtre = 'tous';
     const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', 'Logements libres']];
     box.innerHTML = `
-    <div class="card"><h3>Annuaire des locataires</h3><p class="muted small">Seules les personnes de l’annuaire peuvent recevoir un code : le code ne fonctionne qu’avec l’e-mail indiqué ici. Logement = <b>Bloc-Étage-Appartement</b> (ex : A-RDJ-A001).</p>
+    <div class="card"><h3>Nos clients</h3><p class="muted small">Seules les personnes de cette liste peuvent recevoir un code : le code ne fonctionne qu’avec l’e-mail indiqué ici. Logement = <b>Bloc-Étage-Appartement</b> (ex : A-RDJ-A001).</p>
       <div class="grid2"><div><label for="ar">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
       <div><label>Mettre à jour depuis Excel</label><label class="btn xl block" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <p class="muted small" style="margin:8px 0 0">Une feuille par résidence (nom de la feuille = nom de la résidence), colonnes : BLOC, ETAGE, APP., LOCATAIRE, MAIL. Plusieurs lignes pour un même appartement = historique : la dernière remplie est gardée.</p>
@@ -360,11 +360,11 @@ async function annuaire(box) {
       const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id);
       tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>Appartement</label><input type="text" name="appartement" value="${esc(x.appartement || '')}"></div></div>
         <div class="grid2"><div><label>Locataire</label><input type="text" name="locataire" value="${esc(x.locataire || '')}"></div><div><label>E-mail</label><input name="email" type="email" value="${esc(x.email || '')}"></div></div>
-        <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Retirer de l’annuaire</button></div></form></td>`;
+        <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Retirer de la liste</button></div></form></td>`;
       const f = tr.querySelector('form'), v = (n) => f.elements[n].value.trim();
       f.querySelector('[data-x]').onclick = dessiner;
-      f.querySelector('[data-off]').onclick = () => { if (occupant.has(x.id)) return toast('Ce logement a un compte actif : retirez d’abord le compte (onglet Comptes).'); if (confirm('Retirer ' + x.code + ' de l’annuaire ? (il pourra être réimporté)')) action(async () => check(await sb.from('logements').update({ actif: false }).eq('id', x.id)), 'Logement retiré.'); };
-      f.onsubmit = (e) => { e.preventDefault(); const m = v('email').toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide (pas d’accent ni d’espace).'); action(async () => check(await sb.from('logements').update({ bloc: v('bloc'), etage: v('etage'), appartement: v('appartement'), locataire: v('locataire') || null, email: m || null }).eq('id', x.id)), 'Annuaire mis à jour.'); };
+      f.querySelector('[data-off]').onclick = () => { if (occupant.has(x.id)) return toast('Ce logement a un compte actif : retirez d’abord le compte (onglet Comptes).'); if (confirm('Retirer ' + x.code + ' de Nos clients ? (il pourra être réimporté)')) action(async () => check(await sb.from('logements').update({ actif: false }).eq('id', x.id)), 'Logement retiré.'); };
+      f.onsubmit = (e) => { e.preventDefault(); const m = v('email').toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide (pas d’accent ni d’espace).'); action(async () => check(await sb.from('logements').update({ bloc: v('bloc'), etage: v('etage'), appartement: v('appartement'), locataire: v('locataire') || null, email: m || null }).eq('id', x.id)), 'Nos clients mis à jour.'); };
     });
     }
     lignes();
@@ -379,7 +379,7 @@ async function annuaire(box) {
         }).filter(f => f.lignes.length);
         if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue : vérifiez les colonnes BLOC, ETAGE, APP., LOCATAIRE, MAIL.</p>'; return; }
         imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} logements${f.connue ? '' : ' <span class="badge warn">nouvelle résidence</span>'}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}</li>`).join('')}</ul>
-          <label class="check"><input type="checkbox" id="off"> Retirer de l’annuaire les logements absents du fichier (sauf comptes actifs)</label>
+          <label class="check"><input type="checkbox" id="off"> Retirer de Nos clients les logements absents du fichier (sauf comptes actifs)</label>
           <div class="row" style="margin-top:10px"><button class="btn" type="button" id="ok">Importer</button><button class="btn ghost" type="button" id="no">Annuler</button></div></div>`;
         imp.querySelector('#no').onclick = () => imp.innerHTML = '';
         imp.querySelector('#ok').onclick = async (ev) => {
@@ -427,7 +427,7 @@ async function comptes(box) {
   const problemes = (p) => { const r = [], d = dans(p.date_fin_occupation);
     if (p.statut === 'actif' && d != null && d < 0) r.push('Date de fin dépassée : le retrait automatique n’a pas encore eu lieu, retirez le compte');
     if (p.statut === 'actif' && !p.logement_id && !p.is_adress && !p.is_admin) r.push('Aucun logement rattaché : touchez « Logement »');
-    if (p.logement_id && p.logements && !p.logements.bloc) r.push('Ancien code hors annuaire : touchez « Logement » pour le rattacher au bon appartement');
+    if (p.logement_id && p.logements && !p.logements.bloc) r.push('Ancien code absent de Nos clients : touchez « Logement » pour le rattacher au bon appartement');
     if (p.statut === 'en_attente' || (p.statut !== 'actif' && p.statut !== 'desactive')) r.push('Compte créé sans code valide : renvoyez-lui une invitation');
     return r; };
   const fin = (p) => { const d = dans(p.date_fin_occupation); return d == null ? '' : d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`; };
@@ -557,7 +557,7 @@ async function residences(box) {
   const D = data || [], L = lg.data || [], P = pr.data || [];
   const nbL = (id) => L.filter(x => x.residence_id === id).length, nbO = (id) => L.filter(x => x.residence_id === id && x.locataire).length, nbM = (id) => P.filter(x => x.residence_id === id).length;
   const pb = (r) => { const t = []; if (!r.photo_path) t.push('Sans photo'); if (!r.description) t.push('Sans description'); if (r.visible && !r.lien_decouvrir) t.push('Sans lien « Découvrir »');
-    if (!nbL(r.id)) t.push('Aucun logement dans l’annuaire : impossible d’inviter des locataires'); return t; };
+    if (!nbL(r.id)) t.push('Aucun logement dans Nos clients : impossible d’inviter des locataires'); return t; };
   box.innerHTML = `<div class="card"><h3>Ajouter une résidence</h3><form id="f">
     <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Quartier</label><input id="qu" type="text"></div></div>
     <div class="grid2"><div><label>Type de bien</label><select id="tb"><option value="">—</option>${TYPES_BIEN.map(t => `<option>${t}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
@@ -571,7 +571,7 @@ async function residences(box) {
     <div class="muted small">${nbL(r.id)} logements · ${nbO(r.id)} occupés · ${nbM(r.id)} membres du Club</div>${pb(r).map(alerte).join('')}
     <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button>
       <label class="btn sm ghost" style="margin:0">Photo<input type="file" accept="image/*" data-photo class="sr"></label>
-      <button class="btn sm ghost" data-edit>Modifier</button><a class="btn sm soft" href="#/admin/annuaire" data-ann>Annuaire</a></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
+      <button class="btn sm ghost" data-edit>Modifier</button><a class="btn sm soft" href="#/admin/annuaire" data-ann>Nos clients</a></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#rsd'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', 'Masquées']], 'residences', 'Rechercher une résidence…');
   const $ = (s) => box.querySelector(s);
   let edit = null;
