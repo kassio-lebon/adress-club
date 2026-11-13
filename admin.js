@@ -342,6 +342,74 @@ function lireFeuille(rows) {
   return { lignes, doublons, autresMails };
 }
 
+// ---------- Fenêtre de confirmation centrée (remplace confirm() du navigateur, trop sec et mal placé) ----------
+function dialogue({ titre, corps = '', ok = 'Confirmer', annuler = 'Annuler', danger = false, saisie = null, extra = null }) {
+  return new Promise((res) => {
+    const bg = document.createElement('div'); bg.className = 'dlg-bg';
+    bg.innerHTML = `<div class="dlg${danger ? ' danger' : ''}" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgC">
+      <h2 id="dlgT">${esc(titre)}</h2><div id="dlgC" class="dlg-c">${corps}</div>
+      ${saisie ? `<label for="dlgI">${saisie.label}</label><input id="dlgI" type="text" autocomplete="off" spellcheck="false" autocapitalize="characters">` : ''}
+      <div class="dlg-b">${annuler ? `<button type="button" class="btn ghost" data-r="0">${esc(annuler)}</button>` : ''}<button type="button" class="btn${danger ? ' dlg-rouge' : ''}" data-r="1">${esc(ok)}</button></div>
+      ${extra ? `<button type="button" class="lnk dlg-x" data-r="x">${esc(extra)}</button>` : ''}</div>`;
+    document.body.appendChild(bg); document.body.classList.add('dlg-on');
+    const prev = document.activeElement, okb = bg.querySelector('[data-r="1"]');
+    const fin = (v) => { bg.remove(); document.body.classList.remove('dlg-on'); removeEventListener('keydown', clav, true); prev?.focus?.(); res(v); };
+    const clav = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); fin(false); }
+      if (e.key === 'Tab') { const f = [...bg.querySelectorAll('button:not([disabled]),input')]; const i = f.indexOf(document.activeElement); e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus(); } };
+    addEventListener('keydown', clav, true);
+    bg.querySelectorAll('[data-r]').forEach(b => b.onclick = () => fin(b.dataset.r === '1' ? true : b.dataset.r === 'x' ? 'x' : false));
+    bg.onclick = (e) => { if (e.target === bg) fin(false); };
+    if (saisie) { const i = bg.querySelector('#dlgI'); const verif = () => { okb.disabled = norm(i.value) !== norm(saisie.attendu); }; i.oninput = verif; verif(); i.onkeydown = (e) => { if (e.key === 'Enter' && !okb.disabled) fin(true); }; setTimeout(() => i.focus(), 30); }
+    else setTimeout(() => (danger ? bg.querySelector('[data-r="0"]') || okb : okb).focus(), 30);
+  });
+}
+const li = (t) => `<li>${t}</li>`;
+// Retirer le locataire d'un logement : le logement reste, sans locataire
+async function retirerLocataire(x, { compte, codeEnAttente }) {
+  const nom = x.locataire || compte || 'le locataire';
+  const r = await dialogue({ titre: `Retirer ${nom} du logement ${x.code} ?`, ok: 'Retirer le locataire', danger: true, extra: 'Supprimer plutôt ce logement de la base…',
+    corps: `<p>À utiliser quand le locataire <b>quitte le logement</b>.</p><ul>
+      ${li(`Le logement <b>${esc(x.code)}</b> reste dans la liste et devient <b>libre</b>.`)}
+      ${li(`Le nom et l’e-mail de <b>${esc(nom)}</b> sont effacés de cette fiche.`)}
+      ${compte ? li('Son accès à ADRESS CLUB est coupé et ses annonces sont mises en pause. <b>Rien n’est supprimé</b> : avec un nouveau code, il retrouve tout.') : ''}
+      ${codeEnAttente ? li('Son code d’invitation en attente est annulé.') : ''}</ul>` });
+  if (r === 'x') return supprimerLogement(x);
+  if (!r) return;
+  action(async () => {
+    if (compte) check(await sb.from('profiles').update({ statut: 'desactive' }).eq('logement_id', x.id).eq('statut', 'actif'));
+    check(await sb.from('invitations').delete().eq('logement_id', x.id).is('utilisee_par', null));
+    check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
+  }, `${x.code} est maintenant libre.`);
+}
+// Supprimer le logement de la base : deux confirmations, refusé si un compte résident y est rattaché
+async function supprimerLogement(x) {
+  const { data: P } = await sb.from('profiles').select('nom_affichage,statut').eq('logement_id', x.id);
+  if ((P || []).length) {
+    await dialogue({ titre: `Impossible de supprimer ${x.code}`, ok: 'J’ai compris', annuler: null,
+      corps: `<p>Le compte ADRESS CLUB de <b>${esc(P[0].nom_affichage || 'un résident')}</b> est rattaché à ce logement. Le supprimer effacerait le lien avec son historique (annonces, favoris).</p><ul>
+        ${li('Si le locataire part : utilisez <b>Retirer</b>, le logement devient libre.')}
+        ${li('Si le compte est sur le mauvais logement : <b>Comptes › Logement</b> pour le rattacher ailleurs, puis revenez supprimer.')}</ul>` });
+    return;
+  }
+  const r1 = await dialogue({ titre: `Supprimer ${x.code} de la base ?`, ok: 'Continuer', danger: true,
+    corps: `<p>Différent de « Retirer » : ici c’est <b>le logement lui-même</b> qui disparaît, pas seulement son locataire.</p><ul>
+      ${li(`<b>${esc(x.code)}</b> est effacé de Nos locataires et du plan de la résidence.`)}
+      ${x.locataire || x.email ? li(`Le locataire enregistré (${esc(x.locataire || x.email)}) est effacé avec lui.`) : ''}
+      ${li('Les codes d’invitation non utilisés pour ce logement sont annulés.')}
+      ${li('<b>Action définitive</b> : pour le retrouver, il faudra le recréer ou réimporter le fichier Excel.')}</ul>
+      <p class="muted small">À utiliser pour un logement créé par erreur ou qui n’existe plus.</p>` });
+  if (!r1) return;
+  const r2 = await dialogue({ titre: 'Dernière confirmation', ok: 'Supprimer définitivement', danger: true,
+    corps: `<p>Pour éviter toute erreur, tapez le code du logement : <b class="dlg-code">${esc(x.code)}</b></p>`, saisie: { label: 'Code du logement', attendu: x.code } });
+  if (!r2) return;
+  action(async () => {
+    check(await sb.from('invitations').delete().eq('logement_id', x.id).is('utilisee_par', null));
+    check(await sb.from('invitations').update({ logement_id: null }).eq('logement_id', x.id));
+    check(await sb.from('logements').delete().eq('id', x.id));
+  }, `${x.code} a été supprimé de la base.`);
+}
+
 // ---------- Saisie guidée Bloc / Étage / Appartement : même nomenclature que l'import (RDJ, RDC, 1ER, 2E…, PENTHOUSE) ----------
 const ETAGES_STD = ['RDJ', 'RDC', '1ER', ...Array.from({ length: 14 }, (_, i) => (i + 2) + 'E'), 'PENTHOUSE'];
 const normEtage = (e) => { const s = norm(e).toUpperCase().replace(/\s+/g, ' '); if (!s) return ''; if (/^PENT/.test(s)) return 'PENTHOUSE'; if (/^(RDJ|RDC)/.test(s)) return s.slice(0, 3); const m = s.match(/^\d+/); return m ? (+m[0] === 1 ? '1ER' : +m[0] + 'E') : s; };
@@ -441,7 +509,7 @@ async function annuaire(box) {
         && t.every(w => norm([x.code, x.locataire, x.email, occupant.get(x.id)].join(' ')).includes(w)));
       $('#atb').innerHTML = vis.map(x => { const p = problemes(x), e = etat(x); return `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b></td>
         <td>${!x.bloc ? '<span class="muted">—</span>' : p.some(o => o.k === 'nom') ? '<span class="a-bad">Nom manquant</span>' : esc(x.locataire || '—')}${!x.bloc || (!x.locataire && !x.email && !occupant.has(x.id)) ? '' : x.email && EMAIL_OK(x.email) ? `<div class="small muted">${esc(x.email)}</div>` : `<div class="small a-bad">${x.email ? esc(x.email) + ' (invalide)' : 'E-mail manquant'}${p.find(o => o.fix) ? ` · <button type="button" class="lnk" data-fix="${esc(p.find(o => o.fix).fix)}">Corriger en ${esc(p.find(o => o.fix).fix)}</button>` : ''}</div>`}${p.filter(o => o.t).map(o => alerte(o.t)).join('')}</td>
-        <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button>${x.locataire || x.email || occupant.has(x.id) ? '<button class="btn sm ghost rouge" data-vider>Retirer</button>' : ''}</div></td></tr>`; }).join('');
+        <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${!x.locataire && !x.email && !occupant.has(x.id) ? '<button class="btn sm" data-aff>Affecter un locataire</button>' : ''}${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button>${x.locataire || x.email || occupant.has(x.id) ? '<button class="btn sm ghost rouge" data-vider>Retirer</button>' : ''}</div></td></tr>`; }).join('');
       $('#avide').hidden = !!vis.length;
       brancher();
     };
@@ -458,24 +526,43 @@ async function annuaire(box) {
     // Retirer le locataire : le logement redevient libre ; son compte (s'il en a un) est fermé sans perte, son code en attente annulé
     box.querySelectorAll('[data-vider]').forEach(b => b.onclick = () => {
       const x = L.find(y => y.id === b.closest('tr').dataset.id); if (!x) return;
-      const nom = x.locataire || occupant.get(x.id) || 'le locataire';
-      if (!confirm(`Retirer ${nom} du logement ${x.code} ?\n\n• Le logement redevient libre${occupant.has(x.id) ? '\n• Son accès à ADRESS CLUB est coupé et ses annonces sont mises en pause (rien n’est supprimé)' : ''}${vivant(x.id) ? '\n• Son code d’invitation en attente est annulé' : ''}`)) return;
-      action(async () => {
-        if (occupant.has(x.id)) check(await sb.from('profiles').update({ statut: 'desactive' }).eq('logement_id', x.id).eq('statut', 'actif'));
-        check(await sb.from('invitations').delete().eq('logement_id', x.id).is('utilisee_par', null));
-        check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
-      }, `${x.code} est maintenant libre.`);
+      retirerLocataire(x, { compte: occupant.has(x.id) ? (occupant.get(x.id) || 'ce résident') : null, codeEnAttente: !!vivant(x.id) });
+    });
+    // Logement libre : créer le locataire et l'affecter en une fois (puis, au choix, l'inviter tout de suite)
+    box.querySelectorAll('[data-aff]').forEach(b => b.onclick = () => {
+      const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id); if (!x) return;
+      tr.innerHTML = `<td colspan="4"><form class="ann-ed ann-aff" novalidate><b>Affecter un locataire au logement ${esc(x.code)}</b>
+        <div class="grid2"><div><label for="ffn">Nom du locataire</label><input type="text" id="ffn" placeholder="Prénom et nom" autocomplete="off"></div><div><label for="ffm">E-mail (pour se connecter)</label><input id="ffm" type="email" placeholder="prenom.nom@exemple.com" autocomplete="off"></div></div>
+        <p class="err small" id="fferr" hidden></p>
+        <div class="row" style="margin-top:10px"><button class="btn sm" data-go="inv">Affecter et inviter par WhatsApp</button><button class="btn sm soft" type="button" data-go="seul">Affecter seulement</button><button class="btn sm ghost" type="button" data-x>Annuler</button></div></form></td>`;
+      const f = tr.querySelector('form'), err = (m) => { f.querySelector('#fferr').textContent = m; f.querySelector('#fferr').hidden = !m; };
+      f.querySelector('#ffn').focus();
+      f.querySelector('[data-x]').onclick = dessiner;
+      const valider = async (inviter) => {
+        const nom = f.querySelector('#ffn').value.trim(), m = f.querySelector('#ffm').value.trim().toLowerCase();
+        if (!nom) return err('Saisissez le nom du locataire.');
+        if (!EMAIL_OK(m)) return err('Saisissez une adresse e-mail valide (pas d’accent ni d’espace) : il en aura besoin pour créer son compte.');
+        const w = inviter ? ongletWa() : null; f.querySelectorAll('button').forEach(z => z.disabled = true);
+        try {
+          check(await sb.from('logements').update({ locataire: nom, email: m }).eq('id', x.id));
+          if (inviter) { const inv = await creerInvit({ ...x, locataire: nom, email: m }); envoyerWa(w, msgInvit(inv)); toast(`${nom} affecté à ${x.code}, invitation créée.`); }
+          else toast(`${nom} affecté à ${x.code}.`);
+          rerender();
+        } catch (ex) { if (w) w.close(); f.querySelectorAll('button').forEach(z => z.disabled = false); err(errMsg(ex)); }
+      };
+      f.onsubmit = (e) => { e.preventDefault(); valider(true); };
+      f.querySelector('[data-go="seul"]').onclick = () => valider(false);
     });
     box.querySelectorAll('[data-inv]').forEach(b => b.onclick = () => { invitations._pre = b.closest('tr').dataset.id; location.hash = '#/admin/invitations'; });
     box.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => {
       const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id);
       tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>Appartement</label><input type="text" name="appartement" value="${esc(x.appartement || '')}"></div></div>
         <div class="grid2"><div><label>Locataire</label><input type="text" name="locataire" value="${esc(x.locataire || '')}"></div><div><label>E-mail</label><input name="email" type="email" value="${esc(x.email || '')}"></div></div>
-        <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Retirer de la liste</button></div></form></td>`;
+        <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Supprimer de la base</button></div></form></td>`;
       const f = tr.querySelector('form'), v = (n) => f.elements[n].value.trim();
       const etEd = listeEtages(f.elements.etage, l.map(y => y.etage)); majApp(f.elements.appartement); majBloc(f.elements.bloc);
       f.querySelector('[data-x]').onclick = dessiner;
-      f.querySelector('[data-off]').onclick = () => { if (occupant.has(x.id)) return toast('Ce logement a un compte actif : retirez d’abord le compte (onglet Comptes).'); if (confirm('Retirer ' + x.code + ' de Nos locataires ? (il pourra être réimporté)')) action(async () => check(await sb.from('logements').update({ actif: false }).eq('id', x.id)), 'Logement retiré.'); };
+      f.querySelector('[data-off]').onclick = () => supprimerLogement(x);
       f.onsubmit = (e) => { e.preventDefault(); if (!etEd.ok()) { f.elements.etage.setAttribute('aria-invalid', 'true'); f.elements.etage.focus(); return toast('Choisissez l’étage dans la liste.'); } const m = v('email').toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide (pas d’accent ni d’espace).'); action(async () => check(await sb.from('logements').update({ bloc: v('bloc'), etage: etEd.val(), appartement: v('appartement'), locataire: v('locataire') || null, email: m || null }).eq('id', x.id)), 'Locataire mis à jour.'); };
     });
     }
@@ -963,15 +1050,7 @@ async function plan(box) {
       try { await sauver(); const inv = i || await creerInvit(x); if (!i) { code.set(x.id, inv); I.unshift(inv); } envoyerWa(w, msgInvit(inv)); toast(i ? 'Code renvoyé.' : 'Invitation créée.'); dessiner(); }
       catch (ex) { if (w) w.close(); go.disabled = false; err(errMsg(ex)); } };
     else $('#plform').onsubmit = (ev) => ev.preventDefault();
-    const lib = $('#pllib'); if (lib) lib.onclick = () => {
-      const nom = x.locataire || c?.nom_affichage || 'le locataire';
-      if (!confirm(`Libérer le logement ${x.code} ?\n\n• ${nom} est retiré de la liste${c ? '\n• Son accès à ADRESS CLUB est coupé et ses annonces sont mises en pause (rien n’est supprimé)' : ''}${i ? '\n• Son code d’invitation en attente est annulé' : ''}`)) return;
-      action(async () => {
-        if (c) check(await sb.from('profiles').update({ statut: 'desactive' }).eq('logement_id', x.id).eq('statut', 'actif'));
-        check(await sb.from('invitations').delete().eq('logement_id', x.id).is('utilisee_par', null));
-        check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
-      }, `${x.code} est maintenant libre.`);
-    };
+    const lib = $('#pllib'); if (lib) lib.onclick = () => retirerLocataire(x, { compte: c ? (c.nom_affichage || 'ce résident') : null, codeEnAttente: !!i });
     if (defiler && matchMedia('(max-width: 899px)').matches) f.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
   dessiner();
