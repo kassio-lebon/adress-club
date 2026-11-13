@@ -67,7 +67,7 @@ async function invitations(box) {
   <form id="fi" novalidate>
     <div class="grid2">
       <div><label for="ir">Résidence</label><select id="ir">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
-      <div><label for="lg">Logement</label><select id="lg"></select></div>
+      <div><label for="lgq">Logement</label><div class="combo" id="lgc"><input id="lgq" type="text" placeholder="Rechercher un logement, un locataire…" autocomplete="off" role="combobox" aria-expanded="false"><input type="hidden" id="lg"><div class="combo-list" role="listbox" hidden></div></div></div>
     </div>
     <div id="nvBox" hidden><div class="g3f"><div><label for="nb">Bloc</label><input id="nb" type="text" placeholder="A"></div><div><label for="ne">Étage</label><input id="ne" type="text" placeholder="RDJ"></div><div><label for="nap">Appartement</label><input id="nap" type="text" placeholder="A001"></div></div></div>
     <label for="na">Nom du locataire</label><input id="na" type="text" placeholder="ex : Aminata Kouassi" autocomplete="off">
@@ -94,14 +94,37 @@ async function invitations(box) {
     const l = logSel(); $('#na').value = l?.locataire || ''; $('#em').value = l?.email || '';
     const h = $('#emHint'); h.hidden = !l || !!l.email; h.textContent = 'Pas d’e-mail dans l’annuaire pour ce logement : saisissez-le, il sera enregistré dans l’annuaire.';
   };
-  const majLogements = () => {
-    const l = Lg.filter(x => x.residence_id === $('#ir').value);
-    const etiq = (x) => occupant.has(x.id) ? ` — occupé (${occupant.get(x.id)})` : enAttente.has(x.id) ? ` — code en attente (${enAttente.get(x.id)})` : x.locataire ? ` — ${x.locataire}` : ' — libre';
-    $('#lg').innerHTML = l.map(x => `<option value="${x.id}" ${occupant.has(x.id) || enAttente.has(x.id) ? 'disabled' : ''}>${esc((x.code || x.numero) + etiq(x))}</option>`).join('') + '<option value="+">＋ Nouveau logement…</option><option value="0">Sans logement (équipe ADRESS)</option>';
-    const libre = [...$('#lg').options].find(o => !o.disabled); if (libre) $('#lg').value = libre.value;
-    remplir();
+  // Liste de logements avec recherche (code, locataire) et statut : libre / code envoyé / occupé
+  const RANG = (e) => { const s = norm(e); return s === 'rdj' || s === 'rdc' ? 0 : /^penthouse/.test(s) ? 99 : (parseInt(s, 10) || 50); };
+  const tri = (a, b) => (a.bloc || '').localeCompare(b.bloc || '') || RANG(a.etage) - RANG(b.etage) || (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true });
+  let items = [];
+  const etatLog = (x) => occupant.has(x.id) ? ['occ', 'Occupé', occupant.get(x.id)] : enAttente.has(x.id) ? ['att', 'Code envoyé', enAttente.get(x.id)] : ['lib', 'Libre', x.locataire || ''];
+  const choisir = (v) => {
+    const it = items.find(i => i.v === v); if (!it) return;
+    $('#lg').value = v; $('#lgq').value = it.label + (it.nom ? ' — ' + it.nom : ''); fermer(); remplir();
+    if (v === '+') $('#nb').focus();
   };
-  $('#ir').onchange = majLogements; $('#lg').onchange = () => { remplir(); if ($('#lg').value === '+') $('#nb').focus(); };
+  const lst = () => $('#lgc .combo-list');
+  const fermer = () => { lst().hidden = true; $('#lgq').setAttribute('aria-expanded', 'false'); };
+  const ouvrir = (q = '') => {
+    const t = norm(q).split(/\s+/).filter(Boolean);
+    const vis = items.filter(i => !t.length || t.every(w => i.cle.includes(w)));
+    lst().innerHTML = vis.length ? vis.map(i => `<div class="combo-it${i.off ? ' off' : ''}${i.v === $('#lg').value ? ' sel' : ''}" role="option" data-v="${i.v}"><span><b>${esc(i.label)}</b>${i.nom ? ` <span class="muted">— ${esc(i.nom)}</span>` : ''}</span>${i.st ? `<span class="combo-st ${i.st[0]}">${i.st[1]}</span>` : ''}</div>`).join('') : '<div class="combo-vide">Aucun logement ne correspond.</div>';
+    lst().hidden = false; $('#lgq').setAttribute('aria-expanded', 'true');
+    lst().querySelectorAll('.combo-it:not(.off)').forEach(d => d.onmousedown = (ev) => { ev.preventDefault(); choisir(d.dataset.v); });
+  };
+  const majLogements = () => {
+    const l = Lg.filter(x => x.residence_id === $('#ir').value).sort(tri);
+    items = l.map(x => { const s = etatLog(x); return { v: x.id, label: x.code || x.numero, nom: s[0] === 'lib' ? s[2] : s[2], st: s, off: s[0] !== 'lib', cle: norm([x.code, x.numero, x.locataire, x.email, s[1], s[2]].join(' ')) }; })
+      .concat([{ v: '+', label: '＋ Nouveau logement…', cle: 'nouveau logement ajouter' }, { v: '0', label: 'Sans logement (équipe ADRESS)', cle: 'sans logement equipe adress admin' }]);
+    $('#lg').value = ''; $('#lgq').value = '';
+    const libre = items.find(i => !i.off && i.st); if (libre) choisir(libre.v); else remplir();
+  };
+  $('#ir').onchange = majLogements;
+  $('#lgq').onfocus = () => { $('#lgq').select(); ouvrir(''); };
+  $('#lgq').oninput = () => ouvrir($('#lgq').value);
+  $('#lgq').onblur = () => setTimeout(() => { fermer(); const it = items.find(i => i.v === $('#lg').value); if (it) $('#lgq').value = it.label + (it.nom ? ' — ' + it.nom : ''); }, 120);
+  $('#lgq').onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); const d = lst().querySelector('.combo-it:not(.off)'); if (d) choisir(d.dataset.v); } if (ev.key === 'Escape') fermer(); };
   majLogements();
   const partager = (i) => {
     const r = $('#res'); r.hidden = false;
