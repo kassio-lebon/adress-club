@@ -907,10 +907,15 @@ function profil() {
   const pr = $('#pushRow'), majPush = () => {
     if (!pushOk()) { pr.innerHTML = `<small class="muted">${estIOS() ? 'Sur iPhone, installez d’abord l’appli sur l’écran d’accueil pour recevoir les notifications.' : 'Ce navigateur ne permet pas les notifications.'}</small>`; return; }
     const st = Notification.permission;
-    pr.innerHTML = st === 'granted' ? '<span class="badge ok">Activées</span> <small class="muted">Notifications sur ce téléphone</small>'
+    pr.innerHTML = st === 'granted' ? '<span class="badge ok">Activées</span> <small class="muted">sur ce téléphone</small><button class="btn sm ghost" type="button" id="pushTest">Envoyer un test</button>'
       : st === 'denied' ? '<small class="muted">Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.</small>'
       : '<button class="btn sm" type="button" id="pushOn">Activer les notifications sur ce téléphone</button>';
     const b = pr.querySelector('#pushOn'); if (b) b.onclick = async () => { b.disabled = true; const ok = await activerPush(true); toast(ok ? 'Notifications activées.' : 'Notifications non activées.'); majPush(); };
+    const t = pr.querySelector('#pushTest'); if (t) t.onclick = async () => {
+      t.disabled = true; t.textContent = 'Envoi…'; await activerPush(false);
+      const { data: n, error } = await sb.rpc('tester_push'); t.disabled = false; t.textContent = 'Envoyer un test';
+      toast(error ? errMsg(error) : n ? 'Test envoyé : la notification arrive dans quelques secondes (vous pouvez fermer l’appli).' : 'Ce téléphone n’est pas encore abonné : réessayez dans un instant.');
+    };
   };
   majPush();
   $('#fmdp').onsubmit = async (e) => {
