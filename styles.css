@@ -903,3 +903,53 @@ a.back[href="#/"]{display:none}
 @media (min-width:760px){.tabs.chips{flex-wrap:wrap;overflow:visible;margin-left:0;margin-right:0;padding-left:0;padding-right:0;row-gap:8px}}
 .combo-haut{position:relative;z-index:50}
 .combo-list{z-index:60}
+
+/* v63 : palette sobre — encre, gris et rouge ADRESS uniquement (plus de vert / ambre) */
+:root{--ok:#16171A;--ok-tint:#F2F2F3;--warn:#16171A;--warn-tint:#F2F2F3}
+.badge.ok{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
+.badge.warn{background:var(--sunken);color:var(--ink)}
+.pill.reserve,.pill.disponible{color:var(--ink)}
+.card-res{border:1.5px solid var(--ink);background:var(--surface)}
+.card-res .pill.reserve{background:var(--ink);color:#fff;border:0}
+.stamp{border-color:var(--ink);color:var(--ink);background:rgba(255,255,255,.94)}
+.res-note{background:var(--sunken);color:var(--ink-2)}
+.res-note b{color:var(--ink)}
+.sv-etat.ok{background:var(--sunken);color:var(--ink)}
+.sv-etat.res{background:var(--sunken);color:var(--ink)}
+.suivi li.fait i,.suivi li.fait::before{background:var(--ink);border-color:var(--ink)}
+.tk-vide .tk-ok{background:var(--sunken)}
+.tk-vide .tk-ok::after{border-color:var(--ink)}
+.inv-ok{background:var(--sunken);border-color:var(--line)}
+.combo-st.lib{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
+.combo-st.att{background:var(--sunken);color:var(--ink-2)}
+.combo-st.occ{background:transparent;color:var(--muted)}
+.combo-st.mail{background:transparent;color:var(--red)}
+/* Annuaire : recherche, filtres, problèmes à corriger */
+.ann-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px}
+.ann-bar h2{margin:0}
+.ann-bar input{flex:1 1 260px;max-width:380px}
+.ann-f{margin:10px 0 12px}
+.ann-f .chip span{font-weight:500;opacity:.65;margin-left:2px}
+.ann-f .chip.pb:not(.on){color:var(--red);border-color:currentColor}
+.st-l{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}
+.st-l.actif{color:var(--ink)}
+.st-l.code{color:var(--ink-2)}
+.a-pb{margin-top:4px;font-size:12.5px;line-height:1.4;color:var(--red)}
+.lnk{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--ink);text-decoration:underline;cursor:pointer}
+.zoo{background:var(--sunken);border-color:var(--line)}
+.ask-tel{border-color:var(--line-2)}
+/* pas de reflet qui balaie les boutons en boucle */
+.btn.shine:not(.ghost){animation:none;background-image:none}
+.login form .btn::after{display:none}
+/* Bouton d'import Excel : vert Excel, sans effet */
+.btn.xl{background:#217346;border-color:#217346;color:#fff;transition:none}
+.btn.xl:hover,.btn.xl:active{background:#1B5E39;border-color:#1B5E39;transform:none}
+.btn.xl::before,.btn.xl::after{display:none!important}
+.adm .row>.btn{flex:none}
+.a-bad{color:var(--red)}
+/* Indicateurs : sections, jauge sobre */
+.st-h{font-size:15px;margin:22px 0 10px;color:var(--ink)}
+.st-h:first-child{margin-top:4px}
+.stat .s{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.35}
+.jauge{height:4px;border-radius:2px;background:var(--sunken);margin-top:10px;overflow:hidden}
+.jauge i{display:block;height:100%;background:var(--ink);border-radius:2px}

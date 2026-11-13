@@ -80,9 +80,11 @@ function decorate() {
   });
   // compteurs animés (indicateurs)
   app.querySelectorAll('.stat .v').forEach(el => {
-    const n = parseFloat(String(el.textContent).replace(',', '.')); if (!isFinite(n) || n === 0) return;
-    const dec = String(el.textContent).includes('.') ? 1 : 0, t0 = performance.now(), d = 1100;
-    const step = (t) => { const p = Math.min(1, (t - t0) / d), e = 1 - Math.pow(1 - p, 3); el.textContent = (n * e).toFixed(dec); if (p < 1) requestAnimationFrame(step); };
+    // Compte jusqu'à la valeur en gardant l'unité (« 93 % », « 4 j », « 1,5 mois »)
+    const txt = String(el.textContent), m = /^(\d+(?:[.,]\d+)?)(.*)$/.exec(txt.trim()); if (!m) return;
+    const n = parseFloat(m[1].replace(',', '.')), suf = m[2], virg = m[1].includes(','); if (!isFinite(n) || n === 0) return;
+    const dec = /[.,]/.test(m[1]) ? 1 : 0, t0 = performance.now(), d = 1100;
+    const step = (t) => { const p = Math.min(1, (t - t0) / d), e = 1 - Math.pow(1 - p, 3); const v = (n * e).toFixed(dec); el.textContent = (virg ? v.replace('.', ',') : v) + suf; if (p < 1) requestAnimationFrame(step); else el.textContent = txt; };
     requestAnimationFrame(step);
   });
   moveIndicator();
