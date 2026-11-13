@@ -731,3 +731,7 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 
 /* v43 : intro — nom ADRESS IMMOBILIER conservé, seul le petit emblème du logo est masqué */
 .intro2 .intro-in img.wm{height:70px;-webkit-mask-image:linear-gradient(90deg,transparent 33.5%,#000 33.5%),linear-gradient(180deg,transparent 81.5%,#000 81.5%);mask-image:linear-gradient(90deg,transparent 33.5%,#000 33.5%),linear-gradient(180deg,transparent 81.5%,#000 81.5%);-webkit-mask-composite:source-over;mask-composite:add}
+
+/* v44 : bouton d'installation en 1 clic dans la fenêtre d'aide */
+.sheet .inst1{margin:6px 0 10px;animation:reveal .45s cubic-bezier(.16,1,.3,1)}
+.ph.ko{filter:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B5B7BD' stroke-width='1.5'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Ccircle cx='9' cy='10' r='1.6'/%3E%3Cpath d='m21 16-5-5-8 8'/%3E%3C/svg%3E")!important;background-size:38px!important}

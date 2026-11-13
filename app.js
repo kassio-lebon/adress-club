@@ -274,9 +274,13 @@ function nouveauMdp() {
     state.recup = false; toast('Mot de passe enregistré.'); await chargerProfil(); location.hash = '#/'; router();
   };
 }
-export async function installer() {
-  if (!window._installPrompt && !estIOS()) await new Promise(r => { let n = 0; const t = setInterval(() => { if (window._installPrompt || ++n > 15) { clearInterval(t); r(); } }, 100); });
-  if (window._installPrompt) {
+// Android hors Chrome (Firefox, Brave, Opera, Samsung…) : l'installation en 1 clic n'existe que dans Chrome → bouton pour y ouvrir l'appli
+const estChrome = () => /Chrome\//.test(navigator.userAgent) && !/SamsungBrowser|EdgA|OPR|Opera|Firefox|FxiOS|YaBrowser|UCBrowser|MiuiBrowser|HeyTap|Vivaldi|DuckDuckGo|wv\)/i.test(navigator.userAgent) && !navigator.brave;
+const lienChrome = () => 'intent://' + location.host + location.pathname + '?inst=1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent('https://play.google.com/store/apps/details?id=com.android.chrome') + ';end';
+export async function installer(auto) {
+  auto = auto === true;
+  if (!auto && !window._installPrompt && !estIOS()) await new Promise(r => { let n = 0; const t = setInterval(() => { if (window._installPrompt || ++n > 30) { clearInterval(t); r(); } }, 100); });
+  if (window._installPrompt && !auto) {
     window._installPrompt.prompt();
     const r = await window._installPrompt.userChoice.catch(() => null);
     if (r && r.outcome === 'accepted') { window._installPrompt = null; toast('ADRESS CLUB est installée sur votre téléphone.'); document.querySelectorAll('.install-card').forEach(x => x.remove()); }
@@ -292,10 +296,16 @@ export async function installer() {
   const osv = estIOS() ? 'ios' : 'android';
   d.innerHTML = `<div class="sheet" role="dialog" aria-label="Installer l'application"><img src="icon-192.png" alt="" width="56" height="56"><h3>Installer ADRESS CLUB sur votre téléphone</h3>
     <div class="tuto-box" data-os="${osv}">${videoTuto(osv)}<a href="#" class="tuto-sw small">Voir la vidéo ${osv === 'ios' ? 'Android' : 'iPhone'}</a></div>
+    <button class="btn block inst1" type="button" id="inst1" hidden>📲 Installer en 1 clic</button>
+    ${mobile && !estIOS() && !window._installPrompt ? `<a class="btn block inst1" id="instChrome" href="${lienChrome()}">📲 Installer en 1 clic avec Chrome</a><p class="muted small center" style="margin-top:-4px">Votre navigateur ne permet pas l’installation directe : ce bouton ouvre ADRESS CLUB dans Chrome, où il suffit de toucher « Installer ». Ou suivez les étapes ci-dessous.</p>` : ''}
     ${etapes}
     ${mobile ? '<p class="muted small">L’icône ADRESS CLUB apparaîtra sur l’écran d’accueil de votre téléphone, comme une application.</p>' : ''}
     <button class="btn block" type="button">J'ai compris</button></div>`;
-  d.onclick = (e) => { if (e.target === d || e.target.tagName === 'BUTTON') d.remove(); };
+  d.onclick = (e) => { if (e.target === d || (e.target.tagName === 'BUTTON' && e.target.id !== 'inst1')) d.remove(); };
+  // Si le navigateur autorise l'installation directe pendant que la fenêtre est ouverte, le bouton « 1 clic » apparaît
+  const b1 = d.querySelector('#inst1');
+  const veille = setInterval(() => { if (!d.isConnected) return clearInterval(veille); if (window._installPrompt) { b1.hidden = false; const c = d.querySelector('#instChrome'); if (c) { c.nextElementSibling?.remove(); c.remove(); } clearInterval(veille); } }, 500);
+  b1.onclick = async () => { const p = window._installPrompt; if (!p) return; p.prompt(); const r = await p.userChoice.catch(() => null); window._installPrompt = null; if (r && r.outcome === 'accepted') { d.remove(); toast('ADRESS CLUB est installée sur votre téléphone.'); document.querySelectorAll('.install-card').forEach(x => x.remove()); } else b1.hidden = true; };
   d.querySelector('.tuto-sw').onclick = (e) => { e.preventDefault(); const b = d.querySelector('.tuto-box'), o = b.dataset.os === 'ios' ? 'android' : 'ios'; b.dataset.os = o; b.querySelector('video').outerHTML = videoTuto(o, true); e.target.textContent = 'Voir la vidéo ' + (o === 'ios' ? 'Android' : 'iPhone'); };
   document.body.appendChild(d);
 }
@@ -811,6 +821,8 @@ function avis() {
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window._installPrompt = e; });
 window.addEventListener('appinstalled', () => { window._installPrompt = null; document.querySelectorAll('.install-card').forEach(x => x.remove()); });
 window.addEventListener('hashchange', router);
+// Arrivée depuis le bouton « Installer avec Chrome » : la fenêtre d'installation s'ouvre d'elle-même
+if (new URLSearchParams(location.search).has('inst')) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (_) {} setTimeout(() => { if (!estInstallee()) installer(true); }, 1800); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
 // Œil 👁 sur tous les champs mot de passe : afficher / masquer ce qu'on tape
 const OEIL = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -825,6 +837,12 @@ function yeux(root) {
   });
 }
 new MutationObserver(() => yeux(document)).observe(document.body, { childList: true, subtree: true });
+// Photo qui ne se charge pas : on oublie son lien (peut-être périmé) et on recharge la page une fois pour en obtenir un neuf
+window.addEventListener('acl-photo-ko', (e) => {
+  let vu = false; signedCache.forEach((v, k) => { if (v[0] === e.detail) { signedCache.delete(k); vu = true; } });
+  if (!vu) return; sauverSig();
+  if (!state.reessai || Date.now() - state.reessai > 60000) { state.reessai = Date.now(); clearTimeout(state.reessaiT); state.reessaiT = setTimeout(router, 400); }
+});
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } if (ev === 'PASSWORD_RECOVERY') { state.recup = true; setTimeout(router, 0); } });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });

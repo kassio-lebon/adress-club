@@ -57,7 +57,7 @@ const vus = new Set();
 function photos() {
   app.querySelectorAll('.ph:not(.ld)').forEach(el => {
     const m = /url\(["']?(.*?)["']?\)/.exec(el.style.backgroundImage || ''); if (!m || !m[1] || vus.has(m[1])) { el.classList.add('ld'); return; }
-    const im = new Image(); im.onload = im.onerror = () => { vus.add(m[1]); el.classList.add('ld'); }; im.src = m[1];
+    const im = new Image(); im.onload = () => { vus.add(m[1]); el.classList.add('ld'); }; im.onerror = () => { el.classList.add('ld', 'ko'); window.dispatchEvent(new CustomEvent('acl-photo-ko', { detail: m[1] })); }; im.src = m[1];
   });
   app.querySelectorAll('.gal img:not(.ld)').forEach(im => { if (im.complete) im.classList.add('ld'); else im.addEventListener('load', () => im.classList.add('ld'), { once: true }); });
 }
