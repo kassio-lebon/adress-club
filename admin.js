@@ -1,15 +1,66 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
 import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES, FILTRES_BP, compress, barreRecherche } from './app.js';
 
-const ONGLETS = [['stats','Indicateurs'],['invitations','Invitations'],['annuaire','Nos locataires'],['comptes','Comptes'],['moderation','Modération'],['annonces','Annonces'],['contenus','Contenus'],['residences','Résidences'],['partenaires','Bons plans'],['avis','Avis'],['parametres','Paramètres']];
+// Navigation en 4 groupes (au lieu de 11 onglets à plat) : on choisit d'abord le domaine, puis l'écran
+const GROUPES = [
+  ['Locataires', [['annuaire', 'Nos locataires'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
+  ['Le Market', [['annonces', 'Annonces'], ['moderation', 'Signalements']]],
+  ['Vitrine', [['residences', 'Résidences'], ['contenus', 'Actualités'], ['partenaires', 'Bons plans']]],
+  ['Pilotage', [['stats', 'Indicateurs'], ['avis', 'Avis'], ['parametres', 'Paramètres']]]];
+// Aide de chaque écran : une phrase « à quoi ça sert » toujours visible, le pas-à-pas replié
+const AIDE = {
+  annuaire: ['La liste officielle des locataires de chaque résidence : un logement, un locataire, une adresse e-mail. Les invitations partent de cette liste.', [
+    'Choisissez la résidence en haut de l’écran.',
+    'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
+    'Nouveau locataire : touchez « Modifier » sur son logement, saisissez son nom et son e-mail, puis « Inviter ».',
+    'Départ d’un locataire : touchez « Retirer ». Le logement redevient libre.',
+    'Mise à jour de toute une résidence : « Importer un fichier Excel » (fichier BASE RÉSIDENCE, une feuille par résidence).']],
+  invitations: ['Envoyer à un locataire son code personnel pour qu’il crée son compte ADRESS CLUB.', [
+    'Choisissez la résidence, puis tapez le logement ou le nom du locataire : son nom et son e-mail se remplissent seuls.',
+    'Touchez « Créer l’invitation », puis « Envoyer par WhatsApp » : le message est déjà rédigé.',
+    'Le locataire crée son compte avec l’e-mail indiqué dans le message, sinon le code est refusé.',
+    'Un code expiré se remplace d’un clic avec « Nouveau code ».']],
+  comptes: ['Les personnes qui ont déjà un compte : vérifier, changer de logement, retirer l’accès au départ.', [
+    '« Retirer » coupe l’accès et met ses annonces en pause. Rien n’est perdu : avec un nouveau code, la personne retrouve tout.',
+    '« Logement » rattache le compte au bon appartement.',
+    '« Mot de passe » crée un mot de passe provisoire à envoyer par WhatsApp.',
+    'Une date de fin d’occupation retire l’accès automatiquement à cette date.']],
+  annonces: ['Toutes les annonces publiées par les résidents sur le Market.', [
+    'Touchez le titre pour voir l’annonce.',
+    '« Retirer » enlève une annonce non conforme du Market ; « Rétablir » la remet en ligne.']],
+  moderation: ['Les annonces signalées par des résidents, à examiner. Vous recevez une notification à chaque signalement.', [
+    'Touchez « Voir l’annonce ».',
+    'Non conforme : « Retirer l’annonce ». Conforme : « Maintenir ».',
+    'L’annonce reste en ligne tant que vous n’avez pas décidé.']],
+  residences: ['Les fiches des résidences montrées aux résidents sur l’accueil.', [
+    'Ajoutez une résidence avec le formulaire en haut.',
+    '« Photo » change la photo, « Masquer » la cache sans rien perdre.',
+    '« Supprimer » efface la résidence et ses logements, définitivement (double confirmation).']],
+  contenus: ['Les actualités et magazines (Flip Immo) affichés aux résidents.', [
+    'Publiez avec le formulaire en haut : type, titre, image et, pour un Flip Immo, le lien du flipbook.',
+    '« Masquer » retire un contenu sans le perdre ; « Supprimer » l’efface.']],
+  partenaires: ['Les bons plans des partenaires proposés aux résidents.', [
+    'Ajoutez un partenaire avec le formulaire en haut.',
+    'Il n’apparaît aux résidents que s’il est « Validé » et « Visible ».']],
+  stats: ['Les chiffres clés : occupation des résidences, adhésion au Club, activité du Market.', [
+    'Les taux sont calculés à partir de Nos locataires : tenez cette liste à jour.']],
+  avis: ['Ce que les résidents pensent de l’application.', ['Le filtre « Avec suggestion » montre les idées d’amélioration.']],
+  parametres: ['Les règles du Market : durée des annonces, rappel au vendeur, nombre de photos. À modifier rarement.', ['Changez une valeur puis touchez « Enregistrer ».']] };
+
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
 const TYPES_BIEN = ['Appartements','Villas en résidence','Villas individuelles','Mixte'];
 
 export async function renderAdmin(app, ong) {
   if (!state.profil?.is_admin) { app.innerHTML = '<div class="card">Accès réservé à ADRESS IMMOBILIER.</div>'; return; }
-  ong = ong || 'stats';
+  ong = ong || 'annuaire';
+  const g = GROUPES.find(([, o]) => o.some(([k]) => k === ong)) || GROUPES[0];
+  const titre = g[1].find(([k]) => k === ong)?.[1] || '';
+  const [but, etapes] = AIDE[ong] || ['', []];
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Espace ADRESS</h1>
-  <div class="tabs chips">${ONGLETS.map(([k, l]) => `<a class="chip ${k === ong ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div><div id="adm"></div>`;
+  <nav class="adm-nav"><div class="adm-g">${GROUPES.map(([n, o]) => `<a class="${n === g[0] ? 'on' : ''}" href="#/admin/${o[0][0]}">${n}</a>`).join('')}</div>
+  ${g[1].length > 1 ? `<div class="tabs chips adm-s">${g[1].map(([k, l]) => `<a class="chip ${k === ong ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div>` : ''}</nav>
+  ${but ? `<div class="aide"><p><b>${esc(titre)}</b> — ${esc(but)}</p>${etapes.length ? `<details><summary>Comment faire ?</summary><ol>${etapes.map(e => `<li>${esc(e)}</li>`).join('')}</ol></details>` : ''}</div>` : ''}
+  <div id="adm"></div>`;
   const box = app.querySelector('#adm');
   await ({ stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
   if (ong !== 'parametres') {
@@ -120,7 +171,7 @@ async function invitations(box) {
   const etat = (i) => i.utilisee_par ? `<span class="badge ok">Activé le ${dateFr(i.utilisee_le)}</span>` : new Date(i.expire_le) < new Date() ? '<span class="badge soft">Expiré</span>' : '<span class="badge warn">En attente</span>';
   if (!R.length) { box.innerHTML = '<div class="card center pad">Ajoutez d’abord une résidence dans l’onglet <a href="#/admin/residences">Résidences</a>.</div>'; return; }
   box.innerHTML = `
-  <div class="card"><h3>Inviter un locataire</h3><p class="muted small">Choisissez la résidence puis le logement : le nom et l’e-mail du locataire se remplissent depuis <a href="#/admin/annuaire">Nos locataires</a>. Le locataire devra créer son compte avec <b>cet e-mail</b>.</p>
+  <div class="card"><h3>Inviter un locataire</h3>
   <form id="fi" novalidate>
     <div class="grid2">
       <div><label for="ir">Résidence</label><select id="ir">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
@@ -328,10 +379,9 @@ async function annuaire(box) {
     if (filtre === 'pb' && !nb.pb) filtre = 'tous';
     const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', 'Logements libres']];
     box.innerHTML = `
-    <div class="card"><h3>Nos locataires</h3><p class="muted small">Seules les personnes de cette liste peuvent recevoir un code : le code ne fonctionne qu’avec l’e-mail indiqué ici. Logement = <b>Bloc-Étage-Appartement</b> (ex : A-RDJ-A001).</p>
-      <div class="grid2"><div><label for="ar">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
-      <div><label>Mettre à jour depuis Excel</label><label class="btn xl block" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
-      <p class="muted small" style="margin:8px 0 0">Une feuille par résidence (nom de la feuille = nom de la résidence), colonnes : BLOC, ETAGE, APP., LOCATAIRE, MAIL. Plusieurs lignes pour un même appartement = historique : la dernière remplie est gardée.</p>
+    <div class="card">
+      <div class="ann-top"><div><label for="ar" style="margin-top:0">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
+      <div><label class="btn xl block" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
     <details class="card" style="margin-top:12px"><summary>Ajouter un logement</summary><form id="fa" novalidate style="margin-top:10px"><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae" placeholder="RDJ"></div><div><label for="aa">Appartement</label><input type="text" id="aa" placeholder="A001"></div></div>
       <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
@@ -445,8 +495,7 @@ async function comptes(box) {
     if (p.statut === 'en_attente' || (p.statut !== 'actif' && p.statut !== 'desactive')) r.push('Compte créé sans code valide : renvoyez-lui une invitation');
     return r; };
   const fin = (p) => { const d = dans(p.date_fin_occupation); return d == null ? '' : d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`; };
-  box.innerHTML = `<p class="muted small">« Retirer » coupe l’accès, libère le logement et met ses annonces en pause. Rien n’est perdu : avec un nouveau code, la personne retrouve tout. Une date de fin d’occupation déclenche le retrait automatiquement.</p>
-  <div tabindex="0" style="overflow-x:auto" id="cpt"><table class="adm no-q"><thead><tr><th>Résident</th><th>Logement</th><th>Statut</th><th>Fin d'occupation</th><th></th></tr></thead><tbody>
+  box.innerHTML = `<div tabindex="0" style="overflow-x:auto" id="cpt"><table class="adm no-q"><thead><tr><th>Résident</th><th>Logement</th><th>Statut</th><th>Fin d'occupation</th><th></th></tr></thead><tbody>
   ${D.map(p => `<tr data-id="${p.id}" data-f="${tags(p)}"><td><b>${esc(p.nom_affichage || '(sans nom)')}</b>${p.is_admin ? ' <span class="badge soft">admin</span>' : ''}${p.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${[esc(p.type_occupant || ''), p.date_activation ? 'membre depuis le ' + dateFr(p.date_activation) : ''].filter(Boolean).join(' · ')}</div>${problemes(p).map(alerte).join('')}</td>
     <td>${p.logements ? `<b>${esc(p.logements.numero || p.logements.code)}</b>` : '—'}<div class="muted small">${esc(p.residences?.nom || '')}</div></td>
     <td><span class="st-l ${p.statut === 'actif' ? 'actif' : ''}">${p.statut === 'actif' ? 'Actif' : p.statut === 'desactive' ? 'Retiré' : 'En attente'}</span></td>
@@ -494,8 +543,7 @@ async function comptes(box) {
 async function moderation(box) {
   const { data } = await sb.from('signalements').select('*, annonces(id,titre,statut,retiree_par_adress)').order('created_at', { ascending: false }).limit(200);
   const D = data || [], parAnn = new Map(); D.forEach(s => parAnn.set(s.annonce_id, (parAnn.get(s.annonce_id) || 0) + 1));
-  box.innerHTML = `<p class="muted small">L’annonce signalée reste en ligne jusqu’à votre décision. « Retirer » la retire du Market, « Maintenir » clôt le signalement. Vous recevez une notification à chaque nouveau signalement.</p>
-  <div class="list no-q" id="mod">${D.map(s => `<div class="card" data-a="${s.annonce_id}" data-f="${s.decision === 'en_attente' ? 'attente' : 'traite'}">
+  box.innerHTML = `<div class="list no-q" id="mod">${D.map(s => `<div class="card" data-a="${s.annonce_id}" data-f="${s.decision === 'en_attente' ? 'attente' : 'traite'}">
     <div class="row" style="justify-content:space-between;align-items:baseline"><b>${esc(s.annonces?.titre || 'Annonce supprimée')}</b><span class="st-l ${s.decision === 'en_attente' ? 'actif' : ''}">${s.decision === 'en_attente' ? 'À traiter' : s.decision === 'retiree' ? 'Retirée' : 'Maintenue'}</span></div>
     <div class="muted small">Signalé le ${dateFr(s.created_at, true)} · ${esc(s.motif)}${parAnn.get(s.annonce_id) > 1 ? ` · ${parAnn.get(s.annonce_id)} signalements pour cette annonce` : ''}</div>${s.commentaire ? `<p>${esc(s.commentaire)}</p>` : ''}
     <div class="row" style="margin-top:8px">${s.annonces ? `<a class="btn sm soft" href="#/annonce/${s.annonce_id}">Voir l’annonce</a>` : ''}${s.decision === 'en_attente' && s.annonces ? `<button class="btn sm danger" data-r="1">Retirer l'annonce</button><button class="btn sm ghost" data-r="0">Maintenir</button>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucun signalement.</div>'}</div>`;
@@ -627,8 +675,7 @@ async function partenaires(box) {
     else if (p.type_lien !== 'WhatsApp' && !/^https?:\/\//i.test(p.lien)) t.push('Lien invalide (doit commencer par https://)');
     if (!p.logo_path) t.push('Sans logo'); return t; };
   const etat = (p) => enLigne(p) ? 'Visible par les résidents' : !p.valide_par_adress ? 'À valider' : 'Validé mais masqué';
-  box.innerHTML = `<p class="muted small">Un partenaire n'apparaît aux résidents que s'il est <b>validé</b> et <b>visible</b>.</p>
-  <div class="card"><h3>Ajouter un bon plan</h3><form id="f">
+  box.innerHTML = `<div class="card"><h3>Ajouter un bon plan</h3><form id="f">
     <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Catégorie *</label><select id="ca">${FILTRES_BP.map(c => `<option>${c}</option>`).join('')}</select></div></div>
     <label>Description (200 car. max)</label><input id="de" type="text" maxlength="200">
     <div class="grid2"><div><label>Lien</label><input id="li" type="text" placeholder="https://… ou https://wa.me/225…"></div><div><label>Type de lien</label><select id="tl"><option>Site web</option><option>WhatsApp</option><option>Flipbook</option></select></div></div>
