@@ -1146,3 +1146,5 @@ a.back[href="#/"]{display:none}
 .ann-add{margin-top:12px;border:1.5px solid var(--ink)}
 @media (max-width:560px){.ann-btns{width:100%}.ann-btns .btn{flex:1}}
 .ann-add .row .btn{flex:0 0 auto;min-width:160px}
+/* v79 · liste d'étages flottante */
+.combo-list.combo-flot{position:fixed;right:auto;z-index:200;max-height:260px}
