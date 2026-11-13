@@ -820,3 +820,19 @@ details.gerer>summary::-webkit-details-marker{display:none}
 
 /* v52 : moins de répétitions — « ‹ Accueil » déjà dans la navigation */
 a.back[href="#/"]{display:none}
+
+/* v53 : Flip Immo — tous les numéros */
+.fl-une{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:12px;text-decoration:none;color:inherit;text-align:center}
+.fl-une .fl-c{width:min(70vw,300px)}
+.fl-c{position:relative;border-radius:10px;overflow:hidden;background:var(--sunken);box-shadow:0 10px 28px -12px rgba(17,18,20,.35);aspect-ratio:3/4}
+.fl-c img{display:block;width:100%;height:100%;object-fit:cover}
+.fl-vide{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;color:var(--muted)}
+.fl-t h2{margin:2px 0 6px}
+.fl-t .muted{margin:0 0 12px;font-size:14px}
+.fl-k{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--red)}
+.fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px}
+.fl-it{text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:8px}
+.fl-it b{font-size:13.5px;line-height:1.3}
+.fl-it .fl-c{transition:transform .35s cubic-bezier(.16,1,.3,1)}
+.fl-it:active .fl-c{transform:scale(.97)}
+@media (min-width:760px){.fl-une{flex-direction:row;text-align:left;align-items:center}.fl-une .fl-c{width:240px;flex:none}}
