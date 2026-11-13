@@ -1179,3 +1179,5 @@ body.dlg-on{overflow:hidden}
 .res-top .btn{min-height:46px}
 #resForm .row .btn{flex:0 0 auto;min-width:160px}
 .aide .aide-et{margin:12px 0 0;padding:0}
+/* v82 · bouton Supprimer sur chaque ligne de Nos locataires */
+.btn-sup svg{width:15px;height:15px;stroke-width:2}

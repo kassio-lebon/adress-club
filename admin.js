@@ -23,7 +23,7 @@ const AIDE = {
     'Choisissez la résidence en haut de l’écran.',
     'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
     'Nouveau locataire sur un logement libre : « Affecter un locataire », puis « Affecter et inviter par WhatsApp ».',
-    'Départ d’un locataire : touchez « Retirer ». Le logement redevient libre.',
+    'Départ d’un locataire : « Retirer », le logement reste et redevient libre. « Supprimer » efface la ligne entière de la base (double confirmation).',
     'Mise à jour de toute une résidence : « Importer un fichier Excel » (fichier BASE RÉSIDENCE, une feuille par résidence).']],
   invitations: ['Envoyer à un locataire son code personnel pour qu’il crée son compte ADRESS CLUB.', [
     'Choisissez la résidence, puis tapez le logement ou le nom du locataire : son nom et son e-mail se remplissent seuls.',
@@ -371,7 +371,7 @@ const li = (t) => `<li>${t}</li>`;
 // Retirer le locataire d'un logement : le logement reste, sans locataire
 async function retirerLocataire(x, { compte, codeEnAttente }) {
   const nom = x.locataire || compte || 'le locataire';
-  const r = await dialogue({ titre: `Retirer ${nom} du logement ${x.code} ?`, ok: 'Retirer le locataire', danger: true, extra: 'Supprimer plutôt ce logement de la base…',
+  const r = await dialogue({ titre: `Retirer ${nom} du logement ${x.code} ?`, ok: 'Retirer le locataire', danger: true, extra: 'Supprimer plutôt le locataire et le logement de la base…',
     corps: `<p>À utiliser quand le locataire <b>quitte le logement</b>.</p><ul>
       ${li(`Le logement <b>${esc(x.code)}</b> reste dans la liste et devient <b>libre</b>.`)}
       ${li(`Le nom et l’e-mail de <b>${esc(nom)}</b> sont effacés de cette fiche.`)}
@@ -385,28 +385,26 @@ async function retirerLocataire(x, { compte, codeEnAttente }) {
     check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
   }, `${x.code} est maintenant libre.`);
 }
-// Supprimer le logement de la base : deux confirmations, refusé si un compte résident y est rattaché
+// Supprimer de la base : le logement et son locataire disparaissent de la liste (deux confirmations).
+// Un compte résident rattaché est désactivé et détaché, sans perdre ses annonces ni son historique.
 async function supprimerLogement(x) {
-  const { data: P } = await sb.from('profiles').select('nom_affichage,statut').eq('logement_id', x.id);
-  if ((P || []).length) {
-    await dialogue({ titre: `Impossible de supprimer ${x.code}`, ok: 'J’ai compris', annuler: null,
-      corps: `<p>Le compte ADRESS CLUB de <b>${esc(P[0].nom_affichage || 'un résident')}</b> est rattaché à ce logement. Le supprimer effacerait le lien avec son historique (annonces, favoris).</p><ul>
-        ${li('Si le locataire part : utilisez <b>Retirer</b>, le logement devient libre.')}
-        ${li('Si le compte est sur le mauvais logement : <b>Comptes › Logement</b> pour le rattacher ailleurs, puis revenez supprimer.')}</ul>` });
-    return;
-  }
-  const r1 = await dialogue({ titre: `Supprimer ${x.code} de la base ?`, ok: 'Continuer', danger: true,
-    corps: `<p>Différent de « Retirer » : ici c’est <b>le logement lui-même</b> qui disparaît, pas seulement son locataire.</p><ul>
+  const { data: P } = await sb.from('profiles').select('id,nom_affichage,statut').eq('logement_id', x.id);
+  const comptes = P || [], actifs = comptes.filter(p => p.statut === 'actif');
+  const qui = x.locataire || comptes[0]?.nom_affichage || x.email || '';
+  const r1 = await dialogue({ titre: `Supprimer ${qui ? qui + ' et ' : ''}le logement ${x.code} de la base ?`, ok: 'Continuer', danger: true,
+    corps: `<p>Différent de « Retirer » : ici <b>la ligne entière</b> disparaît, le logement comme son locataire.</p><ul>
       ${li(`<b>${esc(x.code)}</b> est effacé de Nos locataires et du plan de la résidence.`)}
-      ${x.locataire || x.email ? li(`Le locataire enregistré (${esc(x.locataire || x.email)}) est effacé avec lui.`) : ''}
+      ${qui ? li(`<b>${esc(qui)}</b> n’apparaît plus dans la liste des locataires.`) : ''}
+      ${actifs.length ? li(`Son compte ADRESS CLUB est <b>désactivé</b> : il ne peut plus se connecter et ses annonces sont mises en pause. Ses annonces et son historique sont conservés : avec un nouveau code, il retrouve tout.`) : comptes.length ? li('Son ancien compte (déjà désactivé) est détaché de ce logement.') : ''}
       ${li('Les codes d’invitation non utilisés pour ce logement sont annulés.')}
       ${li('<b>Action définitive</b> : pour le retrouver, il faudra le recréer ou réimporter le fichier Excel.')}</ul>
-      <p class="muted small">À utiliser pour un logement créé par erreur ou qui n’existe plus.</p>` });
+      <p class="muted small">À utiliser pour une ligne enregistrée par erreur, un logement qui n’existe plus, ou un locataire à effacer complètement.</p>` });
   if (!r1) return;
   const r2 = await dialogue({ titre: 'Dernière confirmation', ok: 'Supprimer définitivement', danger: true,
     corps: `<p>Pour éviter toute erreur, tapez le code du logement : <b class="dlg-code">${esc(x.code)}</b></p>`, saisie: { label: 'Code du logement', attendu: x.code } });
   if (!r2) return;
   action(async () => {
+    if (comptes.length) check(await sb.from('profiles').update({ statut: 'desactive', logement_id: null }).in('id', comptes.map(p => p.id)));
     check(await sb.from('invitations').delete().eq('logement_id', x.id).is('utilisee_par', null));
     check(await sb.from('invitations').update({ logement_id: null }).eq('logement_id', x.id));
     check(await sb.from('logements').delete().eq('id', x.id));
@@ -512,7 +510,7 @@ async function annuaire(box) {
         && t.every(w => norm([x.code, x.locataire, x.email, occupant.get(x.id)].join(' ')).includes(w)));
       $('#atb').innerHTML = vis.map(x => { const p = problemes(x), e = etat(x); return `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b></td>
         <td>${!x.bloc ? '<span class="muted">—</span>' : p.some(o => o.k === 'nom') ? '<span class="a-bad">Nom manquant</span>' : esc(x.locataire || '—')}${!x.bloc || (!x.locataire && !x.email && !occupant.has(x.id)) ? '' : x.email && EMAIL_OK(x.email) ? `<div class="small muted">${esc(x.email)}</div>` : `<div class="small a-bad">${x.email ? esc(x.email) + ' (invalide)' : 'E-mail manquant'}${p.find(o => o.fix) ? ` · <button type="button" class="lnk" data-fix="${esc(p.find(o => o.fix).fix)}">Corriger en ${esc(p.find(o => o.fix).fix)}</button>` : ''}</div>`}${p.filter(o => o.t).map(o => alerte(o.t)).join('')}</td>
-        <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${!x.locataire && !x.email && !occupant.has(x.id) ? '<button class="btn sm" data-aff>Affecter un locataire</button>' : ''}${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button>${x.locataire || x.email || occupant.has(x.id) ? '<button class="btn sm ghost rouge" data-vider>Retirer</button>' : ''}</div></td></tr>`; }).join('');
+        <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${!x.locataire && !x.email && !occupant.has(x.id) ? '<button class="btn sm" data-aff>Affecter un locataire</button>' : ''}${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button>${x.locataire || x.email || occupant.has(x.id) ? '<button class="btn sm ghost rouge" data-vider>Retirer</button>' : ''}<button class="btn sm ghost rouge btn-sup" data-sup aria-label="Supprimer ${esc(x.code)} de la base" title="Supprimer de la base"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Supprimer</button></div></td></tr>`; }).join('');
       $('#avide').hidden = !!vis.length;
       brancher();
     };
@@ -531,6 +529,7 @@ async function annuaire(box) {
       const x = L.find(y => y.id === b.closest('tr').dataset.id); if (!x) return;
       retirerLocataire(x, { compte: occupant.has(x.id) ? (occupant.get(x.id) || 'ce résident') : null, codeEnAttente: !!vivant(x.id) });
     });
+    box.querySelectorAll('[data-sup]').forEach(b => b.onclick = () => { const x = L.find(y => y.id === b.closest('tr').dataset.id); if (x) supprimerLogement(x); });
     // Logement libre : créer le locataire et l'affecter en une fois (puis, au choix, l'inviter tout de suite)
     box.querySelectorAll('[data-aff]').forEach(b => b.onclick = () => {
       const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id); if (!x) return;
