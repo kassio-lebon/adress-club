@@ -27,6 +27,9 @@ function prix(a) { return a.type === 'don' ? 'GRATUIT' : fcfa(a.prix_fcfa); }
 const qs = () => new URLSearchParams((location.hash.split('?')[1]) || '');
 const estFlip = (u) => /^https:\/\/([a-z0-9-]+\.)?heyzine\.com\//i.test(u || '');
 const lienFlip = (u, t) => estFlip(u) ? '#/lire?' + new URLSearchParams({ u, t: t || '' }).toString() : u;
+// Liens saisis dans l'Espace ADRESS : seuls http(s), e-mail et téléphone sont acceptés
+const sur = (u) => /^(https?:|mailto:|tel:)/i.test(String(u || '').trim()) ? String(u).trim() : '#';
+const fete = () => window.dispatchEvent(new Event('acl-fete'));
 const track = (type, ref_id) => sb.from('evenements').insert({ type, ref_id: ref_id || null }).then(() => {});
 
 // recherche instantanée : filtre les éléments à chaque frappe (sans accents ni majuscules)
@@ -92,9 +95,10 @@ export function compress(file, max = 1280, q = 0.82) {
 // ---------- session et profil ----------
 async function chargerProfil() {
   const { data: { session } } = await sb.auth.getSession();
-  state.session = session;
+  state.session = session; state.profilKo = false;
   if (!session) { state.profil = null; return; }
-  const { data } = await sb.from('profiles').select('*, residence:residences(nom,photo_path)').eq('id', session.user.id).maybeSingle();
+  const { data, error } = await sb.from('profiles').select('*, residence:residences(nom,photo_path)').eq('id', session.user.id).maybeSingle();
+  if (error && !data) { state.profilKo = true; if (state.profil?.id === session.user.id) state.profilKo = false; return; }
   state.profil = data;
   if (data?.statut === 'actif') {
     const { data: p } = await sb.from('parametres').select('cle,valeur');
@@ -128,6 +132,7 @@ async function router() {
   window.scrollTo(0, 0);
   if (!state.session) return connexion();
   if (state.recup || RECUP) { state.recup = true; return nouveauMdp(); }
+  if (state.profilKo) return horsLigne();
   if (!actif()) return activation();
   const view = routes[name] || accueil;
   app.classList.remove('page-in');
@@ -137,6 +142,13 @@ async function router() {
   majCompteurs();
 }
 
+// Réseau absent ou trop lent au démarrage : écran d'attente qui réessaie tout seul
+function horsLigne() {
+  app.innerHTML = `<div class="login"><div class="card center pad" style="margin-top:18vh"><div class="off-ico">⌁</div><b>Connexion impossible pour le moment</b><p class="muted">Vérifiez votre connexion Internet. ADRESS CLUB réessaie automatiquement.</p><button class="btn" id="rt" type="button">Réessayer</button></div></div>`;
+  const go = async () => { const b = app.querySelector('#rt'); if (b) { b.disabled = true; b.textContent = 'Connexion…'; } await chargerProfil(); router(); };
+  app.querySelector('#rt').onclick = go;
+  addEventListener('online', go, { once: true }); setTimeout(() => { if (app.querySelector('#rt:not([disabled])')) go(); }, 15000);
+}
 // ---------- connexion / activation (§2) ----------
 function connexion() {
   app.innerHTML = `
@@ -234,6 +246,7 @@ export async function deconnecter(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Déconnexion…'; }
   try { await Promise.race([sb.auth.signOut({ scope: 'local' }), new Promise(r => setTimeout(r, 2500))]); } catch (_) {}
   try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token/.test(k) || k === 'acl-sig').forEach(k => localStorage.removeItem(k)); } catch (_) {}
+  try { await caches.delete('acl-img'); } catch (_) {} // photos du compte effacées du téléphone (appareil partagé)
   location.hash = '#/'; location.reload();
 }
 // Mot de passe oublié : lien par e-mail si possible, sinon mot de passe provisoire donné par ADRESS
@@ -305,7 +318,7 @@ export async function installer(auto) {
   // Si le navigateur autorise l'installation directe pendant que la fenêtre est ouverte, le bouton « 1 clic » apparaît
   const b1 = d.querySelector('#inst1');
   const veille = setInterval(() => { if (!d.isConnected) return clearInterval(veille); if (window._installPrompt) { b1.hidden = false; const c = d.querySelector('#instChrome'); if (c) { c.nextElementSibling?.remove(); c.remove(); } clearInterval(veille); } }, 500);
-  b1.onclick = async () => { const p = window._installPrompt; if (!p) return; p.prompt(); const r = await p.userChoice.catch(() => null); window._installPrompt = null; if (r && r.outcome === 'accepted') { d.remove(); toast('ADRESS CLUB est installée sur votre téléphone.'); document.querySelectorAll('.install-card').forEach(x => x.remove()); } else b1.hidden = true; };
+  b1.onclick = async () => { const p = window._installPrompt; if (!p) return; p.prompt(); const r = await p.userChoice.catch(() => null); window._installPrompt = null; if (r && r.outcome === 'accepted') { d.remove(); toast('ADRESS CLUB est installée sur votre téléphone.'); fete(); document.querySelectorAll('.install-card').forEach(x => x.remove()); } else b1.hidden = true; };
   d.querySelector('.tuto-sw').onclick = (e) => { e.preventDefault(); const b = d.querySelector('.tuto-box'), o = b.dataset.os === 'ios' ? 'android' : 'ios'; b.dataset.os = o; b.querySelector('video').outerHTML = videoTuto(o, true); e.target.textContent = 'Voir la vidéo ' + (o === 'ios' ? 'Android' : 'iPhone'); };
   document.body.appendChild(d);
 }
@@ -466,6 +479,7 @@ async function annonce(id) {
     const tel = state.profil.consentement_contact && state.profil.telephone;
     app.querySelector('#zoo').innerHTML = `<div class="zoo"><b>C’est zooo ! 🎉</b><p>Le vendeur a reçu votre demande n° ${rang}. ${tel ? `Il vous contactera au <b>${esc(state.profil.telephone)}</b>.` : 'Pour qu’il puisse vous joindre, <a href="#/profil">ajoutez votre numéro dans Mon compte</a> et autorisez son partage.'}</p><p class="muted">Merci !</p></div>`;
     try { navigator.vibrate && navigator.vibrate([12, 40, 18]); } catch (_) {}
+    fete();
   };
   const s = app.querySelector('#sig');
   if (s) s.onclick = async (e) => {
@@ -578,7 +592,7 @@ function publier() {
       go.textContent = 'Publication…';
       const { data, error } = await sb.from('annonces').insert({ type, titre, categorie, etat, description: description || null, prix_fcfa: type === 'vente' ? px : null, photos: paths }).select('id').single();
       if (error) throw error;
-      toast('Votre annonce est en ligne.'); location.hash = `#/annonce/${data.id}`;
+      toast('Votre annonce est en ligne.'); fete(); location.hash = `#/annonce/${data.id}`;
     } catch (e) { go.disabled = false; go.textContent = 'Publier'; err(errMsg(e)); }
   };
 }
@@ -654,7 +668,7 @@ async function residences() {
       ${im.length > 1 ? `<div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div>` : ''}
       ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}</div>` : ''}
     <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc(r.quartier || '')}${r.type_bien ? ' · ' + esc(r.type_bien) : ''}</div>
-    ${r.description ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(r.lien_decouvrir)}" target="_blank" rel="noopener">Découvrir la résidence ↗</a>` : ''}</div></div>`; }).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
+    ${r.description ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">Découvrir la résidence ↗</a>` : ''}</div></div>`; }).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
   (data || []).forEach(r => track('vue_residence', r.id));
   app.querySelectorAll('[data-r]').forEach(a => a.addEventListener('click', () => track('clic_residence', a.dataset.r)));
   app.querySelectorAll('.rs').forEach(diaporama);
@@ -703,14 +717,14 @@ async function nouveautes() {
   <div class="list" style="margin-top:12px">${(data || []).map(c => `<div class="card item">
     ${c.image_path ? `<div class="ph" style="aspect-ratio:16/9;background-image:url('${esc(publicUrl(c.image_path))}')"></div>` : ''}
     <div class="bd" style="padding:14px"><div class="muted small">${esc(c.type)} · ${dateFr(c.date_parution)}</div><h3>${esc(c.titre)}</h3>
-    ${c.texte ? `<p style="white-space:pre-line">${esc(c.texte)}</p>` : ''}${c.lien ? `<a class="btn sm" href="${esc(c.lien)}" target="_blank" rel="noopener">En savoir plus</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune nouveauté pour le moment.</div>'}</div>`;
+    ${c.texte ? `<p style="white-space:pre-line">${esc(c.texte)}</p>` : ''}${c.lien ? `<a class="btn sm" href="${esc(sur(c.lien))}" target="_blank" rel="noopener">En savoir plus</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune nouveauté pour le moment.</div>'}</div>`;
 }
 async function flip() {
   const { data } = await sb.from('contenus').select('*').eq('visible', true).eq('type', 'Flip Immo').order('date_parution', { ascending: false }).limit(1);
   const f = data?.[0];
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Le Flip Immo</h1><p class="muted">Le magazine ADRESS IMMOBILIER</p>
   ${f ? `<div class="card center" style="margin-top:12px">${f.image_path ? `<img src="${esc(publicUrl(f.image_path))}" alt="Couverture du Flip Immo" style="margin:0 auto;max-height:520px;border-radius:10px">` : ''}
-    <h2>${esc(f.titre)}${f.numero ? ' – n° ' + esc(f.numero) : ''}</h2>${f.lien ? `<a class="btn block" id="lire" href="${esc(lienFlip(f.lien, f.titre))}" ${estFlip(f.lien) ? '' : 'target="_blank" rel="noopener"'}>Lire le magazine</a>` : ''}</div>`
+    <h2>${esc(f.titre)}${f.numero ? ' – n° ' + esc(f.numero) : ''}</h2>${f.lien ? `<a class="btn block" id="lire" href="${esc(estFlip(f.lien) ? lienFlip(f.lien, f.titre) : sur(f.lien))}" ${estFlip(f.lien) ? '' : 'target="_blank" rel="noopener"'}>Lire le magazine</a>` : ''}</div>`
   : '<div class="card center pad" style="margin-top:12px">Le prochain numéro arrive bientôt.</div>'}`;
   const l = app.querySelector('#lire'); if (l) l.addEventListener('click', () => track('clic_flip', f.id));
 }
@@ -723,7 +737,7 @@ async function bonnesAdresses() {
   const ligne = (p) => '<div class="card bp">'
     + '<div class="bp-logo"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '></div>'
     + '<div class="bp-txt"><b>' + esc(p.nom) + '</b><div class="muted small">' + esc(p.categorie) + '</div>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>'
-    + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(p.lien) + '" target="_blank" rel="noopener">Découvrir</a>' : '') + '</div>';
+    + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(sur(p.lien)) + '" target="_blank" rel="noopener">Découvrir</a>' : '') + '</div>';
   const flipCard = (p) => '<a class="flipcard" data-p="' + p.id + '" href="' + esc(lienFlip(p.lien, p.nom)) + '">'
     + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><i class="orb o1"></i><i class="orb o2"></i><em>' + esc(p.nom) + '</em></span>'
     + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(p.nom) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
@@ -813,7 +827,7 @@ function avis() {
     if (!u) { const e = app.querySelector('#err'); e.textContent = 'Choisissez Oui, Partiellement ou Non.'; e.hidden = false; return; }
     const { error } = await sb.from('avis').insert({ auteur_id: state.session.user.id, annonce_id: an || null, utilite: u, amelioration: app.querySelector('#am').value.trim() || null, origine: an ? 'cloture' : 'menu' });
     if (error) return toast(errMsg(error));
-    toast('Merci pour votre avis.'); location.hash = an ? '#/mes-annonces' : '#/';
+    toast('Merci pour votre avis.'); fete(); location.hash = an ? '#/mes-annonces' : '#/';
   };
 }
 

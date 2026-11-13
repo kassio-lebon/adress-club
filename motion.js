@@ -169,3 +169,84 @@ if (touch && !reduce) {
     }
   }, { passive: true });
 }
+
+// ================= v45 : finitions premium =================
+const fin = matchMedia('(pointer: fine)').matches;
+const CONF = ['#D4101D', '#E8323E', '#9A9CA3', '#C9CBD0', '#111214'];
+// Fête aux couleurs ADRESS : petits arcs du logo qui jaillissent (annonce publiée, demande envoyée, appli installée…)
+function feteAdress(x = innerWidth / 2, y = innerHeight * .42) {
+  if (reduce) return;
+  const box = document.createElement('div'); box.className = 'confetti'; document.body.appendChild(box);
+  for (let i = 0; i < 34; i++) {
+    const s = document.createElement('i'), c = CONF[i % CONF.length], arc = i % 3 !== 2;
+    s.innerHTML = arc ? `<svg viewBox="0 0 24 14"><path d="M2 12 Q12 -4 22 12" fill="none" stroke="${c}" stroke-width="3.2" stroke-linecap="round"/></svg>` : '';
+    if (!arc) s.style.background = c;
+    s.style.left = x + 'px'; s.style.top = y + 'px'; box.appendChild(s);
+    const a = Math.random() * Math.PI * 2, v = 120 + Math.random() * 220, dx = Math.cos(a) * v, dy = Math.sin(a) * v - 160, r = (Math.random() - .5) * 720;
+    s.animate([{ transform: 'translate(-50%,-50%) scale(.4) rotate(0)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${dx * .8}px), calc(-50% + ${dy * .8}px)) scale(1) rotate(${r * .6}deg)`, opacity: 1, offset: .45 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy + 260}px)) scale(.9) rotate(${r}deg)`, opacity: 0 }],
+      { duration: 1300 + Math.random() * 700, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
+  }
+  setTimeout(() => box.remove(), 2300);
+}
+addEventListener('acl-fete', () => { const b = document.querySelector('#int, .zoo, .toast:not([hidden])'); const r = b && b.getBoundingClientRect(); feteAdress(r ? r.left + r.width / 2 : undefined, r ? r.top + r.height / 2 : undefined); });
+
+// Cœur des favoris : petite gerbe de particules
+document.addEventListener('animationstart', (e) => {
+  if (reduce || e.animationName !== 'heart' || e.target.textContent !== '♥') return;
+  const b = e.target, r = b.getBoundingClientRect();
+  for (let i = 0; i < 9; i++) {
+    const p = document.createElement('i'); p.className = 'spark'; p.style.left = r.left + r.width / 2 + 'px'; p.style.top = r.top + r.height / 2 + 'px';
+    document.body.appendChild(p); const a = (i / 9) * Math.PI * 2, d = 22 + Math.random() * 10;
+    p.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(0)`, opacity: 0 }], { duration: 520, easing: 'cubic-bezier(.2,.8,.3,1)' }).onfinish = () => p.remove();
+  }
+});
+
+// Titres : les mots apparaissent un à un
+function titres() {
+  if (reduce) return;
+  app.querySelectorAll('h1:not(.wd)').forEach(h => {
+    h.classList.add('wd'); if (h.children.length || !h.textContent.trim()) return;
+    h.innerHTML = h.textContent.trim().split(/\s+/).map((w, i) => `<span class="w" style="--i:${i}"><span>${w.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</span></span>`).join(' ');
+  });
+}
+
+// Ordinateur : cartes en relief qui suivent la souris, avec reflet ; boutons « aimantés »
+if (fin && !reduce) {
+  let cur = null, raf = 0, ev = null;
+  const SEL = '.item, .fc, .mini, .feature, .rs-card, .menu a';
+  document.addEventListener('pointermove', (e) => {
+    ev = e; if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0; const t = ev.target.closest && ev.target.closest(SEL);
+      if (cur && cur !== t) { cur.style.transform = ''; cur.classList.remove('tilt'); cur = null; }
+      if (t) {
+        const r = t.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width, py = (ev.clientY - r.top) / r.height;
+        if (!t.querySelector(':scope > .glare')) t.insertAdjacentHTML('beforeend', '<i class="glare"></i>');
+        t.classList.add('tilt'); cur = t;
+        t.style.transform = `perspective(900px) rotateX(${(.5 - py) * 7}deg) rotateY(${(px - .5) * 9}deg) translateY(-3px)`;
+        t.style.setProperty('--gx', px * 100 + '%'); t.style.setProperty('--gy', py * 100 + '%');
+      }
+      const b = ev.target.closest && ev.target.closest('.btn:not(.sm):not([disabled])');
+      document.querySelectorAll('.btn.mag').forEach(x => { if (x !== b) { x.style.translate = ''; x.classList.remove('mag'); } });
+      if (b) { const r = b.getBoundingClientRect(); b.classList.add('mag'); b.style.translate = `${(ev.clientX - r.left - r.width / 2) * .12}px ${(ev.clientY - r.top - r.height / 2) * .25}px`; }
+      const h = ev.target.closest && ev.target.closest('.hero');
+      if (h) { if (!h.querySelector(':scope > .spot')) h.insertAdjacentHTML('beforeend', '<i class="spot"></i>'); const r = h.getBoundingClientRect(); h.style.setProperty('--mx', ev.clientX - r.left + 'px'); h.style.setProperty('--my', ev.clientY - r.top + 'px'); }
+    });
+  }, { passive: true });
+}
+
+// Fine barre de progression de lecture sous l'en-tête
+const prog = document.createElement('i'); prog.className = 'read-prog'; document.body.appendChild(prog);
+let tk2 = false;
+addEventListener('scroll', () => {
+  if (tk2) return; tk2 = true;
+  requestAnimationFrame(() => { const m = document.documentElement.scrollHeight - innerHeight; prog.style.transform = `scaleX(${m > 200 ? Math.min(1, scrollY / m) : 0})`; tk2 = false; });
+}, { passive: true });
+
+// Boutons principaux : reflet qui passe de temps en temps
+function reflets() { app.querySelectorAll('#int:not([disabled]), #go, #gon, .inst1, form .btn.block:not(.ghost)').forEach(b => b.classList.add('shine')); }
+
+new MutationObserver(() => { if (app.classList.contains('page-in')) { titres(); reflets(); } }).observe(app, { attributes: true, attributeFilter: ['class'] });
+titres(); reflets();
