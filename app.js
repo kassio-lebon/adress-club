@@ -533,8 +533,8 @@ async function modifier(id) {
   <form id="f" class="narrow" novalidate>
   <label>Photos (1 à ${max}) *</label>
   <div class="thumbs" id="th"></div>
-  <label class="drop" for="ph">${ICO.camera}Ajouter des photos<small>Jusqu’à ${max} photos au total</small></label>
-  <input id="ph" type="file" accept="image/*" multiple class="sr">
+  <div class="drops"><label class="drop" for="phc">${ICO.camera}Prendre une photo<small>Avec l’appareil photo</small></label><label class="drop" for="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>Choisir dans la galerie<small>Jusqu’à ${max} photos au total</small></label></div>
+  <input id="phc" type="file" accept="image/*" capture="environment" class="sr"><input id="ph" type="file" accept="image/*" multiple class="sr">
   <label for="ti">Titre *</label><input id="ti" type="text" maxlength="80" value="${esc(a.titre)}">
   <div class="grid2">
     <div><label for="ca">Catégorie *</label><select id="ca">${CATEGORIES.map(c => `<option ${c === a.categorie ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
@@ -556,6 +556,7 @@ async function modifier(id) {
   };
   dessiner();
   $('#ph').onchange = (e) => { const place = max - gardees.length; files = files.concat([...e.target.files]).slice(0, Math.max(0, place)); if (gardees.length + files.length >= max) toast(`${max} photos maximum.`); e.target.value = ''; dessiner(); };
+  $('#phc').onchange = $('#ph').onchange;
   $('#f').onsubmit = async (ev) => {
     ev.preventDefault(); err('');
     const titre = $('#ti').value.trim(), px = a.type === 'vente' ? parseInt($('#px').value, 10) : null;
@@ -583,8 +584,8 @@ function publier() {
   <form id="f" class="narrow" novalidate>
   <div class="chips" id="typ"><a class="chip on" data-v="vente">Je vends</a><a class="chip" data-v="don">Je donne</a></div>
   <label>Photos (1 à ${max}) *</label>
-  <label class="drop" for="ph">${ICO.camera}Prendre ou choisir des photos<small>Jusqu’à ${max} photos, compressées automatiquement</small></label>
-  <input id="ph" type="file" accept="image/*" multiple class="sr">
+  <div class="drops"><label class="drop" for="phc">${ICO.camera}Prendre une photo<small>Avec l’appareil photo</small></label><label class="drop" for="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>Choisir dans la galerie<small>Jusqu’à ${max} photos</small></label></div>
+  <input id="phc" type="file" accept="image/*" capture="environment" class="sr"><input id="ph" type="file" accept="image/*" multiple class="sr">
   <div class="thumbs" id="th"></div>
   <label for="ti">Titre *</label><input id="ti" type="text" maxlength="80" placeholder="Canapé 3 places">
   <div class="grid2">
@@ -607,6 +608,7 @@ function publier() {
   const dessiner = () => { $('#th').innerHTML = files.map((f, i) => `<div class="th"><img src="${URL.createObjectURL(f)}" alt="Photo ${i + 1}"><button type="button" data-rm="${i}" aria-label="Retirer la photo ${i + 1}">×</button></div>`).join('');
     app.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { files.splice(+b.dataset.rm, 1); dessiner(); }); };
   $('#ph').onchange = (e) => { files = files.concat([...e.target.files]).slice(0, max); if (e.target.files.length + files.length > max) toast(`${max} photos maximum.`); e.target.value = ''; dessiner(); };
+  $('#phc').onchange = $('#ph').onchange;
   $('#f').onsubmit = async (ev) => {
     ev.preventDefault(); err('');
     const titre = $('#ti').value.trim(), categorie = $('#ca').value, etat = $('#et').value, description = $('#de').value.trim(), px = parseInt($('#px').value, 10);
