@@ -1,5 +1,5 @@
 // ADRESS CLUB — service worker : l'interface fonctionne hors ligne, les données restent toujours en direct.
-const CACHE = 'acl-v53';
+const CACHE = 'acl-v54';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'admin.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png', 'motion.js'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE && x !== 'acl-img' && x !== 'acl-lib').map(x => caches.delete(x)))).then(() => self.clients.claim())); });
@@ -21,7 +21,11 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(fetch(e.request, { cache: 'no-cache' }).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; }).catch(() => caches.match(e.request)));
 });
 self.addEventListener('push', (e) => {
-  const d = e.data ? e.data.json() : { titre: 'ADRESS CLUB' };
-  e.waitUntil(self.registration.showNotification(d.titre || 'ADRESS CLUB', { body: d.message || '', icon: 'icon-192.png', data: { url: d.url || './#/notifications' } }));
+  let d = { titre: 'ADRESS CLUB' }; try { d = e.data ? e.data.json() : d; } catch (_) {}
+  const badge = () => { try { if (self.navigator.setAppBadge && d.badge) return self.navigator.setAppBadge(d.badge); } catch (_) {} };
+  e.waitUntil(Promise.all([self.registration.showNotification(d.titre || 'ADRESS CLUB', { body: d.message || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: d.tag, vibrate: [80, 40, 80], data: { url: d.url || './#/notifications' } }), badge()]));
 });
-self.addEventListener('notificationclick', (e) => { e.notification.close(); e.waitUntil(clients.openWindow(e.notification.data?.url || './')); });
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close(); const url = e.notification.data?.url || './';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => { const w = ws.find(x => 'focus' in x); if (w) { w.navigate(url).catch(() => {}); return w.focus(); } return clients.openWindow(url); }));
+});

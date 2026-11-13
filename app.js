@@ -246,6 +246,7 @@ const videoTuto = (os, auto) => `<video class="tuto-v" controls playsinline prel
 // Déconnexion fiable : session effacée sur le téléphone même si le serveur ne répond pas, puis rechargement propre
 export async function deconnecter(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Déconnexion…'; }
+  try { const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration(); const s = reg && reg.pushManager && await reg.pushManager.getSubscription(); if (s) { await Promise.race([sb.from('push_subscriptions').delete().eq('endpoint', s.endpoint), new Promise(r => setTimeout(r, 1500))]); await s.unsubscribe(); } } catch (_) {}
   try { await Promise.race([sb.auth.signOut({ scope: 'local' }), new Promise(r => setTimeout(r, 2500))]); } catch (_) {}
   try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token/.test(k) || k === 'acl-sig').forEach(k => localStorage.removeItem(k)); } catch (_) {}
   try { await caches.delete('acl-img'); } catch (_) {} // photos du compte effacées du téléphone (appareil partagé)
@@ -324,6 +325,31 @@ export async function installer(auto) {
   d.querySelector('.tuto-sw').onclick = (e) => { e.preventDefault(); const b = d.querySelector('.tuto-box'), o = b.dataset.os === 'ios' ? 'android' : 'ios'; b.dataset.os = o; b.querySelector('video').outerHTML = videoTuto(o, true); e.target.textContent = 'Voir la vidéo ' + (o === 'ios' ? 'Android' : 'iPhone'); };
   document.body.appendChild(d);
 }
+// ---------- Notifications sur l'écran du téléphone (push) ----------
+const PUSH_FN = SUPABASE_URL + '/functions/v1/push';
+const pushOk = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const b64u = (s) => { const r = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+export async function activerPush(demander) {
+  try {
+    if (!pushOk() || !state.session || Notification.permission === 'denied') return false;
+    if (Notification.permission !== 'granted') { if (!demander || await Notification.requestPermission() !== 'granted') return false; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) { const { publicKey } = await (await fetch(PUSH_FN)).json(); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(publicKey) }); }
+    const j = sub.toJSON(); const { error } = await sb.rpc('enregistrer_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+    return !error;
+  } catch (_) { return false; }
+}
+function carteNotif() {
+  if (!pushOk() || Notification.permission !== 'default' || carteInstall()) return '';
+  let plusTard = 0; try { plusTard = +localStorage.getItem('acl-push-later') || 0; } catch (_) {}
+  if (Date.now() - plusTard < 5 * 864e5) return '';
+  return '<div class="card install-card push-card"><span class="pc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><div><b>Soyez prévenu sur votre téléphone</b><small>Nouvelle demande sur vos annonces, réponse d’un vendeur… même appli fermée.</small></div><div class="ic-act"><button class="btn sm" type="button" data-push>Activer</button><button class="btn sm ghost" type="button" data-push-later>Plus tard</button></div></div>';
+}
+function brancherNotif(root) {
+  root.querySelectorAll('[data-push]').forEach(b => b.onclick = async () => { b.disabled = true; const ok = await activerPush(true); b.closest('.push-card').remove(); toast(ok ? 'C’est activé : vous serez prévenu sur votre téléphone.' : 'Notifications refusées. Vous pourrez les activer dans Mon compte.'); });
+  root.querySelectorAll('[data-push-later]').forEach(b => b.onclick = () => { try { localStorage.setItem('acl-push-later', String(Date.now())); } catch (_) {} b.closest('.push-card').remove(); });
+}
 function carteInstall() {
   if (estInstallee() || !(estIOS() || /android|mobile/i.test(navigator.userAgent))) return '';
   let plusTard = 0; try { plusTard = +localStorage.getItem('acl-install-later') || 0; } catch (_) {}
@@ -354,14 +380,14 @@ async function accueil() {
     + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
-    + '</section>' + carteInstall() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
+    + '</section>' + carteInstall() + carteNotif() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
     + lien('#/residences', ICO.residences, 'Nos résidences', 'Photos et contact')
     + lien('#/flip-immo', ICO.flip, 'Le Flip Immo', 'Le magazine ADRESS')
     + lien('#/nouveautes', ICO.news, 'Les nouveautés', 'Programmes et actualités')
     + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Les bons plans</b><small>La sélection ADRESS pour vivre Abidjan</small></span>' + ICO.arrow + '</a>'
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
-  brancherInstall(app);
+  brancherInstall(app); brancherNotif(app);
   fondDefilant(app.querySelector('.hero .bgs'));
 }
 // Arrière-plan de l'accueil : photos des résidences en fondu très lent (une photo n'apparaît qu'une fois prête)
@@ -854,6 +880,7 @@ function profil() {
     <h2>Alertes</h2>
     <label class="check"><input id="nq" type="checkbox" ${p.notif_quotidienne ? 'checked' : ''}> Résumé quotidien des nouvelles annonces (une fois par jour au maximum)</label>
     <label class="check"><input id="ni" type="checkbox" ${p.notif_interet ? 'checked' : ''}> M'alerter quand un résident est intéressé par mon annonce</label>
+    <div class="push-row" id="pushRow"></div>
     <button class="btn block" style="margin-top:12px">Enregistrer</button>
   </form>
   <form class="card" id="fmdp" style="margin-top:12px" novalidate><h2 style="margin-top:0">Changer mon mot de passe</h2>
@@ -872,6 +899,15 @@ function profil() {
     await chargerProfil(); toast('Préférences enregistrées.');
   };
   $('#out').onclick = () => deconnecter($('#out'));
+  const pr = $('#pushRow'), majPush = () => {
+    if (!pushOk()) { pr.innerHTML = `<small class="muted">${estIOS() ? 'Sur iPhone, installez d’abord l’appli sur l’écran d’accueil pour recevoir les notifications.' : 'Ce navigateur ne permet pas les notifications.'}</small>`; return; }
+    const st = Notification.permission;
+    pr.innerHTML = st === 'granted' ? '<span class="badge ok">Activées</span> <small class="muted">Notifications sur ce téléphone</small>'
+      : st === 'denied' ? '<small class="muted">Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.</small>'
+      : '<button class="btn sm" type="button" id="pushOn">Activer les notifications sur ce téléphone</button>';
+    const b = pr.querySelector('#pushOn'); if (b) b.onclick = async () => { b.disabled = true; const ok = await activerPush(true); toast(ok ? 'Notifications activées.' : 'Notifications non activées.'); majPush(); };
+  };
+  majPush();
   $('#fmdp').onsubmit = async (e) => {
     e.preventDefault(); const er = $('#erm'), a = $('#m1').value, b = $('#m2').value; er.hidden = true;
     if (a.length < 8) { er.textContent = '8 caractères minimum.'; er.hidden = false; return; }
@@ -908,6 +944,7 @@ function avis() {
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window._installPrompt = e; });
 window.addEventListener('appinstalled', () => { window._installPrompt = null; document.querySelectorAll('.install-card').forEach(x => x.remove()); });
 window.addEventListener('hashchange', router);
+setTimeout(() => { if (state.session) activerPush(false); }, 4000);
 // Arrivée depuis le bouton « Installer avec Chrome » : la fenêtre d'installation s'ouvre d'elle-même
 if (new URLSearchParams(location.search).has('inst')) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (_) {} setTimeout(() => { if (!estInstallee()) installer(true); }, 1800); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
