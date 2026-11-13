@@ -82,7 +82,7 @@ async function stats(box) {
     ${tuile(jours(delaiAct), 'Délai moyen d’activation', 'entre l’envoi du code et la création du compte')}
     ${tuile(jours(anc), 'Ancienneté moyenne', `comptes actifs : ${P.length}`)}
   </div>
-  ${parRes.length ? `<div style="overflow-x:auto;margin-top:14px"><table class="adm num no-q"><thead><tr><th>Résidence</th><th>Logements</th><th>Occupés</th><th>Libres</th><th>Occupation</th><th>Inscrits au Club</th><th>Adhésion</th><th>Codes en attente</th><th>Départs ≤ 30 j</th></tr></thead>
+  ${parRes.length ? `<div tabindex="0" style="overflow-x:auto;margin-top:14px"><table class="adm num no-q"><thead><tr><th>Résidence</th><th>Logements</th><th>Occupés</th><th>Libres</th><th>Occupation</th><th>Inscrits au Club</th><th>Adhésion</th><th>Codes en attente</th><th>Départs ≤ 30 j</th></tr></thead>
     <tbody>${parRes.map(r => `<tr><td><b>${esc(r.nom)}</b></td><td>${r.total}</td><td>${r.occ}</td><td>${r.libres}</td><td>${tx(pct(r.occ, r.total))}</td><td>${r.m}</td><td>${tx(pct(r.m, r.occ))}</td><td>${r.att}</td><td>${r.dep}</td></tr>`).join('')}</tbody></table></div>` : ''}
   <p class="muted small">Occupé = un locataire est inscrit dans l’<a href="#/admin/annuaire">annuaire</a>. Les taux sont aussi justes que l’annuaire : pensez à le mettre à jour à chaque entrée ou sortie.</p>
   <h2 class="st-h">Le Market</h2>
@@ -139,7 +139,7 @@ async function invitations(box) {
     <p class="err" id="err" hidden></p>
     <button class="btn block" id="go" style="margin-top:14px">Créer l'invitation</button></form>
     <div id="res" hidden></div></div>
-  <h2>Invitations</h2><div style="overflow-x:auto" id="invs"><table class="adm no-q"><thead><tr><th>Locataire</th><th>Logement</th><th>Code</th><th>État</th><th></th></tr></thead><tbody>
+  <h2>Invitations</h2><div tabindex="0" style="overflow-x:auto" id="invs"><table class="adm no-q"><thead><tr><th>Locataire</th><th>Logement</th><th>Code</th><th>État</th><th></th></tr></thead><tbody>
   ${(inv.data || []).map(i => `<tr data-code="${esc(i.code)}" data-f="${i.utilisee_par ? 'active' : new Date(i.expire_le) < new Date() ? 'expiree' : 'attente'}"><td><b>${esc(i.nom_affichage || '—')}</b>${i.is_admin ? ' <span class="badge soft">admin</span>' : ''}${i.email ? `<div class="muted small">${esc(i.email)}</div>` : ''}</td><td>${esc(i.logements?.residences?.nom || '')}<div class="muted small">${esc(i.logements?.numero || i.logements?.code || '—')}</div></td>
     <td><b>${esc(i.code)}</b></td><td>${etat(i)}</td>
     <td>${i.utilisee_par ? '' : new Date(i.expire_le) < new Date() ? `<div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${i.logement_id && (occupant.has(i.logement_id) || enAttente.has(i.logement_id)) ? '<span class="muted small">logement déjà attribué</span>' : '<button class="btn sm ghost" data-renew>Nouveau code</button>'}<button class="btn sm ghost" data-del aria-label="Supprimer">×</button></div>` : `<div class="row" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn sm soft" data-wa>WhatsApp</button><button class="btn sm ghost" data-cp>Copier</button><button class="btn sm ghost" data-del aria-label="Supprimer">×</button></div>`}</td></tr>`).join('')}</tbody></table></div>`;
@@ -282,7 +282,7 @@ async function annuaire(box) {
       <div id="imp"></div></div>
     <div class="ann-bar"><h2>${l.length} logement${l.length > 1 ? 's' : ''}</h2><input type="search" id="aq" placeholder="Rechercher un logement, un nom, un e-mail…" autocomplete="off"></div>
     <div class="chips ann-f">${FILTRES.filter(([k]) => k === 'tous' || nb[k]).map(([k, t]) => `<button type="button" class="chip ${k === filtre ? 'on' : ''}${k === 'pb' ? ' pb' : ''}" data-f="${k}">${t} <span>${nb[k]}</span></button>`).join('')}</div>
-    <div style="overflow-x:auto"><table class="adm no-q"><thead><tr><th>Logement</th><th>Locataire</th><th>Accès</th><th></th></tr></thead><tbody id="atb"></tbody></table></div>
+    <div tabindex="0" style="overflow-x:auto"><table class="adm no-q"><thead><tr><th>Logement</th><th>Locataire</th><th>Accès</th><th></th></tr></thead><tbody id="atb"></tbody></table></div>
     <p class="muted center" id="avide" hidden>Aucun logement ne correspond.</p>
     <div class="card" style="margin-top:14px"><h3>Ajouter un logement</h3><form id="fa" novalidate><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae" placeholder="RDJ"></div><div><label for="aa">Appartement</label><input type="text" id="aa" placeholder="A001"></div></div>
       <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
@@ -378,7 +378,7 @@ async function comptes(box) {
     return r; };
   const fin = (p) => { const d = dans(p.date_fin_occupation); return d == null ? '' : d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`; };
   box.innerHTML = `<p class="muted small">« Retirer » coupe l’accès, libère le logement et met ses annonces en pause. Rien n’est perdu : avec un nouveau code, la personne retrouve tout. Une date de fin d’occupation déclenche le retrait automatiquement.</p>
-  <div style="overflow-x:auto" id="cpt"><table class="adm no-q"><thead><tr><th>Résident</th><th>Logement</th><th>Statut</th><th>Fin d'occupation</th><th></th></tr></thead><tbody>
+  <div tabindex="0" style="overflow-x:auto" id="cpt"><table class="adm no-q"><thead><tr><th>Résident</th><th>Logement</th><th>Statut</th><th>Fin d'occupation</th><th></th></tr></thead><tbody>
   ${D.map(p => `<tr data-id="${p.id}" data-f="${tags(p)}"><td><b>${esc(p.nom_affichage || '(sans nom)')}</b>${p.is_admin ? ' <span class="badge soft">admin</span>' : ''}${p.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${[esc(p.type_occupant || ''), p.date_activation ? 'membre depuis le ' + dateFr(p.date_activation) : ''].filter(Boolean).join(' · ')}</div>${problemes(p).map(alerte).join('')}</td>
     <td>${p.logements ? `<b>${esc(p.logements.numero || p.logements.code)}</b>` : '—'}<div class="muted small">${esc(p.residences?.nom || '')}</div></td>
     <td><span class="st-l ${p.statut === 'actif' ? 'actif' : ''}">${p.statut === 'actif' ? 'Actif' : p.statut === 'desactive' ? 'Retiré' : 'En attente'}</span></td>
@@ -412,7 +412,7 @@ async function comptes(box) {
 async function moderation(box) {
   const { data } = await sb.from('signalements').select('*, annonces(id,titre,statut,retiree_par_adress)').order('created_at', { ascending: false }).limit(200);
   const D = data || [], parAnn = new Map(); D.forEach(s => parAnn.set(s.annonce_id, (parAnn.get(s.annonce_id) || 0) + 1));
-  box.innerHTML = `<p class="muted small">Un signalement masque l’annonce jusqu’à votre décision. « Maintenir » la remet en ligne, « Retirer » la retire du Market.</p>
+  box.innerHTML = `<p class="muted small">L’annonce signalée reste en ligne jusqu’à votre décision. « Retirer » la retire du Market, « Maintenir » clôt le signalement. Vous recevez une notification à chaque nouveau signalement.</p>
   <div class="list no-q" id="mod">${D.map(s => `<div class="card" data-a="${s.annonce_id}" data-f="${s.decision === 'en_attente' ? 'attente' : 'traite'}">
     <div class="row" style="justify-content:space-between;align-items:baseline"><b>${esc(s.annonces?.titre || 'Annonce supprimée')}</b><span class="st-l ${s.decision === 'en_attente' ? 'actif' : ''}">${s.decision === 'en_attente' ? 'À traiter' : s.decision === 'retiree' ? 'Retirée' : 'Maintenue'}</span></div>
     <div class="muted small">Signalé le ${dateFr(s.created_at, true)} · ${esc(s.motif)}${parAnn.get(s.annonce_id) > 1 ? ` · ${parAnn.get(s.annonce_id)} signalements pour cette annonce` : ''}</div>${s.commentaire ? `<p>${esc(s.commentaire)}</p>` : ''}
@@ -429,7 +429,7 @@ async function annonces(box) {
   const tags = (a) => { const t = []; const d = dans(a.date_expiration);
     if (a.retiree_par_adress) t.push('retiree'); else if (['disponible', 'reserve'].includes(a.statut)) { t.push('ligne'); if (a.statut === 'reserve') t.push('reserve'); if (d != null && d <= 7) t.push('bientot'); } else t.push('close');
     if (a.signalee) t.push('signalee'); if (a.is_adress) t.push('adress'); return t.join(' '); };
-  box.innerHTML = `<div style="overflow-x:auto" id="anns"><table class="adm no-q"><thead><tr><th>Annonce</th><th>Statut</th><th>Expire</th><th></th></tr></thead><tbody>
+  box.innerHTML = `<div tabindex="0" style="overflow-x:auto" id="anns"><table class="adm no-q"><thead><tr><th>Annonce</th><th>Statut</th><th>Expire</th><th></th></tr></thead><tbody>
   ${D.map(a => { const d = dans(a.date_expiration), ouverte = !a.retiree_par_adress && ['disponible', 'reserve'].includes(a.statut); return `<tr data-id="${a.id}" data-f="${tags(a)}"><td><a href="#/annonce/${a.id}" class="t-lien"><b>${esc(a.titre)}</b></a>${a.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${a.type === 'don' ? 'Don' : fcfa(a.prix_fcfa)} · publiée le ${dateFr(a.date_publication)}</div>${a.signalee ? alerte('Signalée : à traiter dans Modération') : ''}</td>
     <td><span class="st-l ${ouverte ? 'actif' : ''}">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUT_ANN[a.statut] || esc(a.statut)}</span></td><td>${dateFr(a.date_expiration)}${ouverte && d != null ? `<div class="muted small">${d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`}</div>` : ''}</td>
     <td>${a.retiree_par_adress ? '<button class="btn sm ghost" data-r="0">Rétablir</button>' : ouverte ? '<button class="btn sm danger" data-r="1">Retirer</button>' : ''}</td></tr>`; }).join('')}</tbody></table></div>`;

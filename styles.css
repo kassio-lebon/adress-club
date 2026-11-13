@@ -1,7 +1,7 @@
 /* ADRESS CLUB — charte ADRESS IMMOBILIER. Rouge #D4101D réservé aux actions et aux repères ; le reste est neutre. */
 :root{
   --red:#D4101D; --red-ink:#B30D18; --red-tint:#FBEDEE;
-  --ink:#16171A; --ink-2:#3A3C42; --muted:#74777F; --grey:#8A8D93;
+  --ink:#16171A; --ink-2:#3A3C42; --muted:#686B73; --grey:#8A8D93;
   --line:#E7E7EA; --line-2:#D9DADF; --bg:#FAFAF9; --surface:#FFFFFF; --sunken:#F2F2F3;
   --ok:#1C6B45; --ok-tint:#E7F2EC; --warn:#8A5A00; --warn-tint:#FBF1DC; --danger:#B4121D;
   --r:12px; --r-lg:16px;
@@ -961,3 +961,5 @@ a.back[href="#/"]{display:none}
 .t-lien:hover b{text-decoration:underline}
 .adm.num th:not(:first-child),.adm.num td:not(:first-child){text-align:center;font-variant-numeric:tabular-nums}
 #adm .list .card .row>.btn{flex:0 0 auto}
+/* v66 : audit accessibilité — libellés de la barre du bas lisibles (contraste AA) */
+.tabbar a{color:var(--muted)}

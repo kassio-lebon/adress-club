@@ -1,6 +1,5 @@
 // ADRESS CLUB — application des résidents (PWA)
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { renderAdmin } from './admin.js';
 
 export const SUPABASE_URL = 'https://xvevjlovjpeqfpzfihrj.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_oPj4LrfV0uvN95MmpTPl8A_x5XLxVcj';
@@ -122,7 +121,7 @@ const actif = () => state.profil?.statut === 'actif';
 const routes = {
   '': accueil, 'market': market, 'annonce': annonce, 'publier': publier, 'modifier': modifier, 'mes-annonces': mesAnnonces,
   'residences': residences, 'nouveautes': nouveautes, 'flip-immo': flip, 'bonnes-adresses': bonnesAdresses,
-  'notifications': notifications, 'profil': profil, 'avis': avis, 'lire': lire, 'admin': (p) => renderAdmin(app, p)
+  'notifications': notifications, 'profil': profil, 'avis': avis, 'lire': lire, 'admin': async (p) => (await import('./admin.js')).renderAdmin(app, p)
 };
 async function router() {
   const [path] = location.hash.replace(/^#\/?/, '').split('?');
@@ -465,7 +464,7 @@ async function annonce(id) {
   const dejaDemande = !!dem.data;
   app.innerHTML = `
   <a class="back" href="#/market">‹ Le Market</a>
-  <div class="detail"><div class="detail-media"><div class="gal">${urls.map(u => `<img src="${esc(u)}" alt="${esc(a.titre)}">`).join('')}</div>
+  <div class="detail"><div class="detail-media"><div class="gal" tabindex="0" aria-label="Photos de l’annonce">${urls.map(u => `<img src="${esc(u)}" alt="${esc(a.titre)}">`).join('')}</div>
   ${urls.length > 1 ? `<p class="muted small">${urls.length} photos : utilisez les flèches ou faites glisser</p>` : ''}</div><div class="detail-info">
   <div class="tags">${a.statut === 'reserve' ? '<span class="badge warn">Réservé : nouvelles demandes suspendues</span>' : ''}${a.is_adress ? '<span class="badge">ADRESS IMMOBILIER</span>' : ''}</div>
   <h1>${esc(a.titre)}</h1>
@@ -666,7 +665,7 @@ async function mesAnnonces() {
   if (!['traiter', 'annonces', 'envoyees'].includes(onglet)) onglet = taches.length ? 'traiter' : 'annonces';
   const tabs = `<div class="seg" role="tablist">${[['traiter', 'À traiter'], ['annonces', 'Publiées'], ['envoyees', 'Mes demandes']].map(([k, l]) =>
     `<a role="tab" class="${onglet === k ? 'on' : ''}" href="#/mes-annonces?o=${k}">${l}${k === 'traiter' && taches.length ? `<b>${taches.length}</b>` : ''}</a>`).join('')}</div>`;
-  const vignette = (a, stamp) => `<${ouverte(a) ? `a href="#/annonce/${a.id}"` : 'div'} class="ph vg" style="background-image:url('${esc(photo.get(a.id))}')">${stamp ? '<span class="stamp">Réservé</span>' : ''}</${ouverte(a) ? 'a' : 'div'}>`;
+  const vignette = (a, stamp) => `<${ouverte(a) ? `a href="#/annonce/${a.id}"` : 'div'} class="ph vg" role="img" aria-label="${esc(a.titre)}" style="background-image:url('${esc(photo.get(a.id))}')">${stamp ? '<span class="stamp">Réservé</span>' : ''}</${ouverte(a) ? 'a' : 'div'}>`;
 
   let corps = '';
   if (onglet === 'traiter') {
