@@ -1132,3 +1132,8 @@ a.back[href="#/"]{display:none}
 .pl-t{width:auto;min-width:0}
 @media (max-width:560px){.pl-e{grid-template-columns:40px minmax(0,1fr);gap:8px}.pl-ts{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}.pl-b{padding:12px}.pl-t{padding:6px 7px}}
 @media (pointer:coarse){.j-qbox kbd{display:none}}
+/* v77 · Espace ADRESS en pleine largeur (écrans de travail) */
+.wrap:has(.adm-nav){max-width:none;padding-left:clamp(16px,2.5vw,40px);padding-right:clamp(16px,2.5vw,40px)}
+@media (min-width:1400px){.pl-wrap{grid-template-columns:minmax(0,1fr) 380px}.x-wrap{grid-template-columns:minmax(0,380px) minmax(0,1fr)}}
+.pl-plan{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));align-items:start}
+.pl-plan>.card{grid-column:1/-1}
