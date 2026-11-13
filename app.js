@@ -29,6 +29,8 @@ const estFlip = (u) => /^https:\/\/([a-z0-9-]+\.)?heyzine\.com\//i.test(u || '')
 const lienFlip = (u, t) => estFlip(u) ? '#/lire?' + new URLSearchParams({ u, t: t || '' }).toString() : u;
 // Liens saisis dans l'Espace ADRESS : seuls http(s), e-mail et téléphone sont acceptés
 const sur = (u) => /^(https?:|mailto:|tel:)/i.test(String(u || '').trim()) ? String(u).trim() : '#';
+// Numéro au format international pour WhatsApp et l'appel : 07 07 00 00 00 → 2250707000000 (Côte d'Ivoire par défaut)
+const intl = (t) => { let d = String(t || '').replace(/[^0-9]/g, ''); if (d.startsWith('00')) d = d.slice(2); if (d.length === 10 && d.startsWith('0')) d = '225' + d; return d; };
 const fete = () => window.dispatchEvent(new Event('acl-fete'));
 const track = (type, ref_id) => sb.from('evenements').insert({ type, ref_id: ref_id || null }).then(() => {});
 
@@ -631,7 +633,7 @@ async function mesAnnonces() {
     ${ds.length ? `<details ${ouverte(a) ? 'open' : ''} data-lire="${nl ? a.id : ''}"><summary style="margin-top:10px">${ds.length} demande${ds.length > 1 ? 's' : ''}${nl ? ` · <span class="badge">${nl} nouvelle${nl > 1 ? 's' : ''}</span>` : ''}</summary>
       ${ds.map(d => `<div class="dem"><b>n° ${d.rang}</b> ${esc(d.demandeur)} ${d.statut === 'contactee' ? '<span class="badge ok">contacté</span>' : ''}
         <div class="muted small">Le ${dateFr(d.created_at, true)}</div>
-        ${d.contact ? `<div class="row" style="margin-top:6px"><a class="btn sm soft" data-ct="${d.id}" target="_blank" rel="noopener" href="https://wa.me/${esc(d.contact.replace(/[^0-9]/g, ''))}">WhatsApp</a><a class="btn sm soft" data-ct="${d.id}" href="tel:${esc(d.contact.replace(/[^0-9+]/g, ''))}">Appeler</a></div>`
+        ${d.contact ? `<div class="row" style="margin-top:6px"><a class="btn sm soft" data-ct="${d.id}" target="_blank" rel="noopener" href="https://wa.me/${intl(d.contact)}?text=${encodeURIComponent('Bonjour ' + (d.demandeur || '') + ', je vous contacte au sujet de votre demande pour « ' + a.titre + ' » sur ADRESS CLUB.')}">WhatsApp</a><a class="btn sm soft" data-ct="${d.id}" href="tel:+${intl(d.contact)}">Appeler</a></div>`
           : `<div class="muted small">Numéro pas encore partagé : il s'affichera ici dès que ce résident l'ajoutera.</div>`}</div>`).join('')}</details>` : ''}
     ${ouverte(a) ? `<div class="row" style="margin-top:12px">
       <button class="btn sm ghost" data-act="${a.statut === 'reserve' ? 'disponible' : 'reserve'}">${a.statut === 'reserve' ? 'Remettre disponible' : 'Réservé'}</button>
