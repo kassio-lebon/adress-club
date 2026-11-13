@@ -1168,3 +1168,14 @@ body.dlg-on{overflow:hidden}
 @keyframes dlgIn{from{opacity:0}to{opacity:1}}
 @media (max-width:480px){.dlg-b .btn{flex:1;min-width:0}}
 .ann-aff>b{display:block;margin-bottom:4px}
+/* v81 · aide épinglée et lisible, Résidences avec bouton Créer */
+.aide{padding:14px 16px;background:var(--surface)}
+.aide-but{font-size:14.5px;line-height:1.5;color:var(--ink-2)}
+.aide-but b{display:block;font-size:15px;color:var(--ink);margin-bottom:2px}
+.aide-et{list-style:none;counter-reset:et;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.aide-et li{counter-increment:et;position:relative;margin:0;padding:10px 12px 10px 42px;background:var(--sunken);border-radius:10px;font-size:13.5px;line-height:1.45;color:var(--ink)}
+.aide-et li::before{content:counter(et);position:absolute;left:12px;top:10px;width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center}
+.res-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:6px 0 4px}
+.res-top .btn{min-height:46px}
+#resForm .row .btn{flex:0 0 auto;min-width:160px}
+.aide .aide-et{margin:12px 0 0;padding:0}

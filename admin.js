@@ -4,11 +4,11 @@ import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES
 // Navigation en 4 groupes (au lieu de 11 onglets à plat) : on choisit d'abord le domaine, puis l'écran
 const GROUPES = [
   ['Aujourd’hui', [['jour', 'Aujourd’hui']]],
-  ['Locataires', [['plan', 'Plan des résidences'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
+  ['Locataires', [['plan', 'Plan des résidences'], ['residences', 'Résidences'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
   ['Le Market', [['annonces', 'Annonces'], ['moderation', 'Signalements']]],
-  ['Vitrine', [['residences', 'Résidences'], ['contenus', 'Actualités'], ['partenaires', 'Bons plans']]],
+  ['Vitrine', [['contenus', 'Actualités'], ['partenaires', 'Bons plans']]],
   ['Pilotage', [['stats', 'Indicateurs'], ['avis', 'Avis'], ['parametres', 'Paramètres']]]];
-// Aide de chaque écran : une phrase « à quoi ça sert » toujours visible, le pas-à-pas replié
+// Aide de chaque écran : une phrase « à quoi ça sert » et le pas-à-pas, toujours visibles (étapes numérotées courtes)
 const AIDE = {
   plan: ['Chaque résidence vue comme un immeuble : un carré par appartement, sa couleur dit où en est le locataire.', [
     'Choisissez la résidence en haut.',
@@ -22,7 +22,7 @@ const AIDE = {
   annuaire: ['La liste officielle des locataires de chaque résidence : un logement, un locataire, une adresse e-mail. Les invitations partent de cette liste.', [
     'Choisissez la résidence en haut de l’écran.',
     'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
-    'Nouveau locataire : touchez « Modifier » sur son logement, saisissez son nom et son e-mail, puis « Inviter ».',
+    'Nouveau locataire sur un logement libre : « Affecter un locataire », puis « Affecter et inviter par WhatsApp ».',
     'Départ d’un locataire : touchez « Retirer ». Le logement redevient libre.',
     'Mise à jour de toute une résidence : « Importer un fichier Excel » (fichier BASE RÉSIDENCE, une feuille par résidence).']],
   invitations: ['Envoyer à un locataire son code personnel pour qu’il crée son compte ADRESS CLUB.', [
@@ -42,9 +42,10 @@ const AIDE = {
     'Touchez « Voir l’annonce ».',
     'Non conforme : « Retirer l’annonce ». Conforme : « Maintenir ».',
     'L’annonce reste en ligne tant que vous n’avez pas décidé.']],
-  residences: ['Les fiches des résidences montrées aux résidents sur l’accueil.', [
-    'Ajoutez une résidence avec le formulaire en haut.',
-    '« Photo » change la photo, « Masquer » la cache sans rien perdre.',
+  residences: ['Les résidences ADRESS : leur fiche sur l’accueil des résidents et le nombre de logements suivis.', [
+    'Nouvelle résidence : bouton rouge « Créer une résidence ».',
+    'Ensuite, ajoutez ses logements dans Nos locataires (import Excel ou « Ajouter un logement »).',
+    '« Photo » change la photo, « Masquer » la cache aux résidents sans rien perdre.',
     '« Supprimer » efface la résidence et ses logements, définitivement (double confirmation).']],
   contenus: ['Les actualités et magazines (Flip Immo) affichés aux résidents.', [
     'Publiez avec le formulaire en haut : type, titre, image et, pour un Flip Immo, le lien du flipbook.',
@@ -57,6 +58,8 @@ const AIDE = {
   avis: ['Ce que les résidents pensent de l’application.', ['Le filtre « Avec suggestion » montre les idées d’amélioration.']],
   parametres: ['Les règles du Market : durée des annonces, rappel au vendeur, nombre de photos. À modifier rarement.', ['Changez une valeur puis touchez « Enregistrer ».']] };
 
+// Espaces insécables typographiques (« … », : ; ? !) : évite les guillemets ou deux-points seuls en début de ligne
+const insec = (t) => t.replace(/« /g, '«&nbsp;').replace(/ ([»:;?!])/g, '&nbsp;$1');
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
 const TYPES_BIEN = ['Appartements','Villas en résidence','Villas individuelles','Mixte'];
 
@@ -69,7 +72,7 @@ export async function renderAdmin(app, ong) {
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Espace ADRESS</h1>
   <nav class="adm-nav"><div class="adm-g">${GROUPES.map(([n, o]) => `<a class="${n === g[0] ? 'on' : ''}" href="#/admin/${o[0][0]}">${n}</a>`).join('')}</div>
   ${g[1].length > 1 ? `<div class="tabs chips adm-s">${g[1].map(([k, l]) => `<a class="chip ${k === ong ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div>` : ''}</nav>
-  ${but ? `<div class="aide"><p><b>${esc(titre)}</b> — ${esc(but)}</p>${etapes.length ? `<details><summary>Comment faire ?</summary><ol>${etapes.map(e => `<li>${esc(e)}</li>`).join('')}</ol></details>` : ''}</div>` : ''}
+  ${but ? `<section class="aide" aria-label="Comment faire"><p class="aide-but"><b>${esc(titre)}</b> ${esc(but)}</p>${etapes.length ? `<ol class="aide-et">${etapes.map(e => `<li>${insec(esc(e))}</li>`).join('')}</ol>` : ''}</section>` : ''}
   <div id="adm"></div>`;
   const box = app.querySelector('#adm');
   await ({ jour, plan, express, stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
@@ -95,7 +98,7 @@ function modeEdition(box, titre, labelFichier) {
   card.querySelector('h3').textContent = titre;
   card.querySelector('#f button.btn:not([type=button])').textContent = 'Enregistrer les modifications';
   const lf = card.querySelector('[data-lf]'); if (lf && labelFichier) lf.textContent = labelFichier;
-  card.querySelector('#annul').hidden = false; card.classList.add('editing');
+  card.hidden = false; card.querySelector('#annul').hidden = false; card.classList.add('editing');
   card.scrollIntoView({ block: 'start', behavior: 'smooth' });
   card.querySelector('#annul').onclick = () => rerender();
 }
@@ -755,13 +758,14 @@ async function residences(box) {
   const nbL = (id) => L.filter(x => x.residence_id === id).length, nbO = (id) => L.filter(x => x.residence_id === id && x.locataire).length, nbM = (id) => P.filter(x => x.residence_id === id).length;
   const pb = (r) => { const t = []; if (!r.photo_path) t.push('Sans photo'); if (!r.description) t.push('Sans description'); if (r.visible && !r.lien_decouvrir) t.push('Sans lien « Découvrir »');
     if (!nbL(r.id)) t.push('Aucun logement dans Nos locataires : impossible d’inviter des locataires'); return t; };
-  box.innerHTML = `<div class="card"><h3>Ajouter une résidence</h3><form id="f">
+  box.innerHTML = `<div class="res-top"><span class="muted">${D.length} résidence${D.length > 1 ? 's' : ''}</span><button type="button" class="btn" id="newRes" aria-controls="resForm" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer une résidence</button></div>
+  <div class="card ann-add" id="resForm" hidden><h3>Nouvelle résidence</h3><form id="f">
     <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Quartier</label><input id="qu" type="text"></div></div>
     <div class="grid2"><div><label>Type de bien</label><select id="tb"><option value="">—</option>${TYPES_BIEN.map(t => `<option>${t}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
     <label>Description</label><textarea id="de"></textarea>
     <label>Lien « Découvrir »</label><input id="li" type="url" placeholder="https://">
     <label data-lf>Photo</label><input id="ph" type="file" accept="image/*">
-    <button class="btn block" style="margin-top:12px">Ajouter</button><button class="btn ghost block" type="button" id="annul" hidden style="margin-top:8px">Annuler</button></form></div>
+    <div class="row" style="margin-top:12px"><button class="btn">Créer la résidence</button><button class="btn ghost" type="button" id="annul">Annuler</button></div></form></div>
   <h2>Résidences</h2><div class="list no-q" id="rsd">${D.map(r => `<div class="card" data-id="${r.id}" data-f="${[r.visible ? 'visible' : 'masque', pb(r).length ? 'pb' : ''].join(' ')}" style="display:flex;gap:12px;align-items:flex-start">
     <div class="ct-im" style="width:72px;height:54px;${r.photo_path ? `background-image:url('${esc(publicUrl(r.photo_path))}')` : ''}"></div>
     <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
@@ -772,6 +776,9 @@ async function residences(box) {
   if (D.length) filtres(box.querySelector('#rsd'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', 'Masquées']], 'residences', 'Rechercher une résidence…');
   const $ = (s) => box.querySelector(s);
   let edit = null;
+  const ouvrir = (on) => { $('#resForm').hidden = !on; $('#newRes').setAttribute('aria-expanded', on); if (on) $('#no').focus(); };
+  $('#newRes').onclick = () => ouvrir($('#resForm').hidden);
+  $('#annul').onclick = () => ouvrir(false);
   $('#f').onsubmit = (e) => { e.preventDefault();
     const nom = $('#no').value.trim();
     if (!edit && D.some(r => norm(r.nom) === norm(nom))) return toast('Cette résidence existe déjà.');
