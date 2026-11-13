@@ -813,17 +813,20 @@ async function nouveautes() {
     ${c.texte ? `<p style="white-space:pre-line">${esc(c.texte)}</p>` : ''}${c.lien ? `<a class="btn sm" href="${esc(sur(c.lien))}" target="_blank" rel="noopener">En savoir plus</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune nouveauté pour le moment.</div>'}</div>`;
 }
 async function flip() {
-  // Tous les numéros : le plus récent en grand, les autres en étagère de couvertures
+  // Le numéro à la une en grand (fond flouté de sa couverture), les autres en étagère
   const { data } = await sb.from('contenus').select('*').eq('visible', true).eq('type', 'Flip Immo').order('date_parution', { ascending: false });
   const l = data || [];
   const href = (f) => f.lien ? (estFlip(f.lien) ? lienFlip(f.lien, f.titre) : sur(f.lien)) : '#';
   const ext = (f) => f.lien && !estFlip(f.lien) ? ' target="_blank" rel="noopener"' : '';
-  const couv = (f) => f.image_path ? `<img src="${esc(publicUrl(f.image_path))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="fl-vide">Flip Immo</span>';
+  const img = (f) => f.image_path ? esc(publicUrl(f.image_path)) : '';
+  const couv = (f) => f.image_path ? `<img src="${img(f)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="fl-vide">Flip Immo</span>';
+  const mois = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : '';
   const [a, ...autres] = l;
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Le Flip Immo</h1>
-  ${a ? `<a class="card fl-une" data-f="${a.id}" href="${esc(href(a))}"${ext(a)}><div class="fl-c">${couv(a)}</div>
-      <div class="fl-t"><span class="fl-k">Dernier numéro</span><h2>${esc(a.titre)}${a.numero ? ' – n° ' + esc(a.numero) : ''}</h2>${a.texte ? `<p class="muted">${esc(a.texte)}</p>` : ''}<span class="btn">Lire le magazine</span></div></a>
-    ${autres.length ? `<h2 style="margin-top:22px">Tous les numéros</h2><div class="fl-grid">${autres.map(f => `<a class="fl-it" data-f="${f.id}" href="${esc(href(f))}"${ext(f)}><div class="fl-c">${couv(f)}</div><b>${esc(f.titre)}</b></a>`).join('')}</div>` : ''}`
+  ${a ? `<a class="fl-une" data-f="${a.id}" href="${esc(href(a))}"${ext(a)}>${a.image_path ? `<span class="fl-bg" style="background-image:url('${img(a)}')"></span>` : ''}
+      <div class="fl-c">${couv(a)}</div>
+      <div class="fl-t"><span class="fl-k">À la une</span><h2>${esc(a.titre)}${a.numero ? ' – n° ' + esc(a.numero) : ''}</h2>${a.texte ? `<p>${esc(a.texte)}</p>` : ''}<span class="btn">Lire le magazine</span></div></a>
+    ${autres.length ? `<h2 class="fl-h">Les autres numéros</h2><div class="fl-grid">${autres.map(f => `<a class="card fl-it" data-f="${f.id}" href="${esc(href(f))}"${ext(f)}><div class="fl-c">${couv(f)}</div><div class="fl-it-t"><b>${esc(f.titre)}</b><small>${mois(f.date_parution)}</small><span class="fl-lire">Lire ›</span></div></a>`).join('')}</div>` : ''}`
   : '<div class="card center pad" style="margin-top:12px">Le prochain numéro arrive bientôt.</div>'}`;
   app.querySelectorAll('[data-f]').forEach(x => x.addEventListener('click', () => track('clic_flip', x.dataset.f)));
 }
