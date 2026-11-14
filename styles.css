@@ -1602,3 +1602,15 @@ a>svg.ic:last-child,.badge>svg.ic{margin-right:.3em}
   .accueil-b .salut h1{font-size:44px}
   .tu-t b{font-size:26px}
 }
+
+/* v106 : barre du bas premium — Publier en carré sombre, repère fin, fond translucide */
+.tabbar{background:rgba(250,249,246,.8);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);border-top:1px solid rgba(26,26,26,.07);box-shadow:none}
+.tabbar a{color:#8E8981;font-weight:500}
+.tabbar a.on{color:var(--ink);font-weight:600}
+.tabbar a.on::before,.tab-ind{background:var(--ink)}
+.tab-pub{color:var(--ink)!important}
+.tab-pub .pub{width:30px;height:24px;border-radius:8px;background:var(--ink);color:var(--surface)}
+.tab-pub .pub svg{width:15px;height:15px;stroke-width:2.4}
+.tab-pub:active .pub{background:var(--ink-2)}
+.tab-pub>span:last-child{display:inline}
+@media (prefers-color-scheme:dark){.tabbar{background:rgba(23,24,27,.8);border-top-color:rgba(255,255,255,.07)}.tabbar a{color:#8E9098}}
