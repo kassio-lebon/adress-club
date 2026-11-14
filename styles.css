@@ -1559,3 +1559,17 @@ a>svg.ic:last-child,.badge>svg.ic{margin-right:.3em}
 .ico-share{border:0;padding:0}.ico-share svg{width:18px;height:18px;vertical-align:-4px}
 .rs-loc svg.ic{margin-right:.3em}
 .chip svg.ic{margin-right:.35em}
+
+/* v104 : accueil — les rubriques en tête, logo sans signature */
+.brand img{height:30px}
+.raccourcis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0 4px}
+.raccourcis a{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px 12px;border-radius:16px;background:var(--surface);border:1px solid var(--line);text-decoration:none;color:var(--ink);text-align:center;transition:transform .2s var(--e-out),border-color .2s}
+.raccourcis a:active{transform:scale(.96)}
+.raccourcis a:hover{border-color:var(--line-2)}
+.rc-i{position:relative;display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:var(--red-tint);color:var(--red)}
+.rc-i svg{width:22px;height:22px;stroke-width:1.7}
+.rc-i em{position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--red);color:#fff;font-style:normal;font-size:11px;font-weight:700;display:grid;place-items:center;border:2px solid var(--surface)}
+.raccourcis b{font-size:13px;font-weight:600;line-height:1.25}
+@media (min-width:760px){.raccourcis{grid-template-columns:repeat(6,1fr);gap:12px}.raccourcis b{font-size:13.5px}}
+@media (min-width:960px){.home>*{grid-column:1/-1}.raccourcis{margin:20px 0 8px}}
+@media (min-width:960px){.strip.defile{grid-auto-columns:calc((100% - 100px)/6)}}

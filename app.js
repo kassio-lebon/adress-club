@@ -166,7 +166,7 @@ function horsLigne() {
 // ---------- connexion / activation (§2) ----------
 function connexion() {
   app.innerHTML = `
-  <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>L'espace privé des résidents ADRESS IMMOBILIER</p></div>
+  <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png?v=2" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>L'espace privé des résidents ADRESS IMMOBILIER</p></div>
   <div class="chips" role="tablist"><a class="chip on" data-m="login">Se connecter</a><a class="chip" data-m="signup">J'ai un code d'invitation</a></div>
   <form id="f" class="card" novalidate>
     <div id="sign" hidden>
@@ -222,7 +222,7 @@ function connexion() {
 function activation() {
   const p = state.profil; let inv = {}; try { inv = JSON.parse(localStorage.getItem('acl-inv') || '{}'); } catch (_) {}
   app.innerHTML = `
-  <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>${p?.statut === 'desactive' ? 'Accès désactivé' : 'Activez votre accès'}</p></div>
+  <div class="login"><div class="login-brand"><img class="login-logo" src="logo.png?v=2" alt="ADRESS IMMOBILIER"><h1>ADRESS <span>CLUB</span></h1><p>${p?.statut === 'desactive' ? 'Accès désactivé' : 'Activez votre accès'}</p></div>
   ${p?.statut === 'desactive' ? `<div class="card" style="margin-bottom:12px">Votre accès a été désactivé (fin d'occupation ou décision ADRESS). Si ADRESS IMMOBILIER vous a remis un nouveau code, saisissez-le ci-dessous.</div>` : ''}${`
   <form id="f" class="card">
     <p class="muted">Saisissez le code d'invitation remis par ADRESS IMMOBILIER pour votre logement.</p>
@@ -261,6 +261,8 @@ const ICO = {
   menu: svg('M4 7h16M4 12h16M4 17h16'),
   play: svg('M8 5.5v13l10.5-6.5z'),
   ext: svg('M8 16 16 8M9 8h7v7'),
+  annonces: svg('M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01'),
+  bonsplans: svg('M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 7.5h.01'),
   partage: svg('M12 15V4M8 7.5l4-4 4 4M6 11v8.5h12V11'),
   horsligne: svg('M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16.2a5 5 0 0 1 6 0M12 20h.01M3 3l18 18')
 };
@@ -434,19 +436,20 @@ async function accueil() {
   const pics = []; const ajout = (r) => [r.photo_path, ...(r.photos || [])].forEach(p => { if (p && !/test/i.test(p) && !pics.includes(p)) pics.push(p); });
   (rr || []).filter(r => r.nom === res.nom).forEach(ajout); if (!pics.length && res.photo_path) pics.push(res.photo_path); (rr || []).forEach(ajout);
   const ph = pics[0];
-  const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
   app.innerHTML = '<div class="home">'
     + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz bgs">' + pics.slice(0, 12).map((p, i) => '<img alt="" referrerpolicy="no-referrer" ' + (i ? 'data-src' : 'class="on" src') + '="' + esc(publicUrl(p)) + '">').join('') + '</div>' : '')
     + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>' + salut() + ' ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
     + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
+    // tout l'essentiel visible dès l'arrivée : chacun va où il veut
+    + '<nav class="raccourcis" aria-label="Rubriques">'
+    + [['#/market', ICO.market, 'Le Market'], ['#/mes-annonces', ICO.annonces, 'Mes annonces', nl], ['#/bonnes-adresses', ICO.bonsplans, 'Bons plans'],
+       ['#/residences', ICO.residences, (rr || []).some(estVillas) ? 'Résidences et villas' : 'Nos résidences'], ['#/flip-immo', ICO.flip, 'Flip Immo'], ['#/nouveautes', ICO.news, 'Nouveautés']]
+      .map(([h, ic, t, n]) => '<a href="' + h + '"><span class="rc-i">' + ic + (n ? '<em>' + n + '</em>' : '') + '</span><b>' + t + '</b></a>').join('')
+    + '</nav>'
     + '<section><div class="sec-h"><h2>Le Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
-    + '</section>' + carteDecouverte() + carteInstall() + carteNotif() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
-    + lien('#/residences', ICO.residences, (rr || []).some(estVillas) ? 'Nos résidences et villas' : 'Nos résidences', 'Photos et contact')
-    + lien('#/flip-immo', ICO.flip, 'Le Flip Immo', 'Le magazine ADRESS')
-    + lien('#/nouveautes', ICO.news, 'Les nouveautés', 'Programmes et actualités')
-    + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Les bons plans</b><small>La sélection ADRESS pour vivre Abidjan</small></span>' + ICO.arrow + '</a>'
+    + '</section>' + carteDecouverte() + carteInstall() + carteNotif() + '<section>'
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
   brancherInstall(app); brancherNotif(app); brancherDecouverte(app);
