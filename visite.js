@@ -12,10 +12,10 @@ const cible = (sel) => { for (const s of sel.split(',')) { const el = [...docume
 const vibre = (ms) => { try { if (matchMedia('(pointer: coarse)').matches && navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
 
 export function lancerVisite({ fin } = {}) {
-  if (document.querySelector('.vg')) return;
+  if (document.querySelector('.visite')) return;
   const etapes = ETAPES.filter(e => cible(e.sel));
   if (!etapes.length) return;
-  const vg = document.createElement('div'); vg.className = 'vg'; vg.setAttribute('role', 'dialog'); vg.setAttribute('aria-modal', 'true'); vg.setAttribute('aria-labelledby', 'vgT');
+  const vg = document.createElement('div'); vg.className = 'visite'; vg.setAttribute('role', 'dialog'); vg.setAttribute('aria-modal', 'true'); vg.setAttribute('aria-labelledby', 'vgT');
   vg.innerHTML = `<div class="vg-trou"></div><div class="vg-bulle" aria-live="polite">
     <div class="vg-prog">${etapes.map(() => '<i></i>').join('')}</div>
     <div class="vg-txt"><h3 id="vgT"></h3><p></p></div>

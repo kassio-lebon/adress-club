@@ -1176,8 +1176,8 @@ body.dlg-on{overflow:hidden}
 @media (prefers-reduced-motion:reduce){.dc-ic svg{animation:none}}
 
 /* v91 : visite guidée — projecteur qui glisse d'un élément à l'autre */
-.vg{position:fixed;inset:0;z-index:300;opacity:0;transition:opacity .25s ease}
-.vg.in{opacity:1}.vg.out{opacity:0}
+.visite{position:fixed;inset:0;z-index:300;opacity:0;transition:opacity .25s ease}
+.visite.in{opacity:1}.visite.out{opacity:0}
 .vg-trou{position:fixed;border-radius:16px;box-shadow:0 0 0 200vmax rgba(17,18,20,.64);transition:left .45s cubic-bezier(.65,0,.35,1),top .45s cubic-bezier(.65,0,.35,1),width .45s cubic-bezier(.65,0,.35,1),height .45s cubic-bezier(.65,0,.35,1);pointer-events:none}
 .vg-trou::after{content:"";position:absolute;inset:-4px;border-radius:20px;border:2px solid rgba(255,255,255,.9);animation:vg-pulse 1.8s ease-out infinite}
 @keyframes vg-pulse{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.12)}}
@@ -1243,3 +1243,42 @@ body.vg-on{overflow:hidden}
   .mini:hover,.feature:hover,.menu a:hover{transform:translateY(-4px);box-shadow:0 18px 36px -18px rgba(22,23,26,.28)}
 }
 @media (prefers-reduced-motion:reduce){.page-in>*,.page-in .home>*,.page-in .grid2>*,.page-in .list>*,.page-in .strip>*,.page-in .menu>a{animation:none!important}.rv{transform:none}}
+
+/* v93 : téléphone — tout tient dans l'écran, rien ne se coupe, champs lisibles sans zoom */
+@media (max-width:760px){
+  /* iPhone zoome sur les champs écrits en moins de 16 px : on écrit en 16 px */
+  input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{font-size:16px}
+  input[type=checkbox],input[type=radio]{width:20px;height:20px;accent-color:var(--red);flex:none}
+}
+@media (max-width:600px){
+  /* filtres et onglets : une seule ligne qui défile au doigt, au lieu de deux lignes serrées */
+  .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:2px 16px;scroll-padding:0 16px;-webkit-overflow-scrolling:touch}
+  .chips::-webkit-scrollbar{display:none}
+  .chips>*{flex:none;white-space:nowrap}
+  /* Espace ADRESS : les 5 domaines défilent, avec un fondu qui montre qu'il y en a d'autres */
+  .adm-g{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
+  .adm-g.fin{-webkit-mask-image:none;mask-image:none}
+  /* boutons côte à côte trop longs : l'un sous l'autre, en pleine largeur */
+  .ann-btns .btn{flex:1 1 100%;white-space:normal}
+  /* bons plans : logo + texte sur toute la largeur, bouton dessous */
+  .bp{flex-wrap:wrap;align-items:flex-start}
+  .bp-logo{width:52px;height:52px}
+  .bp-txt{flex:1 1 calc(100% - 66px)}
+  .bp>.btn{flex:1 1 100%;margin-top:4px}
+  /* petites cibles : au moins 40 px sous le doigt */
+  .thumbs button{width:32px;height:32px;top:-9px;right:-9px;font-size:16px}
+  .dc-b .lnk{padding:10px 4px}
+  /* tableaux de l'Espace ADRESS : une fiche par ligne, chaque valeur avec son intitulé */
+  table.adm,table.adm tbody,table.adm tr,table.adm td{display:block;width:100%}
+  table.adm thead,table.adm tr:has(>th){display:none}
+  table.adm{border:0;background:none;border-radius:0;overflow:visible}
+  table.adm tr{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:6px 0}
+  table.adm tr[hidden]{display:none}
+  table.adm td{border:0;padding:6px 14px}
+  table.adm td[data-l]::before{content:attr(data-l);display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:2px}
+  table.adm td:empty{display:none}
+  table.adm input[type=date]{width:100%}
+  table.adm td .row[style]{flex-wrap:wrap!important;justify-content:flex-start!important}
+  .imp-t td,.imp-t th{white-space:normal}
+  .imp-cols{font-size:12.5px}
+}

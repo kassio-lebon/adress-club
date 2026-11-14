@@ -89,10 +89,25 @@ export async function renderAdmin(app, ong) {
   <div id="adm"></div>`;
   const box = app.querySelector('#adm');
   await ({ jour, plan, express, stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, villas, partenaires, avis, parametres }[ong] || stats)(box);
+  mobile(app);
   if (!['parametres', 'jour', 'plan', 'express'].includes(ong)) {
     box.querySelectorAll('table.adm:not(.no-q)').forEach(t => { if (t.querySelectorAll('tr').length > 3) barreRecherche(t.parentElement.matches('div[style*="overflow"]') ? t.parentElement : t, () => [...t.querySelectorAll('tr')].slice(1), 'Rechercher…'); });
     box.querySelectorAll('.list:not(.no-q)').forEach(l => { if (l.children.length > 3) barreRecherche(l, () => [...l.children], 'Rechercher…'); });
   }
+}
+// Téléphone : chaque cellule de tableau reçoit l'intitulé de sa colonne (affiché au-dessus quand le tableau devient une fiche),
+// et le domaine actif de la navigation est ramené au centre
+const etiqueter = (root) => root.querySelectorAll('table.adm').forEach(t => { const h = [...(t.querySelector('thead tr') || t.querySelector('tr:has(> th)') || { children: [] }).children].map(th => th.textContent.trim());
+    t.querySelectorAll('tr').forEach(tr => [...tr.children].forEach((td, i) => { if (td.tagName === 'TD' && h[i] && !td.hasAttribute('data-l')) td.setAttribute('data-l', h[i]); })); });
+let obsTab = null;
+function mobile(root) {
+  etiqueter(root);
+  // tableaux redessinés plus tard (filtres, import, ajout…) : étiquetés eux aussi
+  if (!obsTab) { let t = 0; obsTab = new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => etiqueter(document.getElementById('app')), 60); }); obsTab.observe(document.getElementById('app'), { childList: true, subtree: true }); }
+  const g = root.querySelector('.adm-g'), on = g?.querySelector('a.on');
+  if (g) { const fin = () => g.classList.toggle('fin', g.scrollLeft + g.clientWidth >= g.scrollWidth - 4); g.addEventListener('scroll', fin, { passive: true });
+    if (on && g.scrollWidth > g.clientWidth) g.scrollLeft = on.offsetLeft - (g.clientWidth - on.offsetWidth) / 2; fin(); }
+  const s = root.querySelector('.adm-s'), o2 = s?.querySelector('.on'); if (s && o2 && s.scrollWidth > s.clientWidth) s.scrollLeft = o2.offsetLeft - (s.clientWidth - o2.offsetWidth) / 2;
 }
 const rerender = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
 async function uploadPublic(file, dossier) {
