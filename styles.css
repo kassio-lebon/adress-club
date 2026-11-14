@@ -1647,3 +1647,21 @@ a>svg.ic:last-child,.badge>svg.ic{margin-right:.3em}
 .pub-lien{background:none;border:0;height:44px;font:inherit;font-size:14px;font-weight:500;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.emb .ring{-webkit-mask:none;mask:none;animation:none!important}.pub-txt,.sk-emb,.publiee{animation:none;opacity:1}}
 .publiee:focus{outline:none}
+
+/* ================= v108 : finitions ================= */
+/* Titres d'écran au même style éditorial que l'accueil */
+h1{font-family:Newsreader,Georgia,serif;font-weight:400;font-size:32px;letter-spacing:-.01em;line-height:1.08}
+@media (min-width:960px){h1{font-size:40px}}
+.login-brand h1{font-family:inherit;font-weight:700;font-size:22px;letter-spacing:.14em}
+.detail-info h1{font-size:30px}
+/* Ordinateur : « + Publier » en noir, comme la barre du bas */
+.top-nav .btn{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.top-nav .btn:hover{background:var(--ink-2);border-color:var(--ink-2)}
+/* Liens secondaires discrets (à la place de boutons rouges répétés) */
+.lien-fl{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:14px;font-weight:600;color:var(--ink);text-decoration:none;min-height:36px}
+.lien-fl svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;transition:transform .2s var(--e-out,ease)}
+.lien-fl:hover svg{transform:translateX(3px)}
+/* Tri sur téléphone : 16 px pour que l'iPhone ne zoome pas */
+.tri-m select{font-size:16px}
+/* Logo lisible en mode sombre */
+@media (prefers-color-scheme:dark){img[src^="logo.png"]{content:url(logo-dark.png?v=1)}}

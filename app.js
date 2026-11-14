@@ -16,6 +16,13 @@ const app = document.getElementById('app');
 
 // ---------- utilitaires ----------
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+// Titres saisis tout en majuscules : affichés en casse normale (le texte enregistré ne change pas)
+export const casse = (t) => { t = String(t ?? ''); const l = t.replace(/[^A-Za-zÀ-ÿ]/g, ''); return l.length > 3 && l === l.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t; };
+// Dates proches dites naturellement : « à l’instant », « il y a 2 h », « hier à 18:40 »
+export const quand = (d) => { if (!d) return ''; const t = new Date(d), m = (Date.now() - t) / 6e4, hm = t.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const jour = (x) => new Date(x).setHours(0, 0, 0, 0), j = Math.round((jour(Date.now()) - jour(t)) / 864e5);
+  if (m < 1) return 'À l’instant'; if (m < 60) return `Il y a ${Math.floor(m)} min`; if (j === 0) return `Il y a ${Math.floor(m / 60)} h`; if (j === 1) return `Hier à ${hm}`;
+  if (j < 7) return t.toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^./, c => c.toUpperCase()) + ` à ${hm}`; return dateFr(d); };
 export const fcfa = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
 export const dateFr = (d, h) => d ? new Date(d).toLocaleDateString('fr-FR', h ? { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' } : { day:'2-digit', month:'2-digit', year:'numeric' }) : '';
 export function toast(msg, ms = 3500) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => t.hidden = true, ms); }
@@ -384,7 +391,7 @@ function carteInstall() {
   const tel = estIOS() || /android|mobile/i.test(navigator.userAgent);
   let plusTard = 0; try { plusTard = +localStorage.getItem('acl-install-later') || 0; } catch (_) {}
   if (Date.now() - plusTard < 7 * 864e5) return '';
-  return `<div class="card install-card"><img src="icon-192.png" alt="" width="44" height="44"><div><b>Installez ADRESS CLUB${tel ? '' : ' sur votre téléphone'}</b><small>${tel ? 'Retrouvez l’application sur l’écran d’accueil de votre téléphone.' : 'Vous êtes sur un ordinateur : le bouton vous donne le lien à ouvrir sur votre téléphone.'}</small></div><div class="ic-act"><button class="btn sm" type="button" data-inst>Installer</button><button class="btn sm ghost" type="button" data-later>Plus tard</button></div></div>`;
+  return `<div class="card install-card"><img src="icon-192.png" alt="" width="44" height="44"><div><b>Installez ADRESS CLUB${tel ? '' : ' sur votre téléphone'}</b><small>${tel ? 'Retrouvez l’application sur l’écran d’accueil de votre téléphone.' : 'Le bouton vous donne le lien à ouvrir sur votre téléphone.'}</small></div><div class="ic-act"><button class="btn sm" type="button" data-inst>Installer</button><button class="btn sm ghost" type="button" data-later>Plus tard</button></div></div>`;
 }
 function brancherInstall(root) {
   root.querySelectorAll('[data-inst]').forEach(b => b.onclick = installer);
@@ -453,9 +460,9 @@ async function accueil() {
     + petit('#/nouveautes', 'Nouveautés', 'Programmes')
     + '</nav>'
     + '<section><div class="sec-h"><h2>Cette semaine au Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
-    + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
+    + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(casse(a.titre)) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
-    + '</section>' + carteDecouverte() + carteInstall() + carteNotif() + '<section>'
+    + '</section>' + (carteDecouverte() || carteInstall() || carteNotif()) + '<section>'
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
   brancherInstall(app); brancherNotif(app); brancherDecouverte(app);
@@ -544,9 +551,9 @@ async function market() {
   const liste = cat ? data.filter(a => a.categorie === cat) : data, rayons = !q && !cat && vue !== 'favoris' && parCat.length > 1;
   const carte = (a) => `
     <div class="card item${a.statut === 'reserve' ? ' is-res' : ''}">
-      <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urlDe.get(a.id))}')" role="img" aria-label="${esc(a.titre)}">${a.statut === 'reserve' ? '<span class="stamp">Réservé</span>' : ''}</div>
+      <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urlDe.get(a.id))}')" role="img" aria-label="${esc(casse(a.titre))}">${a.statut === 'reserve' ? '<span class="stamp">Réservé</span>' : ''}</div>
       ${a.est_a_moi ? '<span class="badge st">Votre annonce</span>' : a.type === 'don' ? '<span class="badge st">À donner</span>' : ''}
-      <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc([a.categorie, a.residence || (a.is_adress ? 'ADRESS IMMOBILIER' : '')].filter(Boolean).join(' · '))}</div></div></a>
+      <div class="bd"><div class="t">${esc(casse(a.titre))}</div><div class="p">${prix(a)}</div><div class="muted small">${esc([a.categorie, a.residence || (a.is_adress ? 'ADRESS IMMOBILIER' : '')].filter(Boolean).join(' · '))}</div></div></a>
       ${a.est_a_moi ? '' : `<button class="fav${favs.has(a.id) ? ' on' : ''}" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${ICO.coeur}</button>`}
     </div>`;
   app.innerHTML = `
@@ -591,14 +598,14 @@ async function annonce(id) {
   const dejaDemande = !!dem.data;
   app.innerHTML = `
   <a class="back" href="#/market">‹ Le Market</a>
-  <div class="detail"><div class="detail-media"><div class="gal" tabindex="0" aria-label="Photos de l’annonce">${urls.map(u => `<img src="${esc(u)}" alt="${esc(a.titre)}">`).join('')}</div>
+  <div class="detail"><div class="detail-media"><div class="gal" tabindex="0" aria-label="Photos de l’annonce">${urls.map(u => `<img src="${esc(u)}" alt="${esc(casse(a.titre))}">`).join('')}</div>
   ${urls.length > 1 ? `<p class="muted small">${urls.length} photos : utilisez les flèches ou faites glisser</p>` : ''}</div><div class="detail-info">
   <div class="tags">${a.statut === 'reserve' ? '<span class="badge warn">Réservé : nouvelles demandes suspendues</span>' : ''}${a.is_adress ? '<span class="badge">ADRESS IMMOBILIER</span>' : ''}</div>
-  <h1>${esc(a.titre)}</h1>
+  <h1>${esc(casse(a.titre))}</h1>
   <h2 style="margin-top:4px">${prix(a)}</h2>
   <div class="tags"><span class="tag">${esc(a.categorie)}</span><span class="tag">${esc(a.etat)}</span>${a.residence ? `<span class="tag">${esc(a.residence)}</span>` : ''}</div>
   ${a.description ? `<p style="white-space:pre-line">${esc(a.description)}</p>` : ''}
-  <p class="muted">Publié par ${esc(a.vendeur)} le ${dateFr(a.date_publication)}</p>
+  <p class="muted">${a.vendeur ? `Publié par ${esc(a.vendeur)} le` : 'Publié le'} ${dateFr(a.date_publication)}</p>
   ${a.est_a_moi ? `<div class="row"><a class="btn block" href="#/modifier/${a.id}">Modifier</a><a class="btn ghost block" href="#/mes-annonces">Gérer (réservé, vendu…)</a></div>`
     : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}> ${dejaDemande ? 'C’est zooo ! Demande envoyée ' + ic('check') : 'Ça m’intéresse, ça m’enjaille !'}</button><div id="zoo"></div>
       <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
@@ -792,12 +799,12 @@ async function mesAnnonces() {
   if (!['traiter', 'annonces', 'envoyees'].includes(onglet)) onglet = taches.length ? 'traiter' : 'annonces';
   const tabs = `<div class="seg" role="tablist">${[['traiter', 'À traiter'], ['annonces', 'Publiées'], ['envoyees', 'Mes demandes']].map(([k, l]) =>
     `<a role="tab" class="${onglet === k ? 'on' : ''}" href="#/mes-annonces?o=${k}">${l}${k === 'traiter' && taches.length ? `<b>${taches.length}</b>` : ''}</a>`).join('')}</div>`;
-  const vignette = (a, stamp) => `<${ouverte(a) ? `a href="#/annonce/${a.id}"` : 'div'} class="ph vg" role="img" aria-label="${esc(a.titre)}" style="background-image:url('${esc(photo.get(a.id))}')">${stamp ? '<span class="stamp">Réservé</span>' : ''}</${ouverte(a) ? 'a' : 'div'}>`;
+  const vignette = (a, stamp) => `<${ouverte(a) ? `a href="#/annonce/${a.id}"` : 'div'} class="ph vg" role="img" aria-label="${esc(casse(a.titre))}" style="background-image:url('${esc(photo.get(a.id))}')">${stamp ? '<span class="stamp">Réservé</span>' : ''}</${ouverte(a) ? 'a' : 'div'}>`;
 
   let corps = '';
   if (onglet === 'traiter') {
     corps = taches.map(x => {
-      const a = x.a, tete = (k) => `<div class="tk-top">${vignette(a, a.statut === 'reserve')}<div style="min-width:0"><div class="tk-k">${k}</div><b>${esc(a.titre)}</b></div></div>`;
+      const a = x.a, tete = (k) => `<div class="tk-top">${vignette(a, a.statut === 'reserve')}<div style="min-width:0"><div class="tk-k">${k}</div><b>${esc(casse(a.titre))}</b></div></div>`;
       if (x.k === 'contact') { const d = x.d; return `<div class="card tache" data-id="${a.id}">${tete(d.lue ? 'À contacter' : 'Nouvel intéressé')}
         <p class="tk-msg"><b>${esc(d.demandeur || 'Un résident')}</b> attend votre appel <span class="muted">· demande n° ${d.rang}, ${depuis(d.created_at)}</span></p>
         ${d.contact ? `<div class="row tk-act"><a class="btn" data-ct="${d.id}" target="_blank" rel="noopener" href="${wa(d, a)}">WhatsApp</a><a class="btn ghost" data-ct="${d.id}" href="tel:+${intl(d.contact)}">Appeler</a></div>`
@@ -821,7 +828,7 @@ async function mesAnnonces() {
         : ds.length ? `${ds.length} intéressé${ds.length > 1 ? 's' : ''}${att ? ` · <a class="tk-lien" href="#/mes-annonces?o=traiter">${att} à contacter</a>` : ''}` : 'Pas encore d’intéressé';
       return `<div class="card ann${res ? ' card-res' : ''}${ouverte(a) ? '' : ' fermee'}" data-id="${a.id}">
         <div style="display:flex;gap:12px;align-items:center">${vignette(a, res)}
-        <div style="min-width:0;flex:1"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(a.titre)}</a>` : esc(a.titre)}</b>
+        <div style="min-width:0;flex:1"><b>${ouverte(a) ? `<a href="#/annonce/${a.id}">${esc(casse(a.titre))}</a>` : esc(casse(a.titre))}</b>
           <div class="muted small"><span class="pill ${a.retiree_par_adress ? 'off' : a.statut}">${a.retiree_par_adress ? 'Retirée' : STATUTS[a.statut]}</span> · ${prix(a)}</div>
           <div class="small an-res">${resume}</div></div></div>
         ${gerable ? `<details class="gerer"><summary>Gérer</summary><div class="gerer-in">
@@ -949,7 +956,7 @@ async function nouveautes() {
   <div class="list" style="margin-top:12px">${(data || []).map(c => `<div class="card item">
     ${c.image_path ? `<div class="ph" style="aspect-ratio:16/9;background-image:url('${esc(publicUrl(c.image_path))}')"></div>` : ''}
     <div class="bd" style="padding:14px"><div class="muted small">${esc(c.type)} · ${dateFr(c.date_parution)}</div><h3>${esc(c.titre)}</h3>
-    ${c.texte ? `<p style="white-space:pre-line">${esc(c.texte)}</p>` : ''}${c.lien ? `<a class="btn sm" href="${esc(sur(c.lien))}" target="_blank" rel="noopener">En savoir plus</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune nouveauté pour le moment.</div>'}</div>`;
+    ${c.texte ? `<p style="white-space:pre-line">${esc(c.texte)}</p>` : ''}${c.lien ? `<a class="lien-fl" href="${esc(sur(c.lien))}" target="_blank" rel="noopener">En savoir plus ${ICO.arrow}</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune nouveauté pour le moment.</div>'}</div>`;
 }
 async function flip() {
   // Le numéro à la une en grand (fond flouté de sa couverture), les autres en étagère
@@ -977,11 +984,11 @@ async function bonnesAdresses() {
   const tous = data || [], flips = cat ? [] : tous.filter(p => estFlip(p.lien)), adresses = tous.filter(p => !estFlip(p.lien));
   const ligne = (p) => '<div class="card bp">'
     + '<div class="bp-logo"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '></div>'
-    + '<div class="bp-txt"><b>' + esc(p.nom) + '</b><div class="muted small">' + esc(p.categorie) + '</div>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>'
+    + '<div class="bp-txt"><b>' + esc(casse(p.nom)) + '</b><div class="muted small">' + esc(p.categorie) + '</div>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>'
     + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(sur(p.lien)) + '" target="_blank" rel="noopener">Découvrir</a>' : '') + '</div>';
   const flipCard = (p) => '<a class="flipcard" data-p="' + p.id + '" href="' + esc(lienFlip(p.lien, p.nom)) + '">'
-    + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><em>' + esc(p.nom) + '</em></span>'
-    + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(p.nom) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
+    + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><em>' + esc(casse(p.nom)) + '</em></span>'
+    + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(casse(p.nom)) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
   app.innerHTML = '<a class="back" href="#/">‹ Accueil</a><h1>Les bons plans</h1><p class="muted">La sélection ADRESS pour vivre Abidjan</p>'
     + '<div class="chips"><a class="chip ' + (!cat ? 'on' : '') + '" href="#/bonnes-adresses">Tout</a>' + FILTRES_BP.map(c => '<a class="chip ' + (cat === c ? 'on' : '') + '" href="#/bonnes-adresses?cat=' + encodeURIComponent(c) + '">' + c + '</a>').join('') + '</div>'
     + (flips.length ? '<section><h2>À feuilleter</h2><div class="list">' + flips.map(flipCard).join('') + '</div></section>' : '')
@@ -1005,7 +1012,7 @@ async function notifications() {
   const { data } = await sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Notifications</h1>
   <div class="list" style="margin-top:12px">${(data || []).map(n => `<a class="card notif ${n.lue ? '' : 'unread'}" style="display:block;text-decoration:none" href="${n.type === 'info' && n.annonce_id ? '#/mes-annonces?o=envoyees' : n.type === 'interet' || n.type === 'rappel_j53' || n.type === 'expiration' ? '#/mes-annonces' : n.type === 'nouveautes' ? '#/market' : '#/'}">
-    <b>${esc(n.titre)}</b>${n.message ? `<div class="muted small">${esc(n.message)}</div>` : ''}<div class="muted small">${dateFr(n.created_at, true)}</div></a>`).join('') || '<div class="card center pad">Aucune notification.</div>'}</div>
+    <b>${esc(n.titre)}</b>${n.message ? `<div class="muted small">${esc(n.message)}</div>` : ''}<div class="muted small">${quand(n.created_at)}</div></a>`).join('') || '<div class="card center pad">Aucune notification.</div>'}</div>
   <p class="muted small center" style="margin-top:12px">Réglez vos alertes dans <a href="#/profil">Mon compte</a>.</p>`;
   const nonLues = (data || []).filter(n => !n.lue).map(n => n.id);
   if (nonLues.length) await sb.from('notifications').update({ lue: true }).in('id', nonLues);
@@ -1051,7 +1058,7 @@ function profil() {
     const st = Notification.permission;
     pr.innerHTML = st === 'granted' ? '<span class="badge ok">' + ic('check') + 'Activées</span> <small class="muted">sur cet appareil</small><button class="btn sm ghost" type="button" id="pushTest">Envoyer un test</button>'
       : st === 'denied' ? '<small class="muted">Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.</small>'
-      : '<button class="btn sm" type="button" id="pushOn">Activer les notifications</button>';
+      : '<button class="btn sm ghost" type="button" id="pushOn">Activer les notifications</button>';
     const b = pr.querySelector('#pushOn'); if (b) b.onclick = async () => { b.disabled = true; const ok = await activerPush(true); toast(ok ? 'Notifications activées.' : 'Notifications non activées.'); majPush(); };
     const t = pr.querySelector('#pushTest'); if (t) t.onclick = async () => {
       t.disabled = true; t.textContent = 'Envoi…'; await activerPush(false);
@@ -1070,7 +1077,7 @@ function profil() {
   };
   const ir = $('#instRow'), tel = estIOS() || /android|mobile/i.test(navigator.userAgent);
   ir.innerHTML = estInstallee() ? '<span class="badge ok">' + ic('check') + 'Installée</span> <small class="muted">sur cet appareil</small>'
-    : `<small class="muted">${tel ? 'Pas encore sur l’écran d’accueil de ce téléphone.' : 'Vous êtes sur un ordinateur : installez-la sur votre téléphone.'}</small><button class="btn sm" type="button" id="install">${ic('tel')}Installer${tel ? '' : ' sur mon téléphone'}</button>`;
+    : `<small class="muted">${tel ? 'Pas encore sur l’écran d’accueil de ce téléphone.' : 'Vous êtes sur un ordinateur : installez-la sur votre téléphone.'}</small><button class="btn sm ghost" type="button" id="install">${ic('tel')}Installer${tel ? '' : ' sur mon téléphone'}</button>`;
   const ib2 = $('#install'); if (ib2) ib2.onclick = installer;
 }
 
