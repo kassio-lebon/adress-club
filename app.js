@@ -424,36 +424,41 @@ function brancherDecouverte(root) {
   root.querySelectorAll('[data-tard]').forEach(b => b.onclick = () => { try { localStorage.setItem('acl-visite', 'tard:' + Date.now()); } catch (_) {} const c = b.closest('.decouvre'); c.classList.add('out'); setTimeout(() => c.remove(), 280); });
 }
 async function accueil() {
-  // compteurs, dernières annonces et résidences chargés en même temps
-  const [, { data: recents }, { data: rr }] = await Promise.all([
+  // compteurs, dernières annonces, résidences et dernier Flip Immo chargés en même temps
+  const [, { data: recents }, { data: rr }, { count: nbAnn }, { data: fl }] = await Promise.all([
     majCompteurs(),
     sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8),
-    sb.from('residences').select('nom,photo_path,photos,type_bien').eq('visible', true).order('ordre')]);
+    sb.from('residences').select('nom,photo_path,photos,type_bien').eq('visible', true).order('ordre'),
+    sb.from('v_market').select('id', { count: 'exact', head: true }),
+    sb.from('contenus').select('image_path,numero').eq('visible', true).eq('type', 'Flip Immo').order('date_parution', { ascending: false }).limit(1)]);
   const nl = state.compteurs.demandes_non_lues || 0;
   const urls = await photosUrls((recents || []).map(a => a.photos[0]), true);
   const res = state.profil.residence || {};
-  // photos d'arrière-plan : d'abord la résidence du locataire, puis les autres résidences ADRESS
+  // photos des résidences : d'abord celle du locataire, puis les autres résidences ADRESS
   const pics = []; const ajout = (r) => [r.photo_path, ...(r.photos || [])].forEach(p => { if (p && !/test/i.test(p) && !pics.includes(p)) pics.push(p); });
   (rr || []).filter(r => r.nom === res.nom).forEach(ajout); if (!pics.length && res.photo_path) pics.push(res.photo_path); (rr || []).forEach(ajout);
-  const ph = pics[0];
-  app.innerHTML = '<div class="home">'
-    + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz bgs">' + pics.slice(0, 12).map((p, i) => '<img alt="" referrerpolicy="no-referrer" ' + (i ? 'data-src' : 'class="on" src') + '="' + esc(publicUrl(p)) + '">').join('') + '</div>' : '')
-    + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>' + salut() + ' ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
-    + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
-    // tout l'essentiel visible dès l'arrivée : chacun va où il veut
-    + '<nav class="raccourcis" aria-label="Rubriques">'
-    + [['#/market', ICO.market, 'Le Market'], ['#/mes-annonces', ICO.annonces, 'Mes annonces', nl], ['#/bonnes-adresses', ICO.bonsplans, 'Bons plans'],
-       ['#/residences', ICO.residences, (rr || []).some(estVillas) ? 'Résidences et villas' : 'Nos résidences'], ['#/flip-immo', ICO.flip, 'Flip Immo'], ['#/nouveautes', ICO.news, 'Nouveautés']]
-      .map(([h, ic, t, n]) => '<a href="' + h + '"><span class="rc-i">' + ic + (n ? '<em>' + n + '</em>' : '') + '</span><b>' + t + '</b></a>').join('')
+  const pl = (n, m) => n + ' ' + m + (n > 1 ? 's' : '');
+  const f = (fl || [])[0], villas = (rr || []).some(estVillas);
+  const tuile = (cls, h, img, titre, sous) => '<a class="tuile ' + cls + '" href="' + h + '">' + (img ? '<img src="' + esc(img) + '" alt="" referrerpolicy="no-referrer" decoding="async">' : '') + '<span class="tu-t"><b>' + titre + '</b><small>' + sous + '</small></span></a>';
+  const petit = (h, titre, sous, chaud) => '<a class="petit' + (chaud ? ' chaud' : '') + '" href="' + h + '"><b>' + titre + '</b><small>' + sous + '</small></a>';
+  app.innerHTML = '<div class="home accueil-b">'
+    + '<div class="salut"><h1>' + salut() + ', ' + esc(state.profil.nom_affichage || '') + '.</h1>' + (res.nom ? '<span>' + esc(res.nom) + '</span>' : '') + '</div>'
+    + '<nav class="mosaique" aria-label="Rubriques">'
+    + tuile('tu-market', '#/market', urls[0] || publicUrl(pics[1] || pics[0]), 'Le Market', nbAnn ? pl(nbAnn, 'annonce') + ' entre voisins' : 'Vendez, donnez entre voisins')
+    + tuile('tu-res', '#/residences', publicUrl(pics[0]), villas ? 'Résidences' : 'Nos résidences', villas ? 'Résidences et villas' : 'Photos et contacts')
+    + tuile('tu-flip', '#/flip-immo', f && f.image_path ? publicUrl(f.image_path) : publicUrl(pics[2] || pics[0]), 'Flip Immo', 'Le magazine' + (f && f.numero ? ' · N° ' + esc(f.numero) : ''))
+    + '</nav><nav class="petits" aria-label="Accès rapides">'
+    + petit('#/mes-annonces', 'Mes annonces', nl ? pl(nl, 'demande') : 'Vos objets', nl)
+    + petit('#/bonnes-adresses', 'Bons plans', 'Abidjan')
+    + petit('#/nouveautes', 'Nouveautés', 'Programmes')
     + '</nav>'
-    + '<section><div class="sec-h"><h2>Le Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
+    + '<section><div class="sec-h"><h2>Cette semaine au Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
     + '</section>' + carteDecouverte() + carteInstall() + carteNotif() + '<section>'
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
   brancherInstall(app); brancherNotif(app); brancherDecouverte(app);
-  fondDefilant(app.querySelector('.hero .bgs'));
   defiler(app.querySelector('.strip.defile'), app.querySelectorAll('[data-sn]'));
 }
 // Accueil selon l'heure : « Bonjour » le jour, « Bonsoir » à partir de 18 h
