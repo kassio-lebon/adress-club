@@ -480,7 +480,7 @@ async function supprimerLogement(x) {
 
 // ---------- Saisie guidée Bloc / Étage / Appartement : même nomenclature que l'import (RDJ, RDC, 1ER, 2E…, PENTHOUSE) ----------
 // Villas : pas de bloc ni d'étage, le logement est repéré par son nom technique (A1, V3…) ; type_logement = 'Villa'
-const estVilla = (x) => x?.type_logement === 'Villa';
+const estVilla = (x) => /^villa/i.test(x?.type_logement || '');
 const ancienCode = (x) => !!x && !x.bloc && !estVilla(x);
 const ETAGES_STD = ['RDJ', 'RDC', '1ER', ...Array.from({ length: 14 }, (_, i) => (i + 2) + 'E'), 'PENTHOUSE'];
 const normEtage = (e) => { const s = norm(e).toUpperCase().replace(/\s+/g, ' '); if (!s) return ''; if (/^PENT/.test(s)) return 'PENTHOUSE'; if (/^(RDJ|RDC)/.test(s)) return s.slice(0, 3); const m = s.match(/^\d+/); return m ? (+m[0] === 1 ? '1ER' : +m[0] + 'E') : s; };
@@ -545,7 +545,8 @@ async function annuaire(box) {
     if (occupant.has(x.id) && x.locataire && occupant.get(x.id) && !memeNom(occupant.get(x.id), x.locataire)) p.push({ t: `Compte actif au nom de « ${occupant.get(x.id)} » : nouveau locataire ? Retirez l’ancien compte dans Comptes` });
     return p;
   };
-  let rid = annuaire._rid && R.some(r => r.id === annuaire._rid) ? annuaire._rid : (R.find(r => L.some(l => l.residence_id === r.id && l.bloc)) || R[0])?.id;
+  const choisie = annuaire._sel && R.find(r => norm(r.nom) === norm(annuaire._sel)); annuaire._sel = '';
+  let rid = choisie ? choisie.id : annuaire._rid && R.some(r => r.id === annuaire._rid) ? annuaire._rid : (R.find(r => L.some(l => l.residence_id === r.id && l.bloc)) || R[0])?.id;
   let filtre = annuaire._f || 'tous', q = '';
   const statut = (x) => {
     const e = etat(x), i = codes.get(x.id);
@@ -693,9 +694,10 @@ async function annuaire(box) {
                 <p>Une sauvegarde de la liste actuelle sera téléchargée juste avant l’import.</p>` });
             if (!okk) return;
           }
-          bt.disabled = true; const bilan = [];
-          try { if (sauvegarder(X, feuilles)) toast('Sauvegarde téléchargée.');
-            for (const f of feuilles) { const r = check(await sb.rpc('admin_importer_annuaire', { p_residence: f.nom, p_lignes: f.lignes, p_desactiver_absents: true }));
+          bt.disabled = true; bt.textContent = 'Import en cours…'; const bilan = [], echecs = [];
+          try { if (sauvegarder(X, feuilles)) toast('Sauvegarde téléchargée.'); } catch (_) {}
+          // Chaque résidence / ensemble est importé à part : une erreur sur l'un n'empêche pas les autres
+          for (const f of feuilles) { try { const r = check(await sb.rpc('admin_importer_annuaire', { p_residence: f.nom, p_lignes: f.lignes, p_desactiver_absents: true }));
               if (f.absents.length) { const ids = f.absents.map(x => x.id), avecCompte = f.absents.filter(x => occupant.has(x.id)).map(x => x.id);
                 check(await sb.from('invitations').delete().in('logement_id', ids).is('utilisee_par', null));
                 if (avecCompte.length) { check(await sb.from('profiles').update({ statut: 'desactive' }).in('logement_id', avecCompte).eq('statut', 'actif'));
@@ -706,12 +708,17 @@ async function annuaire(box) {
                 const { data: rr } = await sb.from('residences').select('id,type_bien').ilike('nom', f.nom).limit(1);
                 if (rr?.[0]) { check(await sb.from('logements').update({ type_logement: 'Villa' }).eq('residence_id', rr[0].id).in('appartement', f.lignes.map(x => x.appartement)));
                   if (!rr[0].type_bien) check(await sb.from('residences').update({ type_bien: 'Villas en résidence' }).eq('id', rr[0].id)); } }
-              bilan.push(`${f.nom} : ${r.crees} ajouté(s), ${r.mis_a_jour} mis à jour${f.absents.length ? `, ${f.absents.length} retiré(s)` : ''}`); } toast('Annuaire importé.'); annuaire._msg = bilan.join(' — '); await annuaire(box); }
-          catch (ex) { bt.disabled = false; toast(errMsg(ex)); }
+              bilan.push(`${f.nom} : ${r.crees} ajouté(s), ${r.mis_a_jour} mis à jour${f.absents.length ? `, ${f.absents.length} retiré(s)` : ''}`); }
+            catch (ex) { echecs.push(`${f.nom} : ${errMsg(ex)}`); } }
+          toast(echecs.length ? `Import terminé avec ${echecs.length} erreur(s).` : 'Annuaire importé.');
+          annuaire._msg = bilan.join(' — '); annuaire._err = echecs.join(' — ');
+          // la liste est rechargée tout de suite, sans avoir à rafraîchir la page (la résidence importée reste sélectionnée)
+          if (feuilles[0]) { const r0 = feuilles.find(f => !echecs.some(e => e.startsWith(f.nom + ' :'))) || feuilles[0]; annuaire._sel = r0.nom; }
+          await annuaire(box);
         };
       } catch (ex) { imp.innerHTML = `<p class="err">${esc(errMsg(ex))}</p>`; }
     };
-    if (annuaire._msg) { $('#imp').innerHTML = `<p class="inv-ok" style="text-align:left">${esc(annuaire._msg)}</p>`; annuaire._msg = ''; }
+    if (annuaire._msg || annuaire._err) { $('#imp').innerHTML = (annuaire._msg ? `<p class="inv-ok" style="text-align:left">${esc(annuaire._msg)}</p>` : '') + (annuaire._err ? `<p class="err" style="text-align:left">Non importé — ${esc(annuaire._err)}</p>` : ''); annuaire._msg = annuaire._err = ''; }
   };
   dessiner();
 }
