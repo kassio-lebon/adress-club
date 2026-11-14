@@ -413,7 +413,7 @@ async function accueil() {
   // compteurs, dernières annonces et résidences chargés en même temps
   const [, { data: recents }, { data: rr }] = await Promise.all([
     majCompteurs(),
-    sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut,date_publication').order('date_publication', { ascending: false }).limit(8),
+    sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8),
     sb.from('residences').select('nom,photo_path,photos,type_bien').eq('visible', true).order('ordre')]);
   const nl = state.compteurs.demandes_non_lues || 0;
   const urls = await photosUrls((recents || []).map(a => a.photos[0]), true);
@@ -425,8 +425,7 @@ async function accueil() {
   const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
   app.innerHTML = '<div class="home">'
     + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz bgs">' + pics.slice(0, 12).map((p, i) => '<img alt="" referrerpolicy="no-referrer" ' + (i ? 'data-src' : 'class="on" src') + '="' + esc(publicUrl(p)) + '">').join('') + '</div>' : '')
-    + (pics.length > 1 ? '<div class="hero-dots" aria-hidden="true">' + pics.slice(0, 12).map((_, i) => '<i' + (i ? '' : ' class="on"') + '></i>').join('') + '</div>' : '')
-    + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + ' · ' + new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + '</p><h1>' + salut() + ' ' + esc(state.profil.nom_affichage || '') + '</h1><p class="hero-mot">' + esc(motDuJour(recents || [], res.nom)) + '</p></section>'
+    + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>' + salut() + ' ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
     + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
     + '<section><div class="sec-h"><h2>Le Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
@@ -439,19 +438,11 @@ async function accueil() {
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
   brancherInstall(app); brancherNotif(app); brancherDecouverte(app);
-  fondDefilant(app.querySelector('.hero .bgs'), app.querySelector('.hero-dots'));
+  fondDefilant(app.querySelector('.hero .bgs'));
   defiler(app.querySelector('.strip.defile'), app.querySelectorAll('[data-sn]'));
 }
-// Accueil selon l'heure : « Bonjour » le jour, « Bonsoir » à partir de 18 h ; une phrase courte qui change chaque jour
+// Accueil selon l'heure : « Bonjour » le jour, « Bonsoir » à partir de 18 h
 const salut = () => { const h = new Date().getHours(); return h >= 18 || h < 4 ? 'Bonsoir' : 'Bonjour'; };
-function motDuJour(recents, res) {
-  const auj = new Date().toDateString(), n = recents.filter(a => a.date_publication && new Date(a.date_publication).toDateString() === auj).length;
-  if (n) return n > 1 ? `${n} nouvelles annonces aujourd’hui sur le Market.` : 'Une nouvelle annonce aujourd’hui sur le Market.';
-  const h = new Date().getHours();
-  const MOTS = h >= 18 || h < 4 ? ['Belle soirée chez vous.', 'Bonne soirée à ' + (res || 'la résidence') + '.', 'Un dernier tour sur le Market avant de dormir ?']
-    : ['Belle journée à ' + (res || 'la résidence') + '.', 'Un objet qui dort chez vous ? Donnez-lui une seconde vie sur le Market.', 'Vos voisins ont peut-être ce qu’il vous faut : faites un tour sur le Market.', 'Les bons plans ADRESS vous attendent.', 'Un meuble en trop ? Publiez-le en une minute.'];
-  return MOTS[Math.floor(Date.now() / 864e5) % MOTS.length];
-}
 // Bande « Le Market » de l'accueil : défilement continu, fluide et doux (boucle sans fin) ;
 // il ralentit puis s'arrête dès qu'on la touche ou la survole, et repart en douceur
 function defiler(strip, fleches) {
@@ -488,8 +479,8 @@ function defiler(strip, fleches) {
   requestAnimationFrame(image);
 }
 // Arrière-plan de l'accueil : photos des résidences en fondu très lent (une photo n'apparaît qu'une fois prête)
-function fondDefilant(box, points) {
-  const imgs = box ? [...box.querySelectorAll('img')] : [], pts = points ? [...points.children] : [];
+function fondDefilant(box) {
+  const imgs = box ? [...box.querySelectorAll('img')] : [];
   if (imgs.length < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const charger = (im) => { if (!im.getAttribute('src')) im.src = im.dataset.src; return im.decode ? im.decode() : Promise.resolve(); };
   let k = 0; charger(imgs[1]).catch(() => {});
@@ -497,11 +488,10 @@ function fondDefilant(box, points) {
     if (!box.isConnected) return clearInterval(t);
     if (document.hidden) return;
     const n = (k + 1) % imgs.length, im = imgs[n];
-    try { await charger(im); } catch (_) { imgs.splice(n, 1); pts.splice(n, 1)[0]?.remove(); if (imgs.length < 2) clearInterval(t); return; }
+    try { await charger(im); } catch (_) { imgs.splice(n, 1); if (imgs.length < 2) clearInterval(t); return; }
     if (!box.isConnected) return;
     imgs[k].classList.replace('on', 'off');
     im.classList.remove('off'); void im.offsetWidth; im.classList.add('on'); k = n;
-    pts.forEach((d, i) => d.classList.toggle('on', i === k));
     charger(imgs[(k + 1) % imgs.length]).catch(() => {});
   }, 6000);
 }
