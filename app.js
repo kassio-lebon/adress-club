@@ -17,7 +17,11 @@ const app = document.getElementById('app');
 // ---------- utilitaires ----------
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 // Titres saisis tout en majuscules : affichés en casse normale (le texte enregistré ne change pas)
-export const casse = (t) => { t = String(t ?? ''); const l = t.replace(/[^A-Za-zÀ-ÿ]/g, ''); return l.length > 3 && l === l.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t; };
+export const casse = (t) => { t = String(t ?? ''); const l = t.replace(/[^A-Za-zÀ-ÿ]/g, ''); if (l.length <= 3 || l !== l.toUpperCase()) return t;
+  // sigles (TV, LG, PS5, 300L) gardés en capitales, marques écrites comme la marque, le reste en minuscules
+  const SIGLES = /^(TV|LG|HP|PC|USB|LED|DVD|CD|GPS|XL|XXL|XS|BMW|JBL|MSI|IKEA|HDMI|WIFI|PVC|RAM|SSD|LCD|OLED|TNT|ADRESS|IMMOBILIER)$/, MARQUES = { SAMSUNG: 'Samsung', SONY: 'Sony', APPLE: 'Apple', IPHONE: 'iPhone', IPAD: 'iPad', MACBOOK: 'MacBook', XIAOMI: 'Xiaomi', TECNO: 'Tecno', INFINIX: 'Infinix', ITEL: 'Itel', OPPO: 'Oppo', HUAWEI: 'Huawei', LENOVO: 'Lenovo', DELL: 'Dell', ASUS: 'Asus', ACER: 'Acer', CANON: 'Canon', NIKON: 'Nikon', PHILIPS: 'Philips', BOSCH: 'Bosch', BOSE: 'Bose', NIKE: 'Nike', ADIDAS: 'Adidas', DYSON: 'Dyson', SMEG: 'Smeg', MOULINEX: 'Moulinex', TEFAL: 'Tefal', ROWENTA: 'Rowenta', HISENSE: 'Hisense', NASCO: 'Nasco', ROLEX: 'Rolex', CLUB: 'Club', PRO: 'Pro', MAX: 'Max', PLUS: 'Plus', MINI: 'Mini' };
+  const r = t.replace(/[A-Za-zÀ-ÿ0-9]+/g, (w) => /\d/.test(w) || SIGLES.test(w) ? w : MARQUES[w] || w.toLowerCase());
+  return /^i[A-Z]/.test(r) ? r : r.replace(/[A-Za-zÀ-ÿ]/, c => c.toUpperCase()); };
 // Dates proches dites naturellement : « à l’instant », « il y a 2 h », « hier à 18:40 »
 export const quand = (d) => { if (!d) return ''; const t = new Date(d), m = (Date.now() - t) / 6e4, hm = t.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const jour = (x) => new Date(x).setHours(0, 0, 0, 0), j = Math.round((jour(Date.now()) - jour(t)) / 864e5);
