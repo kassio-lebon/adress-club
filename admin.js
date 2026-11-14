@@ -1218,7 +1218,7 @@ async function jour(box) {
   const jourTxt = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   box.innerHTML = `
   <div class="j-head"><div><span class="j-date">${esc(jourTxt)}</span>
-    <h2 class="j-titre">${prenom ? `Bonjour ${esc(prenom)}, ` : ''}${cartes.length ? `${plur(cartes.length, 'chose')} à faire aujourd’hui` : 'tout est à jour'}</h2></div>
+    <h2 class="j-titre">${prenom ? `${(new Date().getHours() >= 18 || new Date().getHours() < 4) ? 'Bonsoir' : 'Bonjour'} ${esc(prenom)}, ` : ''}${cartes.length ? `${plur(cartes.length, 'chose')} à faire aujourd’hui` : 'tout est à jour'}</h2></div>
     <div class="j-q"><label class="j-qbox" for="jq"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="jq" type="search" placeholder="Locataire, logement, e-mail, code…" aria-label="Rechercher un locataire, un logement, un code" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="jqr"><kbd>Ctrl K</kbd></label><div class="j-qr" id="jqr" role="listbox" hidden></div></div></div>
   ${cartes.length ? `<section class="j-cartes" aria-label="Actions du jour">${cartes.map(c => `<article class="j-c">
     <div class="j-c1"><span class="j-tag${c.rouge ? ' r' : ''}">${c.tag}</span><span class="muted small">${c.when}</span></div>

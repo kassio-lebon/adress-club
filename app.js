@@ -413,7 +413,7 @@ async function accueil() {
   // compteurs, dernières annonces et résidences chargés en même temps
   const [, { data: recents }, { data: rr }] = await Promise.all([
     majCompteurs(),
-    sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8),
+    sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut,date_publication').order('date_publication', { ascending: false }).limit(8),
     sb.from('residences').select('nom,photo_path,photos,type_bien').eq('visible', true).order('ordre')]);
   const nl = state.compteurs.demandes_non_lues || 0;
   const urls = await photosUrls((recents || []).map(a => a.photos[0]), true);
@@ -426,7 +426,7 @@ async function accueil() {
   app.innerHTML = '<div class="home">'
     + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz bgs">' + pics.slice(0, 12).map((p, i) => '<img alt="" referrerpolicy="no-referrer" ' + (i ? 'data-src' : 'class="on" src') + '="' + esc(publicUrl(p)) + '">').join('') + '</div>' : '')
     + (pics.length > 1 ? '<div class="hero-dots" aria-hidden="true">' + pics.slice(0, 12).map((_, i) => '<i' + (i ? '' : ' class="on"') + '></i>').join('') + '</div>' : '')
-    + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>Bonjour ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
+    + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + ' · ' + new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + '</p><h1>' + salut() + ' ' + esc(state.profil.nom_affichage || '') + '</h1><p class="hero-mot">' + esc(motDuJour(recents || [], res.nom)) + '</p></section>'
     + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
     + '<section><div class="sec-h"><h2>Le Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
@@ -441,6 +441,16 @@ async function accueil() {
   brancherInstall(app); brancherNotif(app); brancherDecouverte(app);
   fondDefilant(app.querySelector('.hero .bgs'), app.querySelector('.hero-dots'));
   defiler(app.querySelector('.strip.defile'), app.querySelectorAll('[data-sn]'));
+}
+// Accueil selon l'heure : « Bonjour » le jour, « Bonsoir » à partir de 18 h ; une phrase courte qui change chaque jour
+const salut = () => { const h = new Date().getHours(); return h >= 18 || h < 4 ? 'Bonsoir' : 'Bonjour'; };
+function motDuJour(recents, res) {
+  const auj = new Date().toDateString(), n = recents.filter(a => a.date_publication && new Date(a.date_publication).toDateString() === auj).length;
+  if (n) return n > 1 ? `${n} nouvelles annonces aujourd’hui sur le Market.` : 'Une nouvelle annonce aujourd’hui sur le Market.';
+  const h = new Date().getHours();
+  const MOTS = h >= 18 || h < 4 ? ['Belle soirée chez vous.', 'Bonne soirée à ' + (res || 'la résidence') + '.', 'Un dernier tour sur le Market avant de dormir ?']
+    : ['Belle journée à ' + (res || 'la résidence') + '.', 'Un objet qui dort chez vous ? Donnez-lui une seconde vie sur le Market.', 'Vos voisins ont peut-être ce qu’il vous faut : faites un tour sur le Market.', 'Les bons plans ADRESS vous attendent.', 'Un meuble en trop ? Publiez-le en une minute.'];
+  return MOTS[Math.floor(Date.now() / 864e5) % MOTS.length];
 }
 // Bande « Le Market » de l'accueil : défilement continu, fluide et doux (boucle sans fin) ;
 // il ralentit puis s'arrête dès qu'on la touche ou la survole, et repart en douceur
@@ -560,6 +570,26 @@ async function market() {
   });
 }
 
+// Partager une annonce : partage du téléphone (WhatsApp, SMS…) avec la photo si possible, sinon WhatsApp ou lien copié
+async function partager(a, photo) {
+  const url = location.origin + location.pathname + '#/annonce/' + a.id;
+  const txt = `${a.titre} · ${a.type === 'don' ? 'à donner' : fcfa(a.prix_fcfa)} sur le Market ADRESS CLUB`;
+  if (navigator.share) {
+    let files;
+    try { const r = await fetch(photo); const b = await r.blob(); const f = new File([b], 'annonce.jpg', { type: b.type || 'image/jpeg' }); if (navigator.canShare?.({ files: [f] })) files = [f]; } catch (_) {}
+    try { await navigator.share(files ? { title: a.titre, text: txt + '\n' + url, files } : { title: a.titre, text: txt, url }); track('partage_annonce', a.id); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const d = document.createElement('div'); d.className = 'sheet-bg';
+  d.innerHTML = `<div class="sheet" role="dialog" aria-label="Partager l'annonce"><h3>Partager cette annonce</h3><p class="muted small">${esc(a.titre)}</p>
+    <a class="btn block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt + '\n' + url)}">Envoyer par WhatsApp</a>
+    <button class="btn ghost block" type="button" id="cpy" style="margin-top:8px">Copier le lien</button>
+    <button class="btn soft block" type="button" id="fer" style="margin-top:8px">Fermer</button></div>`;
+  document.body.appendChild(d);
+  const fermer = () => d.remove(); d.onclick = (e) => { if (e.target === d) fermer(); }; d.querySelector('#fer').onclick = fermer;
+  d.querySelector('[href^="https://wa.me"]').onclick = () => { track('partage_annonce', a.id); setTimeout(fermer, 300); };
+  d.querySelector('#cpy').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('Lien copié.'); } catch (_) { toast(url); } fermer(); };
+}
 async function annonce(id) {
   const { data: a } = await sb.from('v_market').select('*').eq('id', id).maybeSingle();
   if (!a) {
@@ -583,7 +613,9 @@ async function annonce(id) {
     : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'C’est zooo ! Demande envoyée ✓' : 'Ça m’intéresse, ça m’enjaille !'}</button><div id="zoo"></div>
       <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
     : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
+  <button type="button" class="btn ghost block partage" id="share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>Partager cette annonce</button>
   ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}</div></div>`;
+  app.querySelector('#share').onclick = () => partager(a, urls[0]);
   const b = app.querySelector('#int');
   // Le vendeur doit pouvoir joindre l'intéressé : sans numéro partagé, on le demande avant d'envoyer
   const contactOk = () => state.profil.consentement_contact && (state.profil.telephone || '').replace(/[^0-9]/g, '').length >= 8;
@@ -1074,6 +1106,17 @@ function avis() {
     toast('Merci pour votre avis.'); fete(); location.hash = an ? '#/mes-annonces' : '#/';
   };
 }
+
+// ---------- connexion : bandeau discret quand le réseau coupe ----------
+(() => {
+  const b = document.createElement('div'); b.className = 'reseau'; b.setAttribute('role', 'status'); b.hidden = true; document.body.appendChild(b);
+  let t = 0;
+  const maj = (en) => { clearTimeout(t);
+    if (!en) { b.textContent = 'Pas de connexion'; b.className = 'reseau off'; b.hidden = false; }
+    else if (!b.hidden) { b.textContent = 'Connexion rétablie'; b.className = 'reseau on'; t = setTimeout(() => { b.hidden = true; }, 2200); } };
+  addEventListener('offline', () => maj(false)); addEventListener('online', () => maj(true));
+  if (!navigator.onLine) maj(false);
+})();
 
 // ---------- démarrage ----------
 window.addEventListener('appinstalled', () => { window._installPrompt = null; document.querySelectorAll('.install-card').forEach(x => x.remove()); });
