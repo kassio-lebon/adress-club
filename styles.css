@@ -1665,3 +1665,30 @@ h1{font-family:Newsreader,Georgia,serif;font-weight:400;font-size:32px;letter-sp
 .tri-m select{font-size:16px}
 /* Logo lisible en mode sombre */
 @media (prefers-color-scheme:dark){img[src^="logo.png"]{content:url(logo-dark.png?v=1)}}
+
+/* ================= v109 : icônes ================= */
+/* Un seul jeu d'icônes, dessiné par des typographes (Phosphor, graisse Light), utilisé avec parcimonie */
+svg.pi{fill:currentColor!important;stroke:none!important;flex:none}
+svg.pi path{stroke:currentColor;stroke-width:0;stroke-linejoin:round}
+/* petites tailles : trait légèrement renforcé pour rester net */
+svg.pi.ic path,.fav svg.pi path,.chip svg.pi path,.sn-b svg.pi path,.btn svg.pi path,.lien-fl svg.pi path{stroke-width:5}
+.tabbar svg.pi,.icon-btn svg.pi{width:24px;height:24px}
+.tab-pub .pub svg.pi{width:16px;height:16px}
+.tab-pub .pub svg.pi path{stroke-width:10}
+/* cœur des favoris : contour, puis plein quand il est choisi */
+.coeur .h-f{opacity:0;transition:opacity .2s}
+.on>.coeur .h-f,.on .coeur .h-f{opacity:1}
+.fav.on,.chip.on .coeur{color:var(--red)}
+.empty-fav .ef-heart{color:var(--red)}
+.empty-fav .ef-heart .h-f{opacity:0}
+/* loupe des champs de recherche */
+input[type=search],.combo input[type=text]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='%2374777F'%3E%3Cpath d='M228.24,219.76l-51.38-51.38a86.15,86.15,0,1,0-8.48,8.48l51.38,51.38a6,6,0,0,0,8.48-8.48ZM38,112a74,74,0,1,1,74,74A74.09,74.09,0,0,1,38,112Z'/%3E%3C/svg%3E")}
+/* plus de pastilles colorées décoratives */
+.decouvre{grid-template-columns:1fr;background:var(--surface)}
+.cat-bar{gap:2px;align-items:flex-end}
+.cat-bar a{flex-direction:row;align-items:baseline;gap:5px;min-width:0;padding:10px 12px 12px;font-size:14px;white-space:nowrap}
+.cat-bar a em{position:static;padding:0;min-width:0;background:none;font-size:11.5px;font-weight:600;color:var(--muted)}
+.cat-bar a.on em{background:none;color:var(--muted)}
+.rayon-h h2,.cat-h h2{font-family:Newsreader,Georgia,serif;font-weight:400;font-size:24px;letter-spacing:-.01em}
+.rayon-n{background:none;padding:0;font-size:13px;font-weight:500}
+.drop svg.pi{color:var(--ink)}

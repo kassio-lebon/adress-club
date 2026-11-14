@@ -251,30 +251,30 @@ function activation() {
 }
 
 // ---------- accueil (§1, §7 bis) ----------
-const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+const svg = (d) => `<svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="${d}"/></svg>`; // icônes Phosphor (Light)
 const ICO = {
-  market: svg('M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0'),
-  residences: svg('M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M9 9h.01M15 9h.01M9 13h.01M15 13h.01'),
-  flip: svg('M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z'),
-  news: svg('M4 5h13v14H6a2 2 0 0 1-2-2zM17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5'),
-  camera: svg('M4 8h3l2-3h6l2 3h3v11H4zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7'),
-  chev: svg('m9 6 6 6-6 6'),
-  arrow: svg('M5 12h14M13 6l6 6-6 6'),
-  tel: svg('M8 2.5h8a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2zM11 18h2'),
-  coeur: svg('M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z'),
-  pin: svg('M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5'),
-  check: svg('m5 12.5 4.5 4.5L19 7.5'),
-  x: svg('M6 6l12 12M18 6 6 18'),
-  menu: svg('M4 7h16M4 12h16M4 17h16'),
-  play: svg('M8 5.5v13l10.5-6.5z'),
-  ext: svg('M8 16 16 8M9 8h7v7'),
-  annonces: svg('M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01'),
-  bonsplans: svg('M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 7.5h.01'),
-  partage: svg('M12 15V4M8 7.5l4-4 4 4M6 11v8.5h12V11'),
-  horsligne: svg('M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16.2a5 5 0 0 1 6 0M12 20h.01M3 3l18 18')
+  market: svg('M26.22,94.41A6,6,0,0,0,26,96v16A38,38,0,0,0,42,143V216a6,6,0,0,0,6,6H208a6,6,0,0,0,6-6V143A38,38,0,0,0,230,112V96a5.91,5.91,0,0,0-.23-1.64L215.43,44.15A14.07,14.07,0,0,0,202,34H54A14.07,14.07,0,0,0,40.57,44.15Zm25.89-47A2,2,0,0,1,54,46H202a2,2,0,0,1,1.92,1.45L216.05,90H40ZM102,102h52v10a26,26,0,0,1-52,0Zm-64,0H90v10a26,26,0,0,1-38.18,23,6,6,0,0,0-1.650-1A26,26,0,0,1,38,112ZM202,210H54V148.66a38,38,0,0,0,42-16.21,37.95,37.95,0,0,0,64,0,38,38,0,0,0,42,16.21Zm3.83-76a6,6,0,0,0-1.65,1A26,26,0,0,1,166,112V102h52v10A26,26,0,0,1,205.83,134Z'),
+  residences: svg('M240,210H222V96a14,14,0,0,0-14-14H142V32a14,14,0,0,0-21.77-11.64l-80,53.33A14,14,0,0,0,34,85.34V210H16a6,6,0,0,0,0,12H240a6,6,0,0,0,0-12ZM208,94a2,2,0,0,1,2,2V210H142V94ZM46,85.34a2,2,0,0,1,.89-1.66l80-53.34A2,2,0,0,1,130,32V210H46ZM110,112v16a6,6,0,0,1-12,0V112a6,6,0,0,1,12,0Zm-32,0v16a6,6,0,0,1-12,0V112a6,6,0,0,1,12,0Zm0,56v16a6,6,0,0,1-12,0V168a6,6,0,0,1,12,0Zm32,0v16a6,6,0,0,1-12,0V168a6,6,0,0,1,12,0Z'),
+  flip: svg('M232,50H160a38,38,0,0,0-32,17.55A38,38,0,0,0,96,50H24a6,6,0,0,0-6,6V200a6,6,0,0,0,6,6H96a26,26,0,0,1,26,26,6,6,0,0,0,12,0,26,26,0,0,1,26-26h72a6,6,0,0,0,6-6V56A6,6,0,0,0,232,50ZM96,194H30V62H96a26,26,0,0,1,26,26V204.31A37.86,37.86,0,0,0,96,194Zm130,0H160a37.87,37.87,0,0,0-26,10.32V88a26,26,0,0,1,26-26h66Z'),
+  news: svg('M182,112a6,6,0,0,1-6,6H96a6,6,0,0,1,0-12h80A6,6,0,0,1,182,112Zm-6,26H96a6,6,0,0,0,0,12h80a6,6,0,0,0,0-12Zm54-74V184a22,22,0,0,1-22,22H32a22,22,0,0,1-22-21.91V88a6,6,0,0,1,12,0v96a10,10,0,0,0,20,0V64A14,14,0,0,1,56,50H216A14,14,0,0,1,230,64Zm-12,0a2,2,0,0,0-2-2H56a2,2,0,0,0-2,2V184a21.84,21.84,0,0,1-2.41,10H208a10,10,0,0,0,10-10Z'),
+  camera: svg('M208,58H179.21L165,36.67A6,6,0,0,0,160,34H96a6,6,0,0,0-5,2.67L76.78,58H48A22,22,0,0,0,26,80V192a22,22,0,0,0,22,22H208a22,22,0,0,0,22-22V80A22,22,0,0,0,208,58Zm10,134a10,10,0,0,1-10,10H48a10,10,0,0,1-10-10V80A10,10,0,0,1,48,70H80a6,6,0,0,0,5-2.67L99.21,46h57.57L171,67.33A6,6,0,0,0,176,70h32a10,10,0,0,1,10,10ZM128,90a42,42,0,1,0,42,42A42,42,0,0,0,128,90Zm0,72a30,30,0,1,1,30-30A30,30,0,0,1,128,162Z'),
+  chev: svg('M180.24,132.24l-80,80a6,6,0,0,1-8.48-8.48L167.51,128,91.76,52.24a6,6,0,0,1,8.48-8.48l80,80A6,6,0,0,1,180.24,132.24Z'),
+  arrow: svg('M220.24,132.24l-72,72a6,6,0,0,1-8.48-8.48L201.51,134H40a6,6,0,0,1,0-12H201.51L139.76,60.24a6,6,0,0,1,8.48-8.48l72,72A6,6,0,0,1,220.24,132.24Z'),
+  tel: svg('M176,18H80A22,22,0,0,0,58,40V216a22,22,0,0,0,22,22h96a22,22,0,0,0,22-22V40A22,22,0,0,0,176,18ZM70,62H186V194H70ZM80,30h96a10,10,0,0,1,10,10V50H70V40A10,10,0,0,1,80,30Zm96,196H80a10,10,0,0,1-10-10V206H186v10A10,10,0,0,1,176,226Z'),
+  coeur: `<svg class="pi coeur" viewBox="0 0 256 256" aria-hidden="true"><path class="h-o" d="M178,42c-21,0-39.26,9.47-50,25.34C117.26,51.47,99,42,78,42a60.07,60.07,0,0,0-60,60c0,29.2,18.2,59.59,54.1,90.31a334.68,334.68,0,0,0,53.06,37,6,6,0,0,0,5.68,0,334.68,334.68,0,0,0,53.06-37C219.8,161.59,238,131.2,238,102A60.07,60.07,0,0,0,178,42ZM128,217.11C111.59,207.64,30,157.72,30,102A48.05,48.05,0,0,1,78,54c20.28,0,37.31,10.83,44.45,28.27a6,6,0,0,0,11.1,0C140.69,64.83,157.72,54,178,54a48.05,48.05,0,0,1,48,48C226,157.72,144.41,207.64,128,217.11Z"/><path class="h-f" d="M178,42c-21,0-39.26,9.47-50,25.34C117.26,51.47,99,42,78,42a60.07,60.07,0,0,0-60,60c0,29.2,18.2,59.59,54.1,90.31a334.68,334.68,0,0,0,53.06,37,6,6,0,0,0,5.68,0,334.68,334.68,0,0,0,53.06-37C219.8,161.59,238,131.2,238,102A60.07,60.07,0,0,0,178,42Z"/></svg>`,
+  pin: svg('M128,66a38,38,0,1,0,38,38A38,38,0,0,0,128,66Zm0,64a26,26,0,1,1,26-26A26,26,0,0,1,128,130Zm0-112a86.1,86.1,0,0,0-86,86c0,30.91,14.34,63.74,41.47,94.94a252.32,252.32,0,0,0,41.09,38,6,6,0,0,0,6.88,0,252.32,252.32,0,0,0,41.09-38c27.13-31.2,41.47-64,41.47-94.94A86.1,86.1,0,0,0,128,18Zm0,206.51C113,212.93,54,163.62,54,104a74,74,0,0,1,148,0C202,163.62,143,212.93,128,224.51Z'),
+  check: svg('M228.24,76.24l-128,128a6,6,0,0,1-8.48,0l-56-56a6,6,0,0,1,8.48-8.48L96,191.51,219.76,67.76a6,6,0,0,1,8.48,8.48Z'),
+  x: svg('M204.24,195.76a6,6,0,1,1-8.48,8.48L128,136.49,60.24,204.24a6,6,0,0,1-8.48-8.48L119.51,128,51.76,60.24a6,6,0,0,1,8.48-8.48L128,119.51l67.76-67.75a6,6,0,0,1,8.48,8.48L136.49,128Z'),
+  menu: svg('M222,128a6,6,0,0,1-6,6H40a6,6,0,0,1,0-12H216A6,6,0,0,1,222,128ZM40,70H216a6,6,0,0,0,0-12H40a6,6,0,0,0,0,12ZM216,186H40a6,6,0,0,0,0,12H216a6,6,0,0,0,0-12Z'),
+  play: svg('M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z'),
+  ext: svg('M198,64V168a6,6,0,0,1-12,0V78.48L68.24,196.24a6,6,0,0,1-8.48-8.48L177.52,70H88a6,6,0,0,1,0-12H192A6,6,0,0,1,198,64Z'),
+  annonces: svg('M241.91,137.42,142.59,38.1a13.94,13.94,0,0,0-9.9-4.1H40a6,6,0,0,0-6,6v92.69a13.94,13.94,0,0,0,4.1,9.9l99.32,99.32a14,14,0,0,0,19.8,0l84.69-84.69A14,14,0,0,0,241.91,137.42Zm-8.490,11.31-84.69,84.69a2,2,0,0,1-2.83,0L46.59,134.1a2,2,0,0,1-.59-1.41V46h86.69a2,2,0,0,1,1.41.59l99.32,99.31A2,2,0,0,1,233.42,148.730ZM94,84A10,10,0,1,1,84,74,10,10,0,0,1,94,84Z'),
+  bonsplans: svg('M232,102a6,6,0,0,0,6-6V64a14,14,0,0,0-14-14H32A14,14,0,0,0,18,64V96a6,6,0,0,0,6,6,26,26,0,0,1,0,52,6,6,0,0,0-6,6v32a14,14,0,0,0,14,14H224a14,14,0,0,0,14-14V160a6,6,0,0,0-6-6,26,26,0,0,1,0-52ZM30,192V165.53a38,38,0,0,0,0-75.06V64a2,2,0,0,1,2-2H90V194H32A2,2,0,0,1,30,192Zm196-26.47V192a2,2,0,0,1-2,2H102V62H224a2,2,0,0,1,2,2V90.47a38,38,0,0,0,0,75.06Z'),
+  partage: svg('M214,112v96a14,14,0,0,1-14,14H56a14,14,0,0,1-14-14V112A14,14,0,0,1,56,98H80a6,6,0,0,1,0,12H56a2,2,0,0,0-2,2v96a2,2,0,0,0,2,2H200a2,2,0,0,0,2-2V112a2,2,0,0,0-2-2H176a6,6,0,0,1,0-12h24A14,14,0,0,1,214,112ZM92.24,68.24,122,38.49V136a6,6,0,0,0,12,0V38.49l29.76,29.75a6,6,0,1,0,8.48-8.48l-40-40a6,6,0,0,0-8.48,0l-40,40a6,6,0,1,0,8.48,8.48Z'),
+  horsligne: svg('M138,204a10,10,0,1,1-10-10A10,10,0,0,1,138,204ZM52.44,36A6,6,0,0,0,43.56,44L61.33,63.58a169.41,169.41,0,0,0-41.14,25,6,6,0,1,0,7.62,9.27A157.58,157.58,0,0,1,69.91,73l26.48,29.13a122.21,122.21,0,0,0-44.12,22.19,6,6,0,0,0,7.46,9.41,110,110,0,0,1,45.87-21.47l31.13,34.25A74.4,74.4,0,0,0,128,146a73.44,73.44,0,0,0-43.53,14.15A6,6,0,0,0,88,171a5.930,5.930,0,0,0,3.53-1.15,62,62,0,0,1,59.76-7.31L203.56,220a6,6,0,0,0,8.88-8.08ZM235.81,88.55A170.32,170.32,0,0,0,128,50a173.45,173.45,0,0,0-21.76,1.38,6,6,0,1,0,1.52,11.9A160.58,160.58,0,0,1,128,62,158.26,158.26,0,0,1,228.19,97.82a6,6,0,1,0,7.62-9.27Zm-39.54,45.2A6,6,0,0,0,200,135a6,6,0,0,0,3.73-10.7,122.26,122.26,0,0,0-50.9-23.81,6,6,0,1,0-2.43,11.75A110,110,0,0,1,196.27,133.75Z')
 };
 // icône posée dans une phrase ou un bouton : à la taille du texte
-const ic = (k) => ICO[k].replace('<svg ', '<svg class="ic" ');
+const ic = (k) => ICO[k].replace('class="pi', 'class="pi ic');
 // ---------- Installer l'application sur le téléphone ----------
 const estInstallee = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -380,7 +380,7 @@ function carteNotif() {
   if (!pushOk() || Notification.permission !== 'default' || carteInstall()) return '';
   let plusTard = 0; try { plusTard = +localStorage.getItem('acl-push-later') || 0; } catch (_) {}
   if (Date.now() - plusTard < 5 * 864e5) return '';
-  return '<div class="card install-card push-card"><span class="pc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><div><b>Soyez prévenu sur votre téléphone</b><small>Nouvelle demande sur vos annonces, réponse d’un vendeur… même appli fermée.</small></div><div class="ic-act"><button class="btn sm" type="button" data-push>Activer</button><button class="btn sm ghost" type="button" data-push-later>Plus tard</button></div></div>';
+  return '<div class="card install-card push-card"><div><b>Soyez prévenu sur votre téléphone</b><small>Nouvelle demande sur vos annonces, réponse d’un vendeur… même appli fermée.</small></div><div class="ic-act"><button class="btn sm" type="button" data-push>Activer</button><button class="btn sm ghost" type="button" data-push-later>Plus tard</button></div></div>';
 }
 function brancherNotif(root) {
   root.querySelectorAll('[data-push]').forEach(b => b.onclick = async () => { b.disabled = true; const ok = await activerPush(true); b.closest('.push-card').remove(); toast(ok ? 'C’est activé : vous serez prévenu sur votre téléphone.' : 'Notifications refusées. Vous pourrez les activer dans Mon compte.'); });
@@ -421,8 +421,7 @@ const filmDispo = () => filmOk ??= (() => { try { const v = sessionStorage.getIt
 const voirFilm = () => { track('film_presentation'); lecteurVideo(FILM.src, { poster: FILM.poster, titre: 'ADRESS CLUB en ' + FILM.duree }); };
 function carteDecouverte() {
   if (visiteFaite()) return '';
-  return `<div class="card decouvre"><div class="dc-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg></div>
-    <div class="dc-t"><b>Nouveau sur ADRESS CLUB ?</b><small>Découvrez l’essentiel en 4 étapes, en 30 secondes.</small></div>
+  return `<div class="card decouvre"><div class="dc-t"><b>Nouveau sur ADRESS CLUB ?</b><small>Découvrez l’essentiel en 4 étapes, en 30 secondes.</small></div>
     <div class="dc-b"><button type="button" class="btn sm" data-visite>Visite guidée</button><button type="button" class="btn sm soft" data-film hidden>${ic('play')}Le film</button><button type="button" class="lnk small" data-tard>Plus tard</button></div></div>`;
 }
 function brancherDecouverte(root) {
@@ -459,7 +458,7 @@ async function accueil() {
     + petit('#/bonnes-adresses', 'Bons plans', 'Abidjan')
     + petit('#/nouveautes', 'Nouveautés', 'Programmes')
     + '</nav>'
-    + '<section><div class="sec-h"><h2>Cette semaine au Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
+    + '<section><div class="sec-h"><h2>Cette semaine au Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M180.24,132.24l-80,80a6,6,0,0,1-8.48-8.48L167.51,128,91.76,52.24a6,6,0,0,1,8.48-8.48l80,80A6,6,0,0,1,180.24,132.24Z"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(casse(a.titre)) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
     + '</section>' + (carteDecouverte() || carteInstall() || carteNotif()) + '<section>'
@@ -524,18 +523,6 @@ function fondDefilant(box) {
 }
 
 // ---------- Le Market (§3, §4) ----------
-const svgC = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
-const ICO_CAT = {
-  Tout: svgC('<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>'),
-  'Meubles': svgC('<path d="M5 11V8a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3"/><path d="M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M6 19v2M18 19v2"/>'),
-  'Électroménager': svgC('<rect x="4.5" y="2.5" width="15" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.5"/><path d="M8 6h.01M11 6h2"/>'),
-  'Décoration': svgC('<path d="M9 3h6l3 8H6z"/><path d="M12 11v7M8 21h8"/>'),
-  'Enfants et bébé': svgC('<circle cx="12" cy="13" r="7"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="6.5" r="2.5"/><path d="M9.5 15.5c1.5 1.2 3.5 1.2 5 0M10 11.5h.01M14 11.5h.01"/>'),
-  'Vêtements et accessoires': svgC('<path d="M8 3 4 6l2 4 2-1v12h8V9l2 1 2-4-4-3a4 4 0 0 1-8 0z"/>'),
-  'Électronique': svgC('<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20.5h8M12 16.5v4"/>'),
-  'Sport et loisirs': svgC('<circle cx="12" cy="12" r="9"/><path d="M12 3a14 14 0 0 1 0 18M3 12h18M5.6 5.6c3.6 2.4 9.2 2.4 12.8 0M5.6 18.4c3.6-2.4 9.2-2.4 12.8 0"/>'),
-  'Maison et jardin': svgC('<path d="M12 21v-8M12 13c0-4 3-7 7-7 0 4-3 7-7 7zM12 15c0-3-2.5-5.5-6-5.5 0 3 2.5 5.5 6 5.5zM7 21h10"/>'),
-  'Autre': svgC('<circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/>') };
 async function market() {
   const p = qs(); const type = p.get('type') || ''; const q = (p.get('q') || '').trim(); const vue = p.get('vue') || '', cat = p.get('cat') || '';
   let req = sb.from(vue === 'favoris' ? 'v_favoris' : 'v_market').select('*').order('date_publication', { ascending: false }).limit(80);
@@ -565,9 +552,9 @@ async function market() {
     <a class="chip ${type === 'don' ? 'on' : ''}" href="${lien({ type: 'don', vue: '' })}">À donner</a>
     <a class="chip ${vue === 'favoris' ? 'on' : ''}" href="${lien({ vue: 'favoris', type: '', cat: '' })}">${ic('coeur')}Favoris</a>
   </div>
-  ${vue !== 'favoris' && parCat.length > 1 ? `<nav class="cat-bar" aria-label="Catégories"><a class="${!cat ? 'on' : ''}" href="${lien({ cat: '' })}" ${!cat ? 'aria-current="page"' : ''}>${ICO_CAT.Tout}<span>Tout</span></a>${parCat.map(([c, l]) => `<a class="${cat === c ? 'on' : ''}" href="${lien({ cat: c })}" ${cat === c ? 'aria-current="page"' : ''}>${ICO_CAT[c] || ICO_CAT.Autre}<span>${esc(c)}</span><em>${l.length}</em></a>`).join('')}</nav>` : ''}
-  ${cat && liste.length ? `<div class="cat-h"><span class="rayon-i">${ICO_CAT[cat] || ICO_CAT.Autre}</span><h2>${esc(cat)}</h2><span class="rayon-n">${liste.length} annonce${liste.length > 1 ? 's' : ''}</span></div>` : ''}
-  ${rayons ? `<div class="rayons">${parCat.map(([c, l]) => `<section class="rayon"><div class="rayon-h"><span class="rayon-i">${ICO_CAT[c] || ICO_CAT.Autre}</span><h2>${esc(c)}</h2><span class="rayon-n">${l.length}</span><a href="${lien({ cat: c })}">Tout voir</a></div><div class="rail">${l.map(carte).join('')}</div></section>`).join('')}</div>` : ''}
+  ${vue !== 'favoris' && parCat.length > 1 ? `<nav class="cat-bar" aria-label="Catégories"><a class="${!cat ? 'on' : ''}" href="${lien({ cat: '' })}" ${!cat ? 'aria-current="page"' : ''}><span>Tout</span></a>${parCat.map(([c, l]) => `<a class="${cat === c ? 'on' : ''}" href="${lien({ cat: c })}" ${cat === c ? 'aria-current="page"' : ''}><span>${esc(c)}</span><em>${l.length}</em></a>`).join('')}</nav>` : ''}
+  ${cat && liste.length ? `<div class="cat-h"><h2>${esc(cat)}</h2><span class="rayon-n">${liste.length} annonce${liste.length > 1 ? 's' : ''}</span></div>` : ''}
+  ${rayons ? `<div class="rayons">${parCat.map(([c, l]) => `<section class="rayon"><div class="rayon-h"><h2>${esc(c)}</h2><span class="rayon-n">${l.length}</span><a href="${lien({ cat: c })}">Tout voir</a></div><div class="rail">${l.map(carte).join('')}</div></section>`).join('')}</div>` : ''}
   ${liste.length ? `<div class="grid2 grid3" ${rayons ? 'hidden' : ''}>${liste.map(carte).join('')}</div>`
   : vue === 'favoris'
     ? `<div class="card center pad empty-fav"><div class="ef-heart">${ICO.coeur}</div><b>Aucun favori pour le moment</b><p class="muted">Touchez le cœur sur une annonce d’un autre résident pour la retrouver ici.<br>Vos propres annonces n’ont pas de cœur : elles sont dans « Mes annonces ».</p><a class="btn" href="#/market">Parcourir le Market</a></div>`
@@ -670,7 +657,7 @@ async function modifier(id) {
   <form id="f" class="narrow" novalidate>
   <label>Photos (1 à ${max}) *</label>
   <div class="thumbs" id="th"></div>
-  <div class="drops"><label class="drop" for="phc">${ICO.camera}Prendre une photo<small>Avec l’appareil photo</small></label><label class="drop" for="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>Choisir dans la galerie<small>Jusqu’à ${max} photos au total</small></label></div>
+  <div class="drops"><label class="drop" for="phc">${ICO.camera}Prendre une photo<small>Avec l’appareil photo</small></label><label class="drop" for="ph"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,42H40A14,14,0,0,0,26,56V200a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V56A14,14,0,0,0,216,42ZM40,54H216a2,2,0,0,1,2,2V163.57L188.53,134.1a14,14,0,0,0-19.8,0l-21.42,21.42L101.9,110.1a14,14,0,0,0-19.8,0L38,154.2V56A2,2,0,0,1,40,54ZM38,200V171.17l52.58-52.58a2,2,0,0,1,2.84,0L176.83,202H40A2,2,0,0,1,38,200Zm178,2H193.8l-38-38,21.41-21.42a2,2,0,0,1,2.83,0l38,38V200A2,2,0,0,1,216,202ZM146,100a10,10,0,1,1,10,10A10,10,0,0,1,146,100Z"/></svg>Choisir dans la galerie<small>Jusqu’à ${max} photos au total</small></label></div>
   <input id="phc" type="file" accept="image/*" capture="environment" class="sr"><input id="ph" type="file" accept="image/*" multiple class="sr">
   <label for="ti">Titre *</label><input id="ti" type="text" maxlength="80" value="${esc(a.titre)}">
   <div class="grid2">
@@ -721,7 +708,7 @@ function publier() {
   <form id="f" class="narrow" novalidate>
   <div class="chips" id="typ"><a class="chip on" data-v="vente">Je vends</a><a class="chip" data-v="don">Je donne</a></div>
   <label>Photos (1 à ${max}) *</label>
-  <div class="drops"><label class="drop" for="phc">${ICO.camera}Prendre une photo<small>Avec l’appareil photo</small></label><label class="drop" for="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>Choisir dans la galerie<small>Jusqu’à ${max} photos</small></label></div>
+  <div class="drops"><label class="drop" for="phc">${ICO.camera}Prendre une photo<small>Avec l’appareil photo</small></label><label class="drop" for="ph"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M216,42H40A14,14,0,0,0,26,56V200a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V56A14,14,0,0,0,216,42ZM40,54H216a2,2,0,0,1,2,2V163.57L188.53,134.1a14,14,0,0,0-19.8,0l-21.42,21.42L101.9,110.1a14,14,0,0,0-19.8,0L38,154.2V56A2,2,0,0,1,40,54ZM38,200V171.17l52.58-52.58a2,2,0,0,1,2.84,0L176.83,202H40A2,2,0,0,1,38,200Zm178,2H193.8l-38-38,21.41-21.42a2,2,0,0,1,2.83,0l38,38V200A2,2,0,0,1,216,202ZM146,100a10,10,0,1,1,10,10A10,10,0,0,1,146,100Z"/></svg>Choisir dans la galerie<small>Jusqu’à ${max} photos</small></label></div>
   <input id="phc" type="file" accept="image/*" capture="environment" class="sr"><input id="ph" type="file" accept="image/*" multiple class="sr">
   <div class="thumbs" id="th"></div>
   <label for="ti">Titre *</label><input id="ti" type="text" maxlength="80" placeholder="Canapé 3 places">
@@ -1023,8 +1010,8 @@ function profil() {
   const p = state.profil;
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mon compte</h1>
   <section class="card mon-appli" style="margin-top:12px" aria-label="Mon appli"><h2 style="margin-top:0">Mon appli</h2>
-    <div class="ma-l"><span class="ma-i" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg></span><div><b>Installation</b><div id="instRow"></div></div></div>
-    <div class="ma-l"><span class="ma-i" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><div><b>Notifications</b><div class="push-row" id="pushRow"></div></div></div></section>
+    <div class="ma-l"><div><b>Installation</b><div id="instRow"></div></div></div>
+    <div class="ma-l"><div><b>Notifications</b><div class="push-row" id="pushRow"></div></div></div></section>
   <form id="f" class="card" style="margin-top:12px">
     <label for="nom">Nom d'affichage (visible des autres résidents)</label><input id="nom" type="text" maxlength="40" value="${esc(p.nom_affichage)}">
     <label for="tel">Téléphone (privé, nécessaire pour être recontacté sur le Market)</label><input id="tel" type="tel" value="${esc(p.telephone || '')}" placeholder="+225 07 00 00 00 00">
@@ -1121,8 +1108,8 @@ setTimeout(() => { if (state.session) activerPush(false); }, 4000);
 if (new URLSearchParams(location.search).has('inst')) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (_) {} setTimeout(() => { if (!estInstallee()) installer(true); }, 1800); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
 // Œil sur tous les champs mot de passe : afficher / masquer ce qu'on tape
-const OEIL = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-const OEIL_BARRE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4"/><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+const OEIL = '<svg class="pi" viewBox="0 0 256 256" aria-hidden="true" width="20" height="20"><path d="M245.48,125.57c-.34-.78-8.66-19.23-27.24-37.81C201,70.54,171.38,50,128,50S55,70.54,37.76,87.76c-18.58,18.58-26.9,37-27.24,37.81a6,6,0,0,0,0,4.88c.34.77,8.66,19.22,27.24,37.8C55,185.47,84.62,206,128,206s73-20.53,90.24-37.75c18.58-18.58,26.9-37,27.24-37.8A6,6,0,0,0,245.48,125.57ZM128,194c-31.38,0-58.78-11.42-81.45-33.93A134.77,134.77,0,0,1,22.69,128,134.56,134.56,0,0,1,46.55,95.94C69.22,73.42,96.62,62,128,62s58.78,11.42,81.45,33.94A134.56,134.56,0,0,1,233.31,128C226.94,140.21,195,194,128,194Zm0-112a46,46,0,1,0,46,46A46.06,46.06,0,0,0,128,82Zm0,80a34,34,0,1,1,34-34A34,34,0,0,1,128,162Z"/></svg>';
+const OEIL_BARRE = '<svg class="pi" viewBox="0 0 256 256" aria-hidden="true" width="20" height="20"><path d="M52.44,36A6,6,0,0,0,43.56,44L64.44,67c-37.28,21.9-53.23,57-53.92,58.57a6,6,0,0,0,0,4.88c.34.77,8.66,19.22,27.24,37.8C55,185.47,84.62,206,128,206a124.91,124.91,0,0,0,52.57-11.25l23,25.29a6,6,0,0,0,8.88-8.08Zm48.62,71.32,45,49.52a34,34,0,0,1-45-49.52ZM128,194c-31.38,0-58.78-11.42-81.45-33.93A134.57,134.57,0,0,1,22.69,128c4.29-8.2,20.1-35.18,50-51.91L92.89,98.3a46,46,0,0,0,61.35,67.48l17.81,19.6A113.47,113.47,0,0,1,128,194Zm6.4-99.4a6,6,0,0,1,2.25-11.79,46.17,46.17,0,0,1,37.15,40.87,6,6,0,0,1-5.42,6.53l-.56,0a6,6,0,0,1-6-5.45A34.1,34.1,0,0,0,134.4,94.6Zm111.08,35.85c-.41.92-10.37,23-32.86,43.12a6,6,0,1,1-8-8.94A134.07,134.07,0,0,0,233.31,128a134.67,134.67,0,0,0-23.86-32.07C186.78,73.42,159.38,62,128,62a120.19,120.19,0,0,0-19.69,1.6,6,6,0,1,1-2-11.83A131.12,131.12,0,0,1,128,50c43.38,0,73,20.54,90.24,37.76,18.58,18.58,26.9,37,27.24,37.81A6,6,0,0,1,245.48,130.45Z"/></svg>';
 function yeux(root) {
   root.querySelectorAll('input[type=password]:not([data-oeil])').forEach(inp => {
     inp.dataset.oeil = '1';
