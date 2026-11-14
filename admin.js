@@ -24,7 +24,7 @@ const AIDE = {
     'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
     'Nouveau locataire sur un logement libre : « Affecter un locataire », puis « Affecter et inviter par WhatsApp ».',
     'Le locataire déménage : « Retirer » (compte suspendu, il peut revenir). Il quitte définitivement la résidence : « Supprimer ». Dans les deux cas le logement reste et redevient libre.',
-    'Mise à jour de toute une résidence : « Importer un fichier Excel » (fichier BASE RÉSIDENCE, une feuille par résidence).']],
+    'Mise à jour par Excel : « Importer un fichier Excel » (BASE RÉSIDENCE ou BASE VILLA). Le fichier remplace la liste : ce qui n’y est plus est retiré.']],
   invitations: ['Envoyer à un locataire son code personnel pour qu’il crée son compte ADRESS CLUB.', [
     'Choisissez la résidence, puis tapez le logement ou le nom du locataire : son nom et son e-mail se remplissent seuls.',
     'Touchez « Créer l’invitation », puis « Envoyer par WhatsApp » : le message est déjà rédigé.',
@@ -303,6 +303,35 @@ async function invitations(box) {
 // Lecture d'une feuille « SUIVI RÉSIDENCE » (base propre) : ligne d'en-tête BLOC…, colonnes BLOC / ETAGE / APP. ou APPARTEMENT / LOCATAIRE / MAIL.
 // Code = BLOC-ÉTAGE-APPARTEMENT normalisé (RDJ, RDC, 1ER, 2E…, PENTHOUSE). Plusieurs lignes pour un même logement = historique : la dernière remplie est gardée.
 const EMAIL_RE = /[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+// Fichier BASE VILLA : NOM DE LA VILLA | NOM TECHNIQUE | LOCATAIRE | MAIL, toutes les villas sur une feuille.
+// Chaque « nom de villa » devient une résidence « VILLA <NOM> » ; chaque nom technique (A1, V3, 1…) un logement de type Villa.
+const estFeuilleVillas = (rows) => rows.some(r => (r || []).some(c => norm(c).startsWith('nom technique')));
+const nomResVilla = (n) => { const t = String(n || '').trim().replace(/\s+/g, ' ').toUpperCase(); return /^VILLAS?\b/.test(t) ? t : 'VILLA ' + t; };
+function lireVillas(rows) {
+  let hi = -1; rows.forEach((r, i) => { if ((r || []).some(c => norm(c).startsWith('nom technique'))) hi = i; }); // dernière ligne d'en-tête (le fichier en répète une)
+  const H = rows[hi].map(norm), col = (...k) => H.findIndex(h => k.some(x => h === x || h.startsWith(x)));
+  const iV = col('nom de la villa', 'villa'), iT = col('nom technique'), iL = col('locataire'), iM = col('mail', 'email', 'e-mail');
+  const groupes = new Map(); let villa = '', prec = null;
+  for (const r of rows.slice(hi + 1)) {
+    const g = (i) => i < 0 || r?.[i] == null ? '' : String(r[i]).trim();
+    if (![iV, iT, iL, iM].some(i => g(i))) continue;
+    const mails = (g(iM).match(EMAIL_RE) || []).map(m => m.toLowerCase());
+    const loc = g(iL).replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+    // Ligne sans villa ni nom technique : suite de la villa précédente (ex. locataire écrit une ligne plus bas)
+    if (!g(iV) && !g(iT)) { if (prec) { if (!prec.locataire) prec.locataire = loc; if (!prec.email) prec.email = mails[0] || ''; } continue; }
+    if (g(iV)) villa = nomResVilla(g(iV));
+    const tech = norm(g(iT)).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!villa || !tech) continue;
+    if (!groupes.has(villa)) groupes.set(villa, { nom: villa, lignes: [], doublons: [], autresMails: [] });
+    const G = groupes.get(villa);
+    if (mails.length > 1) G.autresMails.push({ code: tech, autres: mails.slice(1) });
+    const deja = G.lignes.find(x => x.appartement === tech);
+    const l = { bloc: '', etage: '', appartement: tech, locataire: loc, email: mails[0] || '' };
+    if (deja) { if (l.locataire || l.email) { if (deja.locataire || deja.email) G.doublons.push({ code: tech, garde: l.locataire, ignores: [deja.locataire] }); Object.assign(deja, l); } prec = deja; }
+    else { G.lignes.push(l); prec = l; }
+  }
+  return [...groupes.values()];
+}
 function lireFeuille(rows) {
   const hi = rows.findIndex(r => (r || []).some(c => norm(c) === 'bloc'));
   if (hi < 0) return { lignes: [], doublons: [], autresMails: [] };
@@ -433,6 +462,9 @@ async function supprimerLogement(x) {
 }
 
 // ---------- Saisie guidée Bloc / Étage / Appartement : même nomenclature que l'import (RDJ, RDC, 1ER, 2E…, PENTHOUSE) ----------
+// Villas : pas de bloc ni d'étage, le logement est repéré par son nom technique (A1, V3…) ; type_logement = 'Villa'
+const estVilla = (x) => x?.type_logement === 'Villa';
+const ancienCode = (x) => !!x && !x.bloc && !estVilla(x);
 const ETAGES_STD = ['RDJ', 'RDC', '1ER', ...Array.from({ length: 14 }, (_, i) => (i + 2) + 'E'), 'PENTHOUSE'];
 const normEtage = (e) => { const s = norm(e).toUpperCase().replace(/\s+/g, ' '); if (!s) return ''; if (/^PENT/.test(s)) return 'PENTHOUSE'; if (/^(RDJ|RDC)/.test(s)) return s.slice(0, 3); const m = s.match(/^\d+/); return m ? (+m[0] === 1 ? '1ER' : +m[0] + 'E') : s; };
 const majApp = (inp) => { inp.maxLength = 4; inp.autocomplete = 'off'; inp.oninput = () => { const v = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); if (v !== inp.value) inp.value = v; }; };
@@ -471,8 +503,8 @@ const chargerXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promi
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 async function annuaire(box) {
   const [res, log, occ, inv] = await Promise.all([
-    sb.from('residences').select('id,nom').order('nom'),
-    sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email,actif').eq('actif', true).order('code'),
+    sb.from('residences').select('id,nom,type_bien').order('nom'),
+    sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email,actif,type_logement').eq('actif', true).order('code'),
     sb.from('profiles').select('logement_id,nom_affichage').eq('statut', 'actif').not('logement_id', 'is', null),
     sb.from('invitations').select('logement_id,expire_le,utilisee_par,created_at').is('utilisee_par', null).order('created_at', { ascending: false })]);
   const R = res.data || [], L = log.data || [];
@@ -488,7 +520,7 @@ async function annuaire(box) {
   const problemes = (x) => {
     const p = [];
     if (!x.locataire && !x.email && !occupant.has(x.id)) return p; // logement libre : rien à corriger
-    if (!x.bloc) return [{ t: 'Ancien code : rattachez ce compte au bon appartement (Comptes › Logement)' }];
+    if (ancienCode(x)) return [{ t: 'Ancien code : rattachez ce compte au bon appartement (Comptes › Logement)' }];
     if (!x.email) p.push({ k: 'mail' });
     else if (!EMAIL_OK(x.email)) p.push({ k: 'mail', fix: suggestion(x.email) });
     else if (parMail.get(x.email) > 1) p.push({ t: `Même e-mail sur ${parMail.get(x.email)} logements : une seule personne pourra se connecter` });
@@ -508,6 +540,7 @@ async function annuaire(box) {
   const dessiner = () => {
     annuaire._rid = rid; annuaire._f = filtre;
     const l = L.filter(x => x.residence_id === rid).sort(triLog);
+    const resA = R.find(r => r.id === rid); const villa = l.some(estVilla) || /villa/i.test(resA?.type_bien || '') || /villa/i.test(resA?.nom || '');
     const nb = { tous: l.length, pb: l.filter(x => problemes(x).length).length, libre: l.filter(x => (x.locataire || x.email) && ['libre', 'expire'].includes(etat(x))).length, vide: l.filter(x => !x.locataire && !x.email && !occupant.has(x.id)).length, code: l.filter(x => etat(x) === 'code').length, actif: l.filter(x => etat(x) === 'actif').length };
     if (filtre === 'pb' && !nb.pb) filtre = 'tous';
     const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', 'Logements libres']];
@@ -516,7 +549,7 @@ async function annuaire(box) {
       <div class="ann-top"><div><label for="ar" style="margin-top:0">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
       <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un logement</button><label class="btn xl" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
-    <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div><label for="ae">Étage</label><input type="text" id="ae"></div><div><label for="aa">Appartement (4 caractères max.)</label><input type="text" id="aa" placeholder="A001"></div></div>
+    <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div ${villa ? 'hidden' : ''}><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div ${villa ? 'hidden' : ''}><label for="ae">Étage</label><input type="text" id="ae"></div><div><label for="aa">${villa ? 'Nom technique de la villa (ex. A1)' : 'Appartement (4 caractères max.)'}</label><input type="text" id="aa" placeholder="${villa ? 'A1' : 'A001'}"></div></div>
       <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
       <div class="row" style="margin-top:12px"><button class="btn">Ajouter le logement</button><button type="button" class="btn ghost" id="faNo">Annuler</button></div></form></div>
     <div class="ann-bar"><h2>${l.length} logement${l.length > 1 ? 's' : ''}</h2><input type="search" id="aq" placeholder="Rechercher un logement, un nom, un e-mail…" autocomplete="off"></div>
@@ -530,7 +563,7 @@ async function annuaire(box) {
       const vis = l.filter(x => (filtre === 'tous' || (filtre === 'pb' ? problemes(x).length : filtre === 'libre' ? (x.locataire || x.email) && ['libre', 'expire'].includes(etat(x)) : filtre === 'vide' ? !x.locataire && !x.email && !occupant.has(x.id) : etat(x) === filtre))
         && t.every(w => norm([x.code, x.locataire, x.email, occupant.get(x.id)].join(' ')).includes(w)));
       $('#atb').innerHTML = vis.map(x => { const p = problemes(x), e = etat(x); return `<tr data-id="${x.id}"><td><b>${esc(x.code)}</b></td>
-        <td>${!x.bloc ? '<span class="muted">—</span>' : p.some(o => o.k === 'nom') ? '<span class="a-bad">Nom manquant</span>' : esc(x.locataire || '—')}${!x.bloc || (!x.locataire && !x.email && !occupant.has(x.id)) ? '' : x.email && EMAIL_OK(x.email) ? `<div class="small muted">${esc(x.email)}</div>` : `<div class="small a-bad">${x.email ? esc(x.email) + ' (invalide)' : 'E-mail manquant'}${p.find(o => o.fix) ? ` · <button type="button" class="lnk" data-fix="${esc(p.find(o => o.fix).fix)}">Corriger en ${esc(p.find(o => o.fix).fix)}</button>` : ''}</div>`}${p.filter(o => o.t).map(o => alerte(o.t)).join('')}</td>
+        <td>${ancienCode(x) ? '<span class="muted">—</span>' : p.some(o => o.k === 'nom') ? '<span class="a-bad">Nom manquant</span>' : esc(x.locataire || '—')}${ancienCode(x) || (!x.locataire && !x.email && !occupant.has(x.id)) ? '' : x.email && EMAIL_OK(x.email) ? `<div class="small muted">${esc(x.email)}</div>` : `<div class="small a-bad">${x.email ? esc(x.email) + ' (invalide)' : 'E-mail manquant'}${p.find(o => o.fix) ? ` · <button type="button" class="lnk" data-fix="${esc(p.find(o => o.fix).fix)}">Corriger en ${esc(p.find(o => o.fix).fix)}</button>` : ''}</div>`}${p.filter(o => o.t).map(o => alerte(o.t)).join('')}</td>
         <td>${statut(x)}</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end">${!x.locataire && !x.email && !occupant.has(x.id) ? '<button class="btn sm" data-aff>Affecter un locataire</button>' : ''}${(e === 'libre' || e === 'expire') && EMAIL_OK(x.email) ? '<button class="btn sm ghost" data-inv>Inviter</button>' : ''}<button class="btn sm soft" data-ed>Modifier</button>${x.locataire || x.email || occupant.has(x.id) ? '<button class="btn sm ghost rouge" data-vider>Retirer</button>' : ''}${x.locataire || x.email || occupant.has(x.id) ? `<button class="btn sm ghost rouge btn-sup" data-sup aria-label="Supprimer le locataire de ${esc(x.code)}" title="Le locataire quitte définitivement la résidence"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Supprimer</button>` : ''}</div></td></tr>`; }).join('');
       $('#avide').hidden = !!vis.length;
       brancher();
@@ -542,7 +575,7 @@ async function annuaire(box) {
     $('#aq').oninput = () => { q = $('#aq').value; lignes(); };
     box.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtre = b.dataset.f; box.querySelectorAll('[data-f]').forEach(c => c.classList.toggle('on', c === b)); annuaire._f = filtre; lignes(); });
     const etAjout = listeEtages($('#ae'), l.map(x => x.etage)); majApp($('#aa')); majBloc($('#ab'));
-    $('#fa').onsubmit = (e) => { e.preventDefault(); if (!$('#ab').value.trim() && !$('#ae').value.trim() && !$('#aa').value.trim()) return toast('Indiquez le bloc, l’étage ou l’appartement.'); if (!etAjout.ok()) { $('#ae').setAttribute('aria-invalid', 'true'); $('#ae').focus(); return toast('Choisissez l’étage dans la liste.'); } const m = $('#am').value.trim().toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide.'); action(async () => check(await sb.from('logements').insert({ residence_id: rid, code: 'tmp-' + Date.now(), bloc: $('#ab').value.trim(), etage: etAjout.val(), appartement: $('#aa').value.trim(), locataire: $('#an').value || null, email: m || null, type_logement: 'Appartement' })), 'Logement ajouté.'); };
+    $('#fa').onsubmit = (e) => { e.preventDefault(); if (villa && !$('#aa').value.trim()) { $('#aa').focus(); return toast('Indiquez le nom technique de la villa (ex. A1).'); } if (!$('#ab').value.trim() && !$('#ae').value.trim() && !$('#aa').value.trim()) return toast('Indiquez le bloc, l’étage ou l’appartement.'); if (!etAjout.ok()) { $('#ae').setAttribute('aria-invalid', 'true'); $('#ae').focus(); return toast('Choisissez l’étage dans la liste.'); } const m = $('#am').value.trim().toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide.'); action(async () => check(await sb.from('logements').insert({ residence_id: rid, code: 'tmp-' + Date.now(), bloc: $('#ab').value.trim(), etage: etAjout.val(), appartement: $('#aa').value.trim(), locataire: $('#an').value || null, email: m || null, type_logement: villa ? 'Villa' : 'Appartement' })), villa ? 'Villa ajoutée.' : 'Logement ajouté.'); };
     function brancher() {
     box.querySelectorAll('[data-fix]').forEach(b => b.onclick = () => action(async () => check(await sb.from('logements').update({ email: b.dataset.fix }).eq('id', b.closest('tr').dataset.id)), 'E-mail corrigé.'));
     // Retirer le locataire : le logement redevient libre ; son compte (s'il en a un) est fermé sans perte, son code en attente annulé
@@ -579,7 +612,7 @@ async function annuaire(box) {
     box.querySelectorAll('[data-inv]').forEach(b => b.onclick = () => { invitations._pre = b.closest('tr').dataset.id; location.hash = '#/admin/invitations'; });
     box.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => {
       const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id);
-      tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>Appartement</label><input type="text" name="appartement" value="${esc(x.appartement || '')}"></div></div>
+      tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div ${estVilla(x) ? 'hidden' : ''}><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div ${estVilla(x) ? 'hidden' : ''}><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>${estVilla(x) ? 'Nom technique de la villa' : 'Appartement'}</label><input type="text" name="appartement" value="${esc(x.appartement || '')}"></div></div>
         <div class="grid2"><div><label>Locataire</label><input type="text" name="locataire" value="${esc(x.locataire || '')}"></div><div><label>E-mail</label><input name="email" type="email" value="${esc(x.email || '')}"></div></div>
         <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Supprimer le logement</button></div></form></td>`;
       const f = tr.querySelector('form'), v = (n) => f.elements[n].value.trim();
@@ -590,24 +623,73 @@ async function annuaire(box) {
     });
     }
     lignes();
+    // Sauvegarde au même format que les fichiers d'import : la réimporter remet la liste telle qu'elle était
+    const sauvegarder = (X, liste) => {
+      const wb = X.utils.book_new(), vil = [['NOM DE LA VILLA', 'NOM TECHNIQUE', 'LOCATAIRE', 'MAIL']];
+      liste.forEach(f => { const r = R.find(z => norm(z.nom) === norm(f.nom)); if (!r) return;
+        const lg = L.filter(x => x.residence_id === r.id).sort(triLog);
+        if (f.villa) lg.forEach(x => vil.push([r.nom, x.appartement || x.code, x.locataire || '', x.email || '']));
+        else X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['BLOC', 'ETAGE', 'APP.', 'LOCATAIRE', 'MAIL'], ...lg.map(x => [x.bloc || '', x.etage || '', x.appartement || '', x.locataire || '', x.email || ''])]), r.nom.replace(/[:\\/?*[\]]/g, ' ').slice(0, 31)); });
+      if (vil.length > 1) X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(vil), 'NOS VILLAS');
+      if (!wb.SheetNames.length) return false;
+      const d = new Date(), z = (n) => String(n).padStart(2, '0');
+      X.writeFile(wb, `Sauvegarde-avant-import-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}h${z(d.getMinutes())}.xlsx`); return true; };
     $('#xl').onchange = async (e) => {
       const file = e.target.files[0]; e.target.value = ''; if (!file) return;
       const imp = $('#imp'); imp.innerHTML = '<p class="muted small">Lecture du fichier…</p>';
       try {
         const X = await chargerXlsx(); const wb = X.read(await file.arrayBuffer(), { type: 'array' });
-        const feuilles = wb.SheetNames.map(n => {
-          const { lignes, doublons, autresMails } = lireFeuille(X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' }));
-          return { nom: n.trim(), lignes, doublons, autresMails, connue: R.some(r => norm(r.nom) === norm(n)), invalides: lignes.filter(x => x.email && !EMAIL_OK(x.email)).length, sans: lignes.filter(x => !x.email).length };
+        // Le fichier fait foi : pour chaque résidence du fichier, ce qui n'y figure plus est retiré (comptes compris, accès suspendu)
+        const fiche = (f, villa) => { const r = R.find(z => norm(z.nom) === norm(f.nom));
+          const cle = (x) => [x.bloc, x.etage, x.appartement].filter(Boolean).join('-').toUpperCase();
+          const codesF = new Set(f.lignes.map(cle)), videsF = new Set(f.lignes.filter(x => !x.locataire && !x.email).map(cle));
+          const absents = r ? L.filter(x => x.residence_id === r.id && !codesF.has(String(x.code || '').toUpperCase())) : [];
+          // logement toujours dans le fichier mais sans locataire, alors qu'un compte y est actif : ce locataire est parti
+          const vides = r ? L.filter(x => x.residence_id === r.id && occupant.has(x.id) && videsF.has(String(x.code || '').toUpperCase())) : [];
+          // même logement, mais autre personne dans le fichier (nom ET e-mail différents) alors que l'ancien locataire a un compte actif
+          const parCode = new Map(f.lignes.map(x => [cle(x), x]));
+          const remplaces = r ? L.filter(x => { if (x.residence_id !== r.id || !occupant.has(x.id) || !x.email) return false; const n = parCode.get(String(x.code || '').toUpperCase());
+            return n && n.email && norm(n.email) !== norm(x.email) && norm(n.locataire) !== norm(x.locataire); }) : [];
+          const perdus = [...absents.filter(x => occupant.has(x.id)), ...vides, ...remplaces].map(x => `${occupant.get(x.id) || x.locataire || 'un résident'} (${x.code})`);
+          const avant = r ? L.filter(x => x.residence_id === r.id && (x.locataire || x.email || occupant.has(x.id))).length : 0;
+          return { ...f, villa, connue: !!r, absents, vides, remplaces, perdus, avant, apres: f.lignes.filter(x => x.locataire || x.email).length, invalides: f.lignes.filter(x => x.email && !EMAIL_OK(x.email)).length, sans: f.lignes.filter(x => x.locataire && !x.email).length }; };
+        const feuilles = wb.SheetNames.flatMap(n => {
+          const rows = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' });
+          if (estFeuilleVillas(rows)) return lireVillas(rows).map(f => fiche(f, true));
+          return [fiche({ nom: n.trim(), ...lireFeuille(rows) }, false)];
         }).filter(f => f.lignes.length);
-        if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue : vérifiez les colonnes BLOC, ETAGE, APP., LOCATAIRE, MAIL.</p>'; return; }
-        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} logements${f.connue ? '' : ' <span class="badge warn">nouvelle résidence</span>'}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}</li>`).join('')}</ul>
-          <label class="check"><input type="checkbox" id="off"> Retirer de la liste les logements absents du fichier (sauf comptes actifs)</label>
+        if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue. Résidences : colonnes BLOC, ETAGE, APP., LOCATAIRE, MAIL. Villas : NOM DE LA VILLA, NOM TECHNIQUE, LOCATAIRE, MAIL.</p>'; return; }
+        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} ${f.villa ? (f.lignes.length > 1 ? 'villas' : 'villa') + ` (${esc(f.lignes.map(x => x.appartement).join(', '))})` : 'logements'}${f.connue ? '' : ' <span class="badge warn">nouvelle résidence</span>'}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.connue ? `<div class="small">Locataires : <b>${f.avant}</b> aujourd’hui → <b>${f.apres}</b> après l’import${f.absents.length ? ` · <span class="err">${f.absents.length} logement${f.absents.length > 1 ? 's' : ''} absent${f.absents.length > 1 ? 's' : ''} du fichier retiré${f.absents.length > 1 ? 's' : ''}${f.absents.some(x => occupant.has(x.id)) ? `, dont ${f.absents.filter(x => occupant.has(x.id)).length} compte(s) actif(s) suspendu(s)` : ''}</span>` : ''}${f.vides.length ? ` · <span class="err">${f.vides.length} compte(s) actif(s) sur un logement désormais vide : accès suspendu</span>` : ''}${f.remplaces.length ? ` · <span class="err">${f.remplaces.length} logement(s) avec un nouveau locataire : l’ancien compte est suspendu</span>` : ''}${f.perdus.length ? `<div class="a-pb">Perdront l’accès (compte suspendu, réactivable) : ${esc(f.perdus.join(', '))}</div>` : ''}</div>` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}</li>`).join('')}</ul>
+          <p class="note small" style="margin:10px 0 0">Le fichier <b>remplace</b> la liste actuelle de chaque résidence qu’il contient : locataires, e-mails et logements. Ce qui n’y figure plus est retiré. Les résidences absentes du fichier ne changent pas. <b>Avant l’import, une sauvegarde de la liste actuelle est téléchargée</b> : en cas d’erreur, réimportez-la pour revenir en arrière.</p>
           <div class="row" style="margin-top:10px"><button class="btn" type="button" id="ok">Importer</button><button class="btn ghost" type="button" id="no">Annuler</button></div></div>`;
         imp.querySelector('#no').onclick = () => imp.innerHTML = '';
         imp.querySelector('#ok').onclick = async (ev) => {
-          ev.target.disabled = true; const bilan = [];
-          try { for (const f of feuilles) { const r = check(await sb.rpc('admin_importer_annuaire', { p_residence: f.nom, p_lignes: f.lignes, p_desactiver_absents: imp.querySelector('#off').checked })); bilan.push(`${f.nom} : ${r.crees} ajouté(s), ${r.mis_a_jour} mis à jour${r.desactives ? `, ${r.desactives} retiré(s)` : ''}`); } toast('Annuaire importé.'); annuaire._msg = bilan.join(' — '); await annuaire(box); }
-          catch (ex) { ev.target.disabled = false; toast(errMsg(ex)); }
+          const bt = ev.target;
+          // Garde-fou : grosse baisse, comptes qui perdent l'accès ou résidence inconnue (faute de frappe = doublon) → confirmation tapée
+          const perdus = feuilles.flatMap(f => f.perdus), chute = feuilles.filter(f => f.connue && f.avant >= 5 && f.apres < f.avant / 2), nouvelles = feuilles.filter(f => !f.connue);
+          if (perdus.length || chute.length || nouvelles.length) {
+            const okk = await dialogue({ titre: 'Vérifiez avant d’importer', ok: 'Importer', danger: true, saisie: { label: 'Tapez IMPORTER pour confirmer', attendu: 'IMPORTER' },
+              corps: `<ul>${chute.map(f => li(`<b>${esc(f.nom)}</b> : ${f.avant} locataires aujourd’hui → <b>${f.apres}</b> après l’import. Si le fichier est incomplet ou n’est pas le bon, annulez.`)).join('')}
+                ${perdus.length ? li(`<b>${perdus.length} compte${perdus.length > 1 ? 's' : ''}</b> perdront l’accès (suspendus, réactivables avec un nouveau code) : ${esc(perdus.slice(0, 8).join(', '))}${perdus.length > 8 ? '…' : ''}`) : ''}
+                ${nouvelles.length ? li(`Nouvelle${nouvelles.length > 1 ? 's' : ''} résidence${nouvelles.length > 1 ? 's' : ''} créée${nouvelles.length > 1 ? 's' : ''} : <b>${esc(nouvelles.map(f => f.nom).join(', '))}</b>. Vérifiez l’orthographe : une faute de frappe crée un doublon.`) : ''}</ul>
+                <p>Une sauvegarde de la liste actuelle sera téléchargée juste avant l’import.</p>` });
+            if (!okk) return;
+          }
+          bt.disabled = true; const bilan = [];
+          try { if (sauvegarder(X, feuilles)) toast('Sauvegarde téléchargée.');
+            for (const f of feuilles) { const r = check(await sb.rpc('admin_importer_annuaire', { p_residence: f.nom, p_lignes: f.lignes, p_desactiver_absents: true }));
+              if (f.absents.length) { const ids = f.absents.map(x => x.id), avecCompte = f.absents.filter(x => occupant.has(x.id)).map(x => x.id);
+                check(await sb.from('invitations').delete().in('logement_id', ids).is('utilisee_par', null));
+                if (avecCompte.length) { check(await sb.from('profiles').update({ statut: 'desactive' }).in('logement_id', avecCompte).eq('statut', 'actif'));
+                  check(await sb.from('logements').update({ actif: false }).in('id', avecCompte)); } }
+              if (f.vides.length) check(await sb.from('profiles').update({ statut: 'desactive' }).in('logement_id', f.vides.map(x => x.id)).eq('statut', 'actif'));
+              if (f.remplaces.length) check(await sb.from('profiles').update({ statut: 'desactive', logement_id: null }).in('logement_id', f.remplaces.map(x => x.id)).eq('statut', 'actif'));
+              if (f.villa) { // marquer les logements comme villas et la résidence comme ensemble de villas
+                const { data: rr } = await sb.from('residences').select('id,type_bien').ilike('nom', f.nom).limit(1);
+                if (rr?.[0]) { check(await sb.from('logements').update({ type_logement: 'Villa' }).eq('residence_id', rr[0].id).in('appartement', f.lignes.map(x => x.appartement)));
+                  if (!rr[0].type_bien) check(await sb.from('residences').update({ type_bien: 'Villas en résidence' }).eq('id', rr[0].id)); } }
+              bilan.push(`${f.nom} : ${r.crees} ajouté(s), ${r.mis_a_jour} mis à jour${f.absents.length ? `, ${f.absents.length} retiré(s)` : ''}`); } toast('Annuaire importé.'); annuaire._msg = bilan.join(' — '); await annuaire(box); }
+          catch (ex) { bt.disabled = false; toast(errMsg(ex)); }
         };
       } catch (ex) { imp.innerHTML = `<p class="err">${esc(errMsg(ex))}</p>`; }
     };
@@ -640,16 +722,16 @@ const alerte = (t) => `<div class="a-pb">${esc(t)}</div>`;
 // ---------- Comptes (§2) ----------
 async function comptes(box) {
   const [{ data }, lg] = await Promise.all([
-    sb.from('profiles').select('id,nom_affichage,statut,date_activation,date_fin_occupation,type_occupant,is_admin,is_adress,logement_id,residence_id,logements(code,numero,locataire,bloc),residences(nom)').order('created_at', { ascending: false }),
-    sb.from('logements').select('id,code,residence_id,locataire,bloc,etage,appartement,residences(nom)').eq('actif', true)]);
-  const D = data || [], LG = (lg.data || []).filter(l => l.bloc).sort((a, b) => (a.residences?.nom || '').localeCompare(b.residences?.nom || '') || triLog(a, b));
+    sb.from('profiles').select('id,nom_affichage,statut,date_activation,date_fin_occupation,type_occupant,is_admin,is_adress,logement_id,residence_id,logements(code,numero,locataire,bloc,type_logement),residences(nom)').order('created_at', { ascending: false }),
+    sb.from('logements').select('id,code,residence_id,locataire,bloc,etage,appartement,type_logement,residences(nom)').eq('actif', true)]);
+  const D = data || [], LG = (lg.data || []).filter(l => l.bloc || estVilla(l)).sort((a, b) => (a.residences?.nom || '').localeCompare(b.residences?.nom || '') || triLog(a, b));
   const pris = new Set(D.filter(p => p.statut === 'actif' && p.logement_id).map(p => p.logement_id));
   const tags = (p) => { const d = dans(p.date_fin_occupation), t = [p.statut === 'actif' ? 'actif' : p.statut === 'desactive' ? 'retire' : 'attente'];
     if (p.statut === 'actif' && d != null && d <= 30) t.push('depart'); if (p.is_admin || p.is_adress) t.push('equipe'); if (problemes(p).length) t.push('pb'); return t.join(' '); };
   const problemes = (p) => { const r = [], d = dans(p.date_fin_occupation);
     if (p.statut === 'actif' && d != null && d < 0) r.push('Date de fin dépassée : le retrait automatique n’a pas encore eu lieu, retirez le compte');
     if (p.statut === 'actif' && !p.logement_id && !p.is_adress && !p.is_admin) r.push('Aucun logement rattaché : touchez « Logement »');
-    if (p.logement_id && p.logements && !p.logements.bloc) r.push('Ancien code absent de Nos locataires : touchez « Logement » pour le rattacher au bon appartement');
+    if (p.logement_id && ancienCode(p.logements)) r.push('Ancien code absent de Nos locataires : touchez « Logement » pour le rattacher au bon appartement');
     if (p.statut === 'en_attente' || (p.statut !== 'actif' && p.statut !== 'desactive')) r.push('Compte créé sans code valide : renvoyez-lui une invitation');
     return r; };
   const fin = (p) => { const d = dans(p.date_fin_occupation); return d == null ? '' : d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`; };
@@ -674,7 +756,7 @@ async function comptes(box) {
     const sel = cell.querySelector('select'); sel.focus();
     sel.onchange = () => { const l = LG.find(x => x.id === sel.value); if (!l) return;
       if (!confirm(`Rattacher ${p.nom_affichage || 'ce compte'} au logement ${l.code} (${l.residences?.nom || ''}) ?`)) { rerender(); return; }
-      action(async () => { const ancien = p.logements && !p.logements.bloc ? p.logement_id : null;
+      action(async () => { const ancien = ancienCode(p.logements) ? p.logement_id : null;
         check(await sb.from('profiles').update({ logement_id: l.id, residence_id: l.residence_id }).eq('id', p.id));
         if (ancien && !D.some(x => x.id !== p.id && x.logement_id === ancien)) await sb.from('logements').update({ actif: false }).eq('id', ancien);
       }, 'Compte rattaché à ' + l.code + '.'); };
@@ -918,13 +1000,13 @@ async function parametres(box) {
 async function base() {
   const [res, log, pro, inv] = await Promise.all([
     sb.from('residences').select('id,nom').order('nom'),
-    sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email').eq('actif', true),
+    sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email,type_logement').eq('actif', true),
     sb.from('profiles').select('id,nom_affichage,logement_id,statut,date_activation,date_fin_occupation').eq('statut', 'actif'),
     sb.from('invitations').select('code,logement_id,nom_affichage,email,expire_le,utilisee_par,utilisee_le,created_at,type_occupant,is_adress,is_admin').order('created_at', { ascending: false }).limit(2000)]);
   const R = res.data || [], L = log.data || [], P = pro.data || [], I = inv.data || [];
   const compte = new Map(P.filter(p => p.logement_id).map(p => [p.logement_id, p]));
   const code = new Map(); I.forEach(i => { if (i.logement_id && !i.utilisee_par && new Date(i.expire_le) > Date.now() && !code.has(i.logement_id)) code.set(i.logement_id, i); });
-  const etat = (x) => compte.has(x.id) ? 'inscrit' : code.has(x.id) ? 'code' : !x.locataire && !x.email ? 'libre' : !x.bloc || !x.locataire || !EMAIL_OK(x.email) ? 'completer' : 'inviter';
+  const etat = (x) => compte.has(x.id) ? 'inscrit' : code.has(x.id) ? 'code' : !x.locataire && !x.email ? 'libre' : ancienCode(x) || !x.locataire || !EMAIL_OK(x.email) ? 'completer' : 'inviter';
   const nomRes = new Map(R.map(r => [r.id, r.nom]));
   return { R, L, P, I, compte, code, etat, nomRes };
 }
@@ -1029,7 +1111,8 @@ async function plan(box) {
     const blocs = [...new Set(l.map(x => x.bloc || ''))].sort((a, b) => (a === '') - (b === '') || a.localeCompare(b, 'fr', { numeric: true }));
     const tuile = (x) => { const e = etat(x), nom = compte.get(x.id)?.nom_affichage || x.locataire || ''; return `<button type="button" class="pl-t ${e}${x.id === sel ? ' sel' : ''}" data-l="${x.id}" aria-pressed="${x.id === sel}" aria-label="${esc(x.code)}, ${ETATS_LOG[e]}${nom ? ', ' + esc(nom) : ''}"><b>${esc(x.appartement || x.code)}</b><span>${esc(nom ? nom.split(/\s+/).slice(0, 2).join(' ') : 'Libre')}</span></button>`; };
     const bloc = (b) => { const lb = l.filter(x => (x.bloc || '') === b); const et = [...new Set(lb.map(x => x.etage || ''))].sort((p, q) => RANG_ET(q) - RANG_ET(p));
-      return `<section class="pl-b"><h3>${b ? 'Bloc ' + esc(b) : 'Anciens codes'}</h3>${et.map(e => `<div class="pl-e"><span class="pl-el">${esc(e || '—')}</span><div class="pl-ts">${lb.filter(x => (x.etage || '') === e).sort(triLog).map(tuile).join('')}</div></div>`).join('')}</section>`; };
+      const vil = !b && lb.every(estVilla);
+      return `<section class="pl-b"><h3>${b ? 'Bloc ' + esc(b) : vil ? 'Villas' : 'Anciens codes'}</h3>${et.map(e => `<div class="pl-e${vil ? ' pl-vil' : ''}"><span class="pl-el">${vil ? '' : esc(e || '—')}</span><div class="pl-ts">${lb.filter(x => (x.etage || '') === e).sort(triLog).map(tuile).join('')}</div></div>`).join('')}</section>`; };
     box.innerHTML = `
     <div class="pl-top"><div class="chips pl-res" role="tablist" aria-label="Résidence">${R.map(r => `<button type="button" role="tab" aria-selected="${r.id === rid}" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)}</button>`).join('')}</div>
       ${nb('inviter') ? `<button type="button" class="btn sm" id="plx">Inviter les ${nb('inviter')} de ${esc(nomRes.get(rid))}</button>` : ''}</div>
@@ -1055,7 +1138,7 @@ async function plan(box) {
         <label for="plm">E-mail (pour se connecter)</label><input id="plm" type="email" value="${esc(x.email || '')}" placeholder="prenom.nom@exemple.com" ${(!x.email && e !== 'libre') || mailKo ? 'aria-invalid="true"' : ''}>
         ${e === 'libre' || c ? '' : !x.locataire && !x.email ? '' : !x.email ? '<p class="a-pb">E-mail manquant : sans lui, le locataire ne peut pas créer son compte.</p>' : mailKo ? `<p class="a-pb">E-mail mal écrit (accent ou espace)${fixMail(x.email) ? ` · <button type="button" class="lnk" id="plfix">Corriger en ${esc(fixMail(x.email))}</button>` : ''}</p>` : ''}
         <p class="err small" id="plerr" hidden></p>
-        ${!x.bloc ? '<p class="a-pb">Ancien code : rattachez ce compte au bon appartement dans Comptes › Logement.</p>' : ''}
+        ${ancienCode(x) ? '<p class="a-pb">Ancien code : rattachez ce compte au bon appartement dans Comptes › Logement.</p>' : ''}
         <ol class="pl-tl">${etape(!!(x.locataire || c), 'Dans la liste', x.locataire ? esc(x.locataire) : 'nom à saisir')}${etape(!!(envoye || c), 'Code envoyé', envoye ? `${esc(envoye.code)} · ${c ? 'utilisé' : 'valable jusqu’au ' + dateFr(envoye.expire_le)}` : '')}${etape(!!c, 'Inscrit au Club', c?.date_activation ? 'le ' + dateFr(c.date_activation) : '')}</ol>
         <div class="pl-act">
           ${c ? '<a class="btn sm soft block" href="#/admin/comptes">Voir dans Comptes</a>' : `<button class="btn block" id="plgo">${i ? 'Renvoyer le code par WhatsApp' : 'Enregistrer et inviter par WhatsApp'}</button>`}

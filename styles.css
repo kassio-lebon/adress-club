@@ -1181,3 +1181,6 @@ body.dlg-on{overflow:hidden}
 .aide .aide-et{margin:12px 0 0;padding:0}
 /* v82 · bouton Supprimer sur chaque ligne de Nos locataires */
 .btn-sup svg{width:15px;height:15px;stroke-width:2}
+/* v84 · villas dans le plan (pas d'étage) */
+.pl-e.pl-vil{grid-template-columns:1fr}
+.pl-e.pl-vil .pl-el{display:none}
