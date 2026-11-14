@@ -1318,3 +1318,33 @@ table.adm td.c-ph{width:72px;padding-right:0}
   .aide .aide-et{display:none}
   .aide.ouvert .aide-et{display:grid;animation:rise .35s var(--ease) both}
 }
+
+/* v95 : résidences et villas bien séparées — sélecteur de type puis bien voulu */
+.tsw{display:inline-flex;gap:4px;padding:4px;border-radius:14px;background:var(--sunken);border:1px solid var(--line);max-width:100%;margin:0 0 12px}
+.tsw button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:0;border-radius:10px;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background .2s var(--ease),color .2s var(--ease),box-shadow .2s var(--ease)}
+.tsw button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tsw button em{font-style:normal;font-size:12px;font-weight:700;min-width:22px;padding:1px 7px;border-radius:999px;background:var(--surface);color:var(--muted);text-align:center}
+.tsw button:hover{color:var(--ink)}
+.tsw button.on{background:var(--ink);color:#fff;box-shadow:0 2px 8px rgba(22,23,26,.18)}
+.tsw button.on em{background:rgba(255,255,255,.18);color:#fff}
+.tsw button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.ann-top .tsw{display:flex;width:max-content}
+.x-top+.tsw{margin-top:14px}
+.tsw+.x-res{margin-top:2px}
+/* tableau de bord : deux blocs distincts avec leur total */
+.j-g{margin-top:14px}
+.j-g:first-of-type{margin-top:4px}
+.j-g+.j-g{padding-top:14px;border-top:2px solid var(--line)}
+.j-grp{display:flex;align-items:center;gap:8px;margin:0 0 4px;padding:8px 12px;border-radius:10px;background:var(--sunken);font-size:13px;letter-spacing:0;text-transform:none;color:var(--ink)}
+.j-grp svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;color:var(--ink)}
+.j-grp b{font-size:14px}
+.j-grp span{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--surface);color:var(--muted)}
+.j-grp em{margin-left:auto;font-style:normal;font-size:12.5px;font-weight:600;color:var(--muted)}
+.j-g a:first-of-type{border-top:0}
+@media (max-width:600px){
+  .tsw{display:flex;width:100%}
+  .tsw button{flex:1 1 0;min-width:0;justify-content:center;gap:6px;padding:0 8px}
+  .tsw.t3 button{font-size:13.5px;padding:0 6px}
+  .tsw.t3 button svg{display:none}
+  .ann-top .tsw{width:100%}
+}

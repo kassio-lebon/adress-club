@@ -4,15 +4,15 @@ import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, FILTRES_BP, com
 // Navigation en 4 groupes (au lieu de 11 onglets à plat) : on choisit d'abord le domaine, puis l'écran
 const GROUPES = [
   ['Aujourd’hui', [['jour', 'Aujourd’hui']]],
-  ['Locataires', [['plan', 'Plan des résidences'], ['residences', 'Résidences'], ['villas', 'Villas'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
+  ['Locataires', [['plan', 'Plan résidences et villas'], ['residences', 'Résidences'], ['villas', 'Villas'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
   ['Le Market', [['annonces', 'Annonces'], ['moderation', 'Signalements']]],
   ['Vitrine', [['contenus', 'Actualités'], ['partenaires', 'Bons plans']]],
   ['Pilotage', [['stats', 'Indicateurs'], ['avis', 'Avis'], ['parametres', 'Paramètres']]]];
 // Aide de chaque écran : une phrase « à quoi ça sert » et le pas-à-pas, toujours visibles (étapes numérotées courtes)
 const AIDE = {
-  plan: ['Chaque résidence vue comme un immeuble : un carré par appartement, sa couleur dit où en est le locataire.', [
-    'Choisissez la résidence en haut.',
-    'Touchez un appartement : sa fiche s’ouvre (nom, e-mail, historique).',
+  plan: ['Chaque résidence ou ensemble de villas vu comme un plan : un carré par logement, sa couleur dit où en est le locataire.', [
+    'En haut, choisissez « Résidences » ou « Villas », puis le bien voulu.',
+    'Touchez un logement : sa fiche s’ouvre (nom, e-mail, historique).',
     'Complétez la fiche puis « Enregistrer et inviter par WhatsApp » : le message part avec son code.',
     'Départ d’un locataire : « Libérer le logement ».']],
   express: ['Envoyer les invitations à la suite, sans rien saisir : un message WhatsApp prêt par locataire.', [
@@ -20,7 +20,7 @@ const AIDE = {
     'Revenez ici : l’envoi est coché et le locataire suivant s’affiche.',
     '« Passer » laisse un locataire pour plus tard ; « À relancer » renvoie les codes qui vont expirer.']],
   annuaire: ['La liste officielle des locataires de chaque résidence : un logement, un locataire, une adresse e-mail. Les invitations partent de cette liste.', [
-    'Choisissez la résidence en haut de l’écran.',
+    'En haut, choisissez « Résidences » ou « Villas », puis le bien dans la liste.',
     'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
     'Nouveau locataire sur un logement libre : « Affecter un locataire », puis « Affecter et inviter par WhatsApp ».',
     'Le locataire déménage : « Retirer » (compte suspendu, il peut revenir). Il quitte définitivement la résidence : « Supprimer ». Dans les deux cas le logement reste et redevient libre.',
@@ -73,6 +73,12 @@ const resVilla = (r) => /villa/i.test(r?.type_bien || '') || /^VILLAS?\b/i.test(
 // Menus : deux groupes « Résidences » puis « Villas »
 const optionsRes = (R, sel, lab = (r) => esc(r.nom)) => { const o = (r) => `<option value="${r.id}" ${r.id === sel ? 'selected' : ''}>${lab(r)}</option>`, a = R.filter(r => !resVilla(r)), v = R.filter(resVilla);
   return a.length && v.length ? `<optgroup label="Résidences">${a.map(o).join('')}</optgroup><optgroup label="Villas">${v.map(o).join('')}</optgroup>` : R.map(o).join(''); };
+// Sélecteur de type de bien : on choisit d'abord « Résidences » ou « Villas », puis le bien voulu
+const IC_RES = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V4h10v17M14 9h6v12M2.5 21h19M7.5 8h3M7.5 12h3M7.5 16h3"/></svg>';
+const IC_VIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V21h13V9.5M10 21v-5.5h4V21"/></svg>';
+const typeDe = (r) => resVilla(r) ? 'vil' : 'res';
+const choixType = (t, nRes, nVil, nTout) => `<div class="tsw${nTout != null ? ' t3' : ''}" role="group" aria-label="Type de bien">${[nTout != null ? ['tout', 'Tout', nTout, ''] : null, ['res', 'Résidences', nRes, IC_RES], ['vil', 'Villas', nVil, IC_VIL]].filter(Boolean)
+  .map(([k, lab, n, ic]) => `<button type="button" class="${t === k ? 'on' : ''}" aria-pressed="${t === k}" data-t="${k}">${ic}<span>${lab}</span><em>${n}</em></button>`).join('')}</div>`;
 // Boutons : résidences d'abord, puis les villas après un séparateur
 const parType = (R, f) => { const a = R.filter(r => !resVilla(r)), v = R.filter(resVilla); return a.map(f).join('') + (a.length && v.length ? '<span class="chips-sep" aria-hidden="true">Villas</span>' : '') + v.map(f).join(''); };
 
@@ -585,6 +591,7 @@ async function annuaire(box) {
   const choisie = annuaire._sel && R.find(r => norm(r.nom) === norm(annuaire._sel)); annuaire._sel = '';
   let rid = choisie ? choisie.id : annuaire._rid && R.some(r => r.id === annuaire._rid) ? annuaire._rid : (R.find(r => L.some(l => l.residence_id === r.id && l.bloc)) || R[0])?.id;
   let filtre = annuaire._f || 'tous', q = '';
+  const deuxTypes = R.some(resVilla) && R.some(r => !resVilla(r));
   const statut = (x) => {
     const e = etat(x), i = codes.get(x.id);
     return e === 'actif' ? `<span class="st-l actif">Compte actif</span>${occupant.get(x.id) ? `<div class="muted small">${esc(occupant.get(x.id))}</div>` : ''}`
@@ -601,7 +608,7 @@ async function annuaire(box) {
     const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', villa ? 'Villas libres' : 'Logements libres']];
     box.innerHTML = `
     <div class="card">
-      <div class="ann-top"><div><label for="ar" style="margin-top:0">${resVilla(R.find(r => r.id === rid)) ? 'Ensemble de villas' : 'Résidence'}</label><select id="ar">${optionsRes(R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select></div>
+      <div class="ann-top"><div>${deuxTypes ? choixType(typeDe(resA), R.filter(r => !resVilla(r)).length, R.filter(resVilla).length) : ''}<label for="ar" style="margin-top:${deuxTypes ? '12px' : '0'}">${resVilla(resA) ? 'Ensemble de villas' : 'Résidence'}</label><select id="ar">${optionsRes(deuxTypes ? R.filter(r => typeDe(r) === typeDe(resA)) : R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select></div>
       <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>${villa ? 'Ajouter une villa' : 'Ajouter un logement'}</button><button type="button" class="btn xl" id="xlGo" aria-expanded="false" aria-controls="imp" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</button><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
     <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div ${villa ? 'hidden' : ''}><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div ${villa ? 'hidden' : ''}><label for="ae">Étage</label><input type="text" id="ae"></div><div><label for="aa">${villa ? 'Nom technique de la villa (ex. A1)' : 'Appartement (4 caractères max.)'}</label><input type="text" id="aa" placeholder="${villa ? 'A1' : 'A001'}"></div></div>
@@ -624,6 +631,7 @@ async function annuaire(box) {
       brancher();
     };
     $('#ar').onchange = () => { rid = $('#ar').value; dessiner(); };
+    box.querySelectorAll('.tsw [data-t]').forEach(b => b.onclick = () => { if (b.dataset.t === typeDe(resA)) return; const T = R.filter(r => typeDe(r) === b.dataset.t); rid = (T.find(r => L.some(x => x.residence_id === r.id)) || T[0]).id; filtre = 'tous'; dessiner(); });
     const ouvrirAjout = (on) => { $('#faBox').hidden = !on; $('#addLog').setAttribute('aria-expanded', on); if (on) $('#ab').focus(); };
     $('#addLog').onclick = () => ouvrirAjout($('#faBox').hidden);
     $('#faNo').onclick = () => ouvrirAjout(false);
@@ -1185,11 +1193,12 @@ async function jour(box) {
     <button type="button" class="btn sm ${c.fort ? '' : 'soft'} block" data-go="${c.k}">${c.cta}</button></article>`).join('')}</section>`
     : '<div class="card center pad"><b>Rien en attente.</b><p class="muted">Tous les locataires connus ont leur code ou leur compte. Pensez à importer la liste à jour quand des locataires arrivent.</p></div>'}
   <div class="j-bas">
-    <section class="card j-adh" aria-labelledby="jadh"><div class="j-sh"><h3 id="jadh">Adhésion au Club par résidence</h3><span class="muted small">inscrits / logements occupés</span></div>
+    <section class="card j-adh" aria-labelledby="jadh"><div class="j-sh"><h3 id="jadh">Adhésion au Club</h3><span class="muted small">inscrits / logements occupés</span></div>
       ${adh.length ? (() => { const ligne = (a) => `<a href="#/admin/plan" data-r="${a.r.id}"><b>${esc(a.r.nom)}</b><span class="jauge"><i style="width:${a.pct}%"></i></span><span class="j-v">${a.m} / ${a.o}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>`;
         const ap = adh.filter(a => !resVilla(a.r)), vi = adh.filter(a => resVilla(a.r));
-        return ap.length && vi.length ? `<p class="j-grp">Résidences</p>${ap.map(ligne).join('')}<p class="j-grp">Villas</p>${vi.map(ligne).join('')}` : adh.map(ligne).join(''); })() : '<p class="muted">Aucun locataire enregistré.</p>'}
-      <p class="muted small">Touchez une résidence pour ouvrir son plan.</p></section>
+        const grp = (ic, lab, A, v) => `<div class="j-g${v ? ' v' : ''}"><div class="j-grp">${ic}<b>${lab}</b><span>${A.length}</span><em>${A.reduce((s, a) => s + a.m, 0)} / ${A.reduce((s, a) => s + a.o, 0)}</em></div>${A.map(ligne).join('')}</div>`;
+        return ap.length && vi.length ? grp(IC_RES, 'Résidences', ap) + grp(IC_VIL, 'Villas', vi, 1) : adh.map(ligne).join(''); })() : '<p class="muted">Aucun locataire enregistré.</p>'}
+      <p class="muted small">Touchez une ligne pour ouvrir son plan.</p></section>
     <section class="card j-fil" aria-labelledby="jfil"><h3 id="jfil">Ce qui s’est passé</h3>
       ${fil.length ? fil.map(e => `<div class="j-ev"><span class="j-av ${e.cls}" aria-hidden="true">${esc(e.ini)}</span><div><span><b>${esc(e.who)}</b> ${esc(e.what)}</span><span class="muted small">${ilYa(e.d)}</span></div></div>`).join('') : '<p class="muted">Rien pour l’instant.</p>'}</section>
   </div>`;
@@ -1234,13 +1243,16 @@ async function plan(box) {
     const bloc = (b) => { const lb = l.filter(x => (x.bloc || '') === b); const et = [...new Set(lb.map(x => x.etage || ''))].sort((p, q) => RANG_ET(q) - RANG_ET(p));
       const vil = !b && lb.every(estVilla);
       return `<section class="pl-b"><h3>${b ? 'Bloc ' + esc(b) : vil ? 'Villas' : 'Anciens codes'}</h3>${et.map(e => `<div class="pl-e${vil ? ' pl-vil' : ''}"><span class="pl-el">${vil ? '' : esc(e || '—')}</span><div class="pl-ts">${lb.filter(x => (x.etage || '') === e).sort(triLog).map(tuile).join('')}</div></div>`).join('')}</section>`; };
+    const tR = typeDe(R.find(r => r.id === rid)), deux = R.some(resVilla) && R.some(r => !resVilla(r));
     box.innerHTML = `
-    <div class="pl-top"><div class="chips pl-res" role="tablist" aria-label="Résidence">${parType(R, r => `<button type="button" role="tab" aria-selected="${r.id === rid}" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)}</button>`)}</div>
+    ${deux ? choixType(tR, R.filter(r => !resVilla(r)).length, R.filter(resVilla).length) : ''}
+    <div class="pl-top"><div class="chips pl-res" role="tablist" aria-label="${tR === 'vil' ? 'Ensemble de villas' : 'Résidence'}">${parType(deux ? R.filter(r => typeDe(r) === tR) : R, r => `<button type="button" role="tab" aria-selected="${r.id === rid}" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)}</button>`)}</div>
       ${nb('inviter') ? `<button type="button" class="btn sm" id="plx">Inviter les ${nb('inviter')} de ${esc(nomRes.get(rid))}</button>` : ''}</div>
     <div class="pl-leg">${['inscrit', 'code', 'inviter', 'completer', 'libre'].map(e => `<span><i class="pl-sw ${e}"></i>${ETATS_LOG[e]} <b>${nb(e)}</b></span>`).join('')}</div>
     <div class="pl-wrap"><div class="pl-plan">${l.length ? blocs.map(bloc).join('') : '<div class="card center pad">Aucun logement : importez la liste dans <a href="#/admin/annuaire">Nos locataires</a>.</div>'}</div>
-      <aside class="pl-f card" id="plf" aria-live="polite">${sel ? '' : '<p class="muted center">Touchez un appartement pour ouvrir sa fiche.</p>'}</aside></div>`;
+      <aside class="pl-f card" id="plf" aria-live="polite">${sel ? '' : `<p class="muted center">Touchez ${tR === 'vil' ? 'une villa' : 'un appartement'} pour ouvrir sa fiche.</p>`}</aside></div>`;
     box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { rid = b.dataset.r; sel = null; dessiner(); });
+    box.querySelectorAll('.tsw [data-t]').forEach(b => b.onclick = () => { if (b.dataset.t === tR) return; const T = R.filter(r => typeDe(r) === b.dataset.t); rid = (T.find(r => L.some(x => x.residence_id === r.id)) || T[0]).id; sel = null; dessiner(); });
     box.querySelectorAll('.pl-t').forEach(b => b.onclick = () => { sel = b.dataset.l; box.querySelectorAll('.pl-t').forEach(t => { t.classList.toggle('sel', t === b); t.setAttribute('aria-pressed', t === b); }); fiche(true); });
     const x = box.querySelector('#plx'); if (x) x.onclick = () => { express._mode = 'nouveau'; express._rid = rid; location.hash = '#/admin/express'; };
     if (sel) fiche(false);
@@ -1291,6 +1303,8 @@ async function plan(box) {
 async function express(box) {
   const B = await base(); const { R, L, I, compte, code, etat, nomRes } = B;
   let mode = express._mode === 'relance' ? 'relance' : 'nouveau', rid = express._rid || null;
+  const resDe = new Map(R.map(r => [r.id, r])); let tx = rid ? typeDe(resDe.get(rid)) : express._t || 'tout';
+  const deTx = (o) => tx === 'tout' || typeDe(resDe.get(o.x.residence_id)) === tx;
   const J7 = Date.now() + 7 * J_MS;
   const ordre = (a, b) => (nomRes.get(a.x.residence_id) || '').localeCompare(nomRes.get(b.x.residence_id) || '') || triLog(a.x, b.x);
   const listes = {
@@ -1298,23 +1312,25 @@ async function express(box) {
     relance: L.filter(x => { const i = code.get(x.id); return i && !compte.has(x.id) && new Date(i.expire_le) <= J7; }).map(x => ({ x, inv: code.get(x.id) })).sort(ordre) };
   const fait = new Map(); // id logement → 'envoye' | 'passe'
   let cur = null;
-  const file = () => listes[mode].filter(o => !rid || o.x.residence_id === rid);
+  const file = () => listes[mode].filter(o => rid ? o.x.residence_id === rid : deTx(o));
   const prochain = () => { const f = file(); cur = (f.find(o => !fait.has(o.x.id)) || null)?.x.id ?? null; };
   const dessiner = () => {
-    express._mode = mode; express._rid = rid;
+    express._mode = mode; express._rid = rid; express._t = tx;
     const f = file(), n = f.length, env = f.filter(o => fait.get(o.x.id) === 'envoye').length;
     if (cur && !f.some(o => o.x.id === cur)) cur = null;
     if (!cur) prochain();
     const o = f.find(v => v.x.id === cur), k = o ? f.indexOf(o) + 1 : 0;
     const resCount = (r) => listes[mode].filter(v => v.x.residence_id === r).length;
-    const resAvec = R.filter(r => resCount(r.id));
+    const resAvec = R.filter(r => resCount(r.id)), deuxX = resAvec.some(resVilla) && resAvec.some(r => !resVilla(r));
+    const nT = (t) => listes[mode].filter(v => typeDe(resDe.get(v.x.residence_id)) === t).length, resX = resAvec.filter(r => tx === 'tout' || typeDe(r) === tx);
     const apercu = o ? msgInvit(o.inv || { nom_affichage: o.x.locataire, email: o.x.email, code: '••••••••', expire_le: new Date(Date.now() + 30 * J_MS) }) : '';
     box.innerHTML = `
     <div class="x-top">
       <div class="chips x-mode" role="tablist" aria-label="Type d’envoi"><button type="button" role="tab" class="chip ${mode === 'nouveau' ? 'on' : ''}" aria-selected="${mode === 'nouveau'}" data-m="nouveau">À inviter <span>${listes.nouveau.length}</span></button><button type="button" role="tab" class="chip ${mode === 'relance' ? 'on' : ''}" aria-selected="${mode === 'relance'}" data-m="relance">À relancer <span>${listes.relance.length}</span></button></div>
       ${n ? `<div class="x-prog"><b>${env} envoyé${env > 1 ? 's' : ''} sur ${n}</b><span class="jauge"><i style="width:${Math.round(100 * env / n)}%"></i></span></div>` : ''}
     </div>
-    ${resAvec.length > 1 ? `<div class="chips ann-f x-res"><button type="button" class="chip ${!rid ? 'on' : ''}" data-r="">Toutes <span>${listes[mode].length}</span></button>${parType(resAvec, r => `<button type="button" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)} <span>${resCount(r.id)}</span></button>`)}</div>` : ''}
+    ${deuxX ? choixType(tx, nT('res'), nT('vil'), listes[mode].length) : ''}
+    ${resX.length > 1 && (!deuxX || tx !== 'tout') ? `<div class="chips ann-f x-res"><button type="button" class="chip ${!rid ? 'on' : ''}" data-r="">${tx === 'vil' ? 'Toutes les villas' : tx === 'res' ? 'Toutes les résidences' : 'Toutes'} <span>${listes[mode].filter(deTx).length}</span></button>${parType(resX, r => `<button type="button" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)} <span>${resCount(r.id)}</span></button>`)}</div>` : ''}
     ${!n ? `<div class="card center pad"><b>${mode === 'nouveau' ? 'Personne à inviter.' : 'Aucun code à relancer.'}</b><p class="muted">${mode === 'nouveau' ? 'Tous les locataires complets ont déjà un code ou un compte. Les fiches incomplètes se corrigent dans le <a href="#/admin/plan">plan des résidences</a>.' : 'Aucun code n’expire dans les 7 jours.'}</p></div>`
     : `<div class="x-wrap">
       <section class="card x-file" aria-label="File d’envoi"><ol>${f.map(v => { const s = fait.get(v.x.id) || (v.x.id === cur ? 'cours' : 'att'); return `<li><button type="button" class="x-it ${s}" data-l="${v.x.id}" ${v.x.id === cur ? 'aria-current="true"' : ''}><i aria-hidden="true">${s === 'envoye' ? '<svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>' : ''}</i><span><b>${esc(v.x.locataire || '')}</b><span class="muted small">${rid ? '' : esc(nomRes.get(v.x.residence_id) || '') + ' · '}${esc(v.x.code)}</span></span><em>${s === 'envoye' ? 'Envoyé' : s === 'passe' ? 'Passé' : s === 'cours' ? 'En cours' : 'À envoyer'}</em></button></li>`; }).join('')}</ol></section>
@@ -1330,6 +1346,7 @@ async function express(box) {
     </div>`}`;
     box.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; cur = null; dessiner(); });
     box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { rid = b.dataset.r || null; cur = null; dessiner(); });
+    box.querySelectorAll('.tsw [data-t]').forEach(b => b.onclick = () => { tx = b.dataset.t; rid = null; cur = null; dessiner(); });
     box.querySelectorAll('.x-it').forEach(b => b.onclick = () => { cur = b.dataset.l; dessiner(); });
     if (!o) return;
     const obtenir = async () => { if (!o.inv) { o.inv = await creerInvit(o.x); code.set(o.x.id, o.inv); I.unshift(o.inv); } return o.inv; };
