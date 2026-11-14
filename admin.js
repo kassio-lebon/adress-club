@@ -306,6 +306,10 @@ const EMAIL_RE = /[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 // Fichier BASE VILLA : NOM DE LA VILLA | NOM TECHNIQUE | LOCATAIRE | MAIL, toutes les villas sur une feuille.
 // Chaque « nom de villa » devient une résidence « VILLA <NOM> » ; chaque nom technique (A1, V3, 1…) un logement de type Villa.
 const estFeuilleVillas = (rows) => rows.some(r => (r || []).some(c => norm(c).startsWith('nom technique')));
+// Code d'une villa = PRÉFIXE-NOM TECHNIQUE (LUM-A1, HER-B1, EME-V3) : unique sans avoir à préciser l'ensemble
+const prefVilla = (nom) => (norm(nom).toUpperCase().replace(/^VILLAS?\s+/, '').replace(/[^A-Z0-9]/g, '') || 'VIL').slice(0, 3);
+const techVilla = (app, nom) => { const t = String(app || '').toUpperCase(), p = prefVilla(nom) + '-'; return t.startsWith(p) ? t.slice(p.length) : t; };
+const codeVilla = (nom, tech) => prefVilla(nom) + '-' + techVilla(tech, nom).replace(/[^A-Z0-9]/g, '');
 const nomResVilla = (n) => { const t = String(n || '').trim().replace(/\s+/g, ' ').toUpperCase(); return /^VILLAS?\b/.test(t) ? t : 'VILLA ' + t; };
 function lireVillas(rows) {
   let hi = -1; rows.forEach((r, i) => { if ((r || []).some(c => norm(c).startsWith('nom technique'))) hi = i; }); // dernière ligne d'en-tête (le fichier en répète une)
@@ -320,13 +324,13 @@ function lireVillas(rows) {
     // Ligne sans villa ni nom technique : suite de la villa précédente (ex. locataire écrit une ligne plus bas)
     if (!g(iV) && !g(iT)) { if (prec) { if (!prec.locataire) prec.locataire = loc; if (!prec.email) prec.email = mails[0] || ''; } continue; }
     if (g(iV)) villa = nomResVilla(g(iV));
-    const tech = norm(g(iT)).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const tech = norm(g(iT)).toUpperCase().replace(/[^A-Z0-9-]/g, '');
     if (!villa || !tech) continue;
     if (!groupes.has(villa)) groupes.set(villa, { nom: villa, lignes: [], doublons: [], autresMails: [] });
     const G = groupes.get(villa);
     if (mails.length > 1) G.autresMails.push({ code: tech, autres: mails.slice(1) });
-    const deja = G.lignes.find(x => x.appartement === tech);
-    const l = { bloc: '', etage: '', appartement: tech, locataire: loc, email: mails[0] || '' };
+    const deja = G.lignes.find(x => x.appartement === codeVilla(villa, tech));
+    const l = { bloc: '', etage: '', appartement: codeVilla(villa, tech), locataire: loc, email: mails[0] || '' };
     if (deja) { if (l.locataire || l.email) { if (deja.locataire || deja.email) G.doublons.push({ code: tech, garde: l.locataire, ignores: [deja.locataire] }); Object.assign(deja, l); } prec = deja; }
     else { G.lignes.push(l); prec = l; }
   }
@@ -575,7 +579,7 @@ async function annuaire(box) {
     $('#aq').oninput = () => { q = $('#aq').value; lignes(); };
     box.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtre = b.dataset.f; box.querySelectorAll('[data-f]').forEach(c => c.classList.toggle('on', c === b)); annuaire._f = filtre; lignes(); });
     const etAjout = listeEtages($('#ae'), l.map(x => x.etage)); majApp($('#aa')); majBloc($('#ab'));
-    $('#fa').onsubmit = (e) => { e.preventDefault(); if (villa && !$('#aa').value.trim()) { $('#aa').focus(); return toast('Indiquez le nom technique de la villa (ex. A1).'); } if (!$('#ab').value.trim() && !$('#ae').value.trim() && !$('#aa').value.trim()) return toast('Indiquez le bloc, l’étage ou l’appartement.'); if (!etAjout.ok()) { $('#ae').setAttribute('aria-invalid', 'true'); $('#ae').focus(); return toast('Choisissez l’étage dans la liste.'); } const m = $('#am').value.trim().toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide.'); action(async () => check(await sb.from('logements').insert({ residence_id: rid, code: 'tmp-' + Date.now(), bloc: $('#ab').value.trim(), etage: etAjout.val(), appartement: $('#aa').value.trim(), locataire: $('#an').value || null, email: m || null, type_logement: villa ? 'Villa' : 'Appartement' })), villa ? 'Villa ajoutée.' : 'Logement ajouté.'); };
+    $('#fa').onsubmit = (e) => { e.preventDefault(); if (villa && !$('#aa').value.trim()) { $('#aa').focus(); return toast('Indiquez le nom technique de la villa (ex. A1).'); } if (!$('#ab').value.trim() && !$('#ae').value.trim() && !$('#aa').value.trim()) return toast('Indiquez le bloc, l’étage ou l’appartement.'); if (!etAjout.ok()) { $('#ae').setAttribute('aria-invalid', 'true'); $('#ae').focus(); return toast('Choisissez l’étage dans la liste.'); } const m = $('#am').value.trim().toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide.'); action(async () => check(await sb.from('logements').insert({ residence_id: rid, code: 'tmp-' + Date.now(), bloc: $('#ab').value.trim(), etage: etAjout.val(), appartement: villa ? codeVilla(resA?.nom, $('#aa').value.trim()) : $('#aa').value.trim(), locataire: $('#an').value || null, email: m || null, type_logement: villa ? 'Villa' : 'Appartement' })), villa ? 'Villa ajoutée.' : 'Logement ajouté.'); };
     function brancher() {
     box.querySelectorAll('[data-fix]').forEach(b => b.onclick = () => action(async () => check(await sb.from('logements').update({ email: b.dataset.fix }).eq('id', b.closest('tr').dataset.id)), 'E-mail corrigé.'));
     // Retirer le locataire : le logement redevient libre ; son compte (s'il en a un) est fermé sans perte, son code en attente annulé
@@ -612,14 +616,14 @@ async function annuaire(box) {
     box.querySelectorAll('[data-inv]').forEach(b => b.onclick = () => { invitations._pre = b.closest('tr').dataset.id; location.hash = '#/admin/invitations'; });
     box.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => {
       const tr = b.closest('tr'), x = L.find(y => y.id === tr.dataset.id);
-      tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div ${estVilla(x) ? 'hidden' : ''}><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div ${estVilla(x) ? 'hidden' : ''}><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>${estVilla(x) ? 'Nom technique de la villa' : 'Appartement'}</label><input type="text" name="appartement" value="${esc(x.appartement || '')}"></div></div>
+      tr.innerHTML = `<td colspan="4"><form class="ann-ed" novalidate><div class="g3f"><div ${estVilla(x) ? 'hidden' : ''}><label>Bloc</label><input type="text" name="bloc" value="${esc(x.bloc || '')}"></div><div ${estVilla(x) ? 'hidden' : ''}><label>Étage</label><input type="text" name="etage" value="${esc(x.etage || '')}"></div><div><label>${estVilla(x) ? 'Nom technique de la villa' : 'Appartement'}</label><input type="text" name="appartement" value="${esc(estVilla(x) ? techVilla(x.appartement, resA?.nom) : x.appartement || '')}"></div></div>
         <div class="grid2"><div><label>Locataire</label><input type="text" name="locataire" value="${esc(x.locataire || '')}"></div><div><label>E-mail</label><input name="email" type="email" value="${esc(x.email || '')}"></div></div>
         <div class="row" style="margin-top:10px"><button class="btn sm">Enregistrer</button><button class="btn sm ghost" type="button" data-x>Annuler</button><button class="btn sm danger" type="button" data-off>Supprimer le logement</button></div></form></td>`;
       const f = tr.querySelector('form'), v = (n) => f.elements[n].value.trim();
       const etEd = listeEtages(f.elements.etage, l.map(y => y.etage)); majApp(f.elements.appartement); majBloc(f.elements.bloc);
       f.querySelector('[data-x]').onclick = dessiner;
       f.querySelector('[data-off]').onclick = () => supprimerLogement(x);
-      f.onsubmit = (e) => { e.preventDefault(); if (!etEd.ok()) { f.elements.etage.setAttribute('aria-invalid', 'true'); f.elements.etage.focus(); return toast('Choisissez l’étage dans la liste.'); } const m = v('email').toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide (pas d’accent ni d’espace).'); action(async () => check(await sb.from('logements').update({ bloc: v('bloc'), etage: etEd.val(), appartement: v('appartement'), locataire: v('locataire') || null, email: m || null }).eq('id', x.id)), 'Locataire mis à jour.'); };
+      f.onsubmit = (e) => { e.preventDefault(); if (!etEd.ok()) { f.elements.etage.setAttribute('aria-invalid', 'true'); f.elements.etage.focus(); return toast('Choisissez l’étage dans la liste.'); } const m = v('email').toLowerCase(); if (m && !EMAIL_OK(m)) return toast('E-mail non valide (pas d’accent ni d’espace).'); action(async () => check(await sb.from('logements').update({ bloc: v('bloc'), etage: etEd.val(), appartement: estVilla(x) ? codeVilla(resA?.nom, v('appartement')) : v('appartement'), locataire: v('locataire') || null, email: m || null }).eq('id', x.id)), 'Locataire mis à jour.'); };
     });
     }
     lignes();
@@ -628,7 +632,7 @@ async function annuaire(box) {
       const wb = X.utils.book_new(), vil = [['NOM DE LA VILLA', 'NOM TECHNIQUE', 'LOCATAIRE', 'MAIL']];
       liste.forEach(f => { const r = R.find(z => norm(z.nom) === norm(f.nom)); if (!r) return;
         const lg = L.filter(x => x.residence_id === r.id).sort(triLog);
-        if (f.villa) lg.forEach(x => vil.push([r.nom, x.appartement || x.code, x.locataire || '', x.email || '']));
+        if (f.villa) lg.forEach(x => vil.push([r.nom, techVilla(x.appartement || x.code, r.nom), x.locataire || '', x.email || '']));
         else X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['BLOC', 'ETAGE', 'APP.', 'LOCATAIRE', 'MAIL'], ...lg.map(x => [x.bloc || '', x.etage || '', x.appartement || '', x.locataire || '', x.email || ''])]), r.nom.replace(/[:\\/?*[\]]/g, ' ').slice(0, 31)); });
       if (vil.length > 1) X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(vil), 'NOS VILLAS');
       if (!wb.SheetNames.length) return false;
