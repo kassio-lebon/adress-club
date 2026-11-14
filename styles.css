@@ -1434,9 +1434,6 @@ th[aria-sort=descending] .th-tri::after{opacity:1;border-top-color:var(--red)}
 /* v99 : accueil selon l'heure */
 .hero p:first-of-type::first-letter{text-transform:uppercase}
 .hero .hero-mot{margin:6px 0 0;font-size:14px;font-weight:500;opacity:.9;max-width:46ch;position:relative;z-index:2}
-/* v99 : partager une annonce */
-.partage{margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px}
-.partage svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 /* v99 : bandeau de connexion */
 .reseau{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));z-index:400;transform:translateX(-50%);max-width:calc(100% - 32px);padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 10px 30px -12px rgba(0,0,0,.45);animation:reseauIn .45s cubic-bezier(.16,1,.3,1) both;text-align:center}
 .reseau.off{background:#22242A;color:#fff}

@@ -467,7 +467,7 @@ function defiler(strip, fleches) {
   [...strip.children].forEach(el => { const c = el.cloneNode(true); c.setAttribute('aria-hidden', 'true'); c.tabIndex = -1; c.querySelector('.ph')?.classList.add('ld'); strip.appendChild(c); });
   strip.classList.add('auto');
   const tour = () => strip.children[n].offsetLeft - strip.children[0].offsetLeft;
-  const VITESSE = innerWidth >= 960 ? 34 : 26; // pixels par seconde : lent et régulier
+  const VITESSE = innerWidth >= 960 ? 18 : 14; // pixels par seconde : très lent et régulier
   let v = 0, pos = strip.scrollLeft, avant = performance.now();
   // le doigt (ou la molette) reprend la main tout de suite ; la souris posée dessus freine en douceur
   const main = () => { v = 0; pos = strip.scrollLeft; stop(); }; lacher = () => { v = 0; };
@@ -570,26 +570,6 @@ async function market() {
   });
 }
 
-// Partager une annonce : partage du téléphone (WhatsApp, SMS…) avec la photo si possible, sinon WhatsApp ou lien copié
-async function partager(a, photo) {
-  const url = location.origin + location.pathname + '#/annonce/' + a.id;
-  const txt = `${a.titre} · ${a.type === 'don' ? 'à donner' : fcfa(a.prix_fcfa)} sur le Market ADRESS CLUB`;
-  if (navigator.share) {
-    let files;
-    try { const r = await fetch(photo); const b = await r.blob(); const f = new File([b], 'annonce.jpg', { type: b.type || 'image/jpeg' }); if (navigator.canShare?.({ files: [f] })) files = [f]; } catch (_) {}
-    try { await navigator.share(files ? { title: a.titre, text: txt + '\n' + url, files } : { title: a.titre, text: txt, url }); track('partage_annonce', a.id); return; }
-    catch (e) { if (e && e.name === 'AbortError') return; }
-  }
-  const d = document.createElement('div'); d.className = 'sheet-bg';
-  d.innerHTML = `<div class="sheet" role="dialog" aria-label="Partager l'annonce"><h3>Partager cette annonce</h3><p class="muted small">${esc(a.titre)}</p>
-    <a class="btn block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt + '\n' + url)}">Envoyer par WhatsApp</a>
-    <button class="btn ghost block" type="button" id="cpy" style="margin-top:8px">Copier le lien</button>
-    <button class="btn soft block" type="button" id="fer" style="margin-top:8px">Fermer</button></div>`;
-  document.body.appendChild(d);
-  const fermer = () => d.remove(); d.onclick = (e) => { if (e.target === d) fermer(); }; d.querySelector('#fer').onclick = fermer;
-  d.querySelector('[href^="https://wa.me"]').onclick = () => { track('partage_annonce', a.id); setTimeout(fermer, 300); };
-  d.querySelector('#cpy').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('Lien copié.'); } catch (_) { toast(url); } fermer(); };
-}
 async function annonce(id) {
   const { data: a } = await sb.from('v_market').select('*').eq('id', id).maybeSingle();
   if (!a) {
@@ -613,9 +593,7 @@ async function annonce(id) {
     : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'C’est zooo ! Demande envoyée ✓' : 'Ça m’intéresse, ça m’enjaille !'}</button><div id="zoo"></div>
       <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
     : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
-  <button type="button" class="btn ghost block partage" id="share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>Partager cette annonce</button>
   ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}</div></div>`;
-  app.querySelector('#share').onclick = () => partager(a, urls[0]);
   const b = app.querySelector('#int');
   // Le vendeur doit pouvoir joindre l'intéressé : sans numéro partagé, on le demande avant d'envoyer
   const contactOk = () => state.profil.consentement_contact && (state.profil.telephone || '').replace(/[^0-9]/g, '').length >= 8;
