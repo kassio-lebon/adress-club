@@ -1425,3 +1425,8 @@ th[aria-sort=descending] .th-tri::after{opacity:1;border-top-color:var(--red)}
 .rail>.item{scroll-snap-align:start}
 @media (min-width:640px){.rail{grid-auto-columns:30%}}
 @media (min-width:960px){.rail{grid-auto-columns:calc((100% - 56px)/5);-webkit-mask-image:none;mask-image:none}.rayons{gap:38px}}
+
+/* v98 : bande « Le Market » — défilement continu, sans aimantation ni saut */
+.strip.defile.auto{scroll-snap-type:none;scroll-behavior:auto}
+.strip.defile.auto>*{scroll-snap-align:none}
+.hero .bgs img{transition:opacity 2.4s cubic-bezier(.4,0,.2,1)}

@@ -442,22 +442,40 @@ async function accueil() {
   fondDefilant(app.querySelector('.hero .bgs'), app.querySelector('.hero-dots'));
   defiler(app.querySelector('.strip.defile'), app.querySelectorAll('[data-sn]'));
 }
-// Bande « Le Market » de l'accueil : défile seule, une annonce toutes les 3 s ; s'arrête dès qu'on la touche ou la survole
+// Bande « Le Market » de l'accueil : défilement continu, fluide et doux (boucle sans fin) ;
+// il ralentit puis s'arrête dès qu'on la touche ou la survole, et repart en douceur
 function defiler(strip, fleches) {
   if (!strip) return;
+  const reduit = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const pas = () => { const c = strip.children; return c[1] ? c[1].offsetLeft - c[0].offsetLeft : strip.clientWidth; };
-  const aller = (sens) => { const fin = strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 8, debut = strip.scrollLeft <= 4;
-    strip.scrollTo({ left: sens > 0 ? (fin ? 0 : strip.scrollLeft + pas()) : (debut ? strip.scrollWidth : strip.scrollLeft - pas()), behavior: 'smooth' }); };
-  let pause = 0, survol = false; const stop = () => { pause = Date.now(); };
-  fleches.forEach(b => b.onclick = () => { stop(); aller(+b.dataset.sn); });
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  ['pointerdown', 'touchstart', 'wheel', 'focusin'].forEach(e => strip.addEventListener(e, stop, { passive: true }));
-  strip.addEventListener('mouseenter', () => { survol = true; }); strip.addEventListener('mouseleave', () => { survol = false; });
-  const t = setInterval(() => {
-    if (!strip.isConnected) return clearInterval(t);
-    if (document.hidden || survol || Date.now() - pause < 7000 || strip.scrollWidth <= strip.clientWidth + 4) return;
-    aller(1);
-  }, 3000);
+  let repos = 0, survol = false, visible = true, lacher = () => {};
+  const stop = (ms = 2500) => { repos = Math.max(repos, performance.now() + ms); };
+  fleches.forEach(b => b.onclick = () => { lacher(); stop(4000); strip.scrollBy({ left: +b.dataset.sn * pas(), behavior: 'smooth' }); });
+  if (reduit || strip.scrollWidth <= strip.clientWidth + 4) return;
+  // une deuxième série d'annonces à la suite : la boucle ne se voit pas
+  const n = strip.children.length;
+  [...strip.children].forEach(el => { const c = el.cloneNode(true); c.setAttribute('aria-hidden', 'true'); c.tabIndex = -1; c.querySelector('.ph')?.classList.add('ld'); strip.appendChild(c); });
+  strip.classList.add('auto');
+  const tour = () => strip.children[n].offsetLeft - strip.children[0].offsetLeft;
+  const VITESSE = innerWidth >= 960 ? 34 : 26; // pixels par seconde : lent et régulier
+  let v = 0, pos = strip.scrollLeft, avant = performance.now();
+  // le doigt (ou la molette) reprend la main tout de suite ; la souris posée dessus freine en douceur
+  const main = () => { v = 0; pos = strip.scrollLeft; stop(); }; lacher = () => { v = 0; };
+  ['pointerdown', 'touchstart', 'wheel', 'focusin'].forEach(e => strip.addEventListener(e, main, { passive: true }));
+  ['touchend', 'pointerup'].forEach(e => strip.addEventListener(e, () => stop(2500), { passive: true }));
+  strip.addEventListener('scroll', () => { if (v < 0.5) pos = strip.scrollLeft; }, { passive: true });
+  strip.addEventListener('mouseenter', () => { survol = true; }); strip.addEventListener('mouseleave', () => { survol = false; stop(800); });
+  if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(strip);
+  const image = (t) => {
+    if (!strip.isConnected) return;
+    const dt = Math.min(64, t - avant) / 1000; avant = t;
+    const enMarche = visible && !document.hidden && !survol && t > repos;
+    v += ((enMarche ? VITESSE : 0) - v) * Math.min(1, dt * 2.2); // accélère et freine en douceur
+    if (!enMarche && v < 0.5) v = 0;
+    else { const T = tour(); pos += v * dt; if (pos >= T) pos -= T; strip.scrollLeft = pos; }
+    requestAnimationFrame(image);
+  };
+  requestAnimationFrame(image);
 }
 // Arrière-plan de l'accueil : photos des résidences en fondu très lent (une photo n'apparaît qu'une fois prête)
 function fondDefilant(box, points) {
