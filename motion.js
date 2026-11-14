@@ -6,7 +6,7 @@ const MARK = {"vb":[446,355],"red":"M408.3 325.7 L403.2 327.7 L397.4 329.0 L391.
 const markSvg = (cls) => '<svg class="' + cls + '" viewBox="0 0 ' + MARK.vb[0] + ' ' + MARK.vb[1] + '" aria-hidden="true"><path class="mg" d="' + MARK.grey + '"/><path class="mr" d="' + MARK.red + '"/><path class="mg mgt" d="' + MARK.greyTop + '"/></svg>';
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const root = document.documentElement;
-let pending = null, shared = false;
+let pending = null, shared = false, vignette = null, parClic = false; // vignette : [lien de l'annonce, image de fond de la carte]
 
 // ---------- intro : à chaque ouverture de l'appli (logo puis « CLUB ») ----------
 let seen = false; try { seen = sessionStorage.getItem('acl-intro') === 'off'; } catch (_) {}
@@ -28,13 +28,16 @@ setTimeout(closeIntro, 3000);
 // ---------- transitions entre écrans (View Transitions API) ----------
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[href^="#/"]');
-  if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || reduce || !document.startViewTransition) return;
+  if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
   const href = a.getAttribute('href'); if (href === location.hash) return;
-  e.preventDefault();
+  // sens du mouvement : onglets et filtres = sur place, lien « retour » = vers la gauche, le reste = on avance
+  root.dataset.dir = a.closest('.tabbar, .top, .chips, .cat-bar, .tabs, .adm-g, .adm-s') ? 'tab' : a.classList.contains('back') || href === '#/' ? 'back' : 'fwd'; parClic = true;
   const ph = a.querySelector('.ph');
   shared = !!(ph && /^#\/annonce\//.test(href));
+  if (shared) vignette = [href, ph.style.backgroundImage];
+  if (reduce || !document.startViewTransition) { shared = false; return; }
+  e.preventDefault();
   if (shared) ph.style.viewTransitionName = 'photo';
-  root.dataset.dir = a.classList.contains('back') ? 'back' : 'fwd';
   root.classList.add('vt');
   const t = document.startViewTransition(() => new Promise((res) => {
     pending = res; setTimeout(() => { if (pending === res) { pending = null; res(); } }, 600);
@@ -42,9 +45,19 @@ document.addEventListener('click', (e) => {
   }));
   t.finished.finally(() => { root.classList.remove('vt'); shared = false; document.querySelectorAll('[style*="view-transition-name"]').forEach(el => el.style.viewTransitionName = ''); });
 }, true);
-window.addEventListener('popstate', () => { root.dataset.dir = 'back'; });
+// retour (bouton du téléphone, geste) ou navigation lancée par l'appli elle-même : le sens se déduit du chemin parcouru
+const pile = [location.hash];
+window.addEventListener('hashchange', () => {
+  const h = location.hash, retour = pile.length > 1 && pile[pile.length - 2] === h;
+  if (retour) pile.pop(); else if (pile[pile.length - 1] !== h) pile.push(h);
+  if (!parClic) root.dataset.dir = retour ? 'back' : 'tab';
+  parClic = false; if (vignette && h !== vignette[0]) vignette = null;
+});
 // La transition part dès que le squelette de l'écran suivant est affiché : l'écran ne reste jamais figé pendant le chargement
-addEventListener('acl-squelette', () => { if (pending) { const r = pending; pending = null; r(); } });
+addEventListener('acl-squelette', () => {
+  // l'attente se voit : la vignette touchée s'agrandit quand même jusqu'à la place de la grande photo
+  const sp = shared && vignette && app.querySelector('.sk-photo'); if (sp) { sp.style.backgroundImage = vignette[1]; sp.classList.add('has-ph'); sp.style.viewTransitionName = 'photo'; }
+  if (pending) { const r = pending; pending = null; r(); } });
 
 // ---------- après chaque rendu d'écran ----------
 new MutationObserver(() => {
@@ -55,7 +68,7 @@ new MutationObserver(() => {
 }).observe(app, { attributes: true, attributeFilter: ['class'] });
 
 // éléments qui apparaissent ensemble au défilement : l'un après l'autre (80 ms d'écart)
-const io = 'IntersectionObserver' in window ? new IntersectionObserver((list) => { let k = 0; list.forEach(x => { if (x.isIntersecting) { x.target.style.transitionDelay = (k++ * 80) + 'ms'; x.target.classList.add('in'); io.unobserve(x.target); } }); }, { rootMargin: '0px 0px -8% 0px' }) : null;
+const io = 'IntersectionObserver' in window ? new IntersectionObserver((list) => { let k = 0; list.forEach(x => { if (x.isIntersecting) { x.target.style.transitionDelay = (k++ * 60) + 'ms'; x.target.classList.add('in'); io.unobserve(x.target); } }); }, { rootMargin: '0px 0px -8% 0px' }) : null;
 
 const vus = new Set();
 function photos() {
@@ -71,7 +84,10 @@ const loginFx = () => { const l = app.querySelector('.login'); if (l && !l.query
 loginFx(); new MutationObserver(loginFx).observe(app, { childList: true, subtree: true });
 
 function decorate() {
-  if (shared) { const g = app.querySelector('.gal img'); if (g) g.style.viewTransitionName = 'photo'; }
+  const g = app.querySelector('.gal img');
+  if (g && shared) g.style.viewTransitionName = 'photo';
+  // la vignette reste affichée sous la grande photo le temps qu'elle charge : pas de flou, pas de trou
+  if (g && vignette && location.hash === vignette[0]) { g.style.backgroundImage = vignette[1]; g.classList.add('de-vignette', 'ld'); g.closest('.detail')?.classList.add('depuis-vignette'); }
   const hero = app.querySelector('.hero');
   if (hero && !hero.querySelector('.mark-anim')) hero.insertAdjacentHTML('beforeend', markSvg('mark-anim'));
   app.querySelectorAll('.fc-cover').forEach(c => { if (!c.querySelector('.mark-anim')) c.insertAdjacentHTML('beforeend', markSvg('mark-anim sm')); });
@@ -79,7 +95,7 @@ function decorate() {
   photos();
   if (reduce) return;
   // révélation au défilement pour ce qui est sous la ligne de flottaison
-  if (io) app.querySelectorAll('.item, .mini, .menu a, .list > .card, .stat, .feature, section h2').forEach(el => {
+  if (io) app.querySelectorAll('.grid2 > .item, .rayon, .mini, .menu a, .list > .card, .stat, .feature, section:not(.rayon) > h2').forEach(el => {
     if (el.getBoundingClientRect().top > innerHeight * .92) { el.classList.add('rv'); io.observe(el); }
   });
   // compteurs animés (indicateurs)
@@ -221,7 +237,7 @@ function titres() {
 // Ordinateur : cartes en relief qui suivent la souris, avec reflet ; boutons « aimantés »
 if (fin && !reduce) {
   let cur = null, raf = 0, ev = null;
-  const SEL = '.item, .fc, .mini, .feature, .rs-card, .menu a';
+  const SEL = '.item, .fc, .mini, .rs-card';
   document.addEventListener('pointermove', (e) => {
     ev = e; if (raf) return;
     raf = requestAnimationFrame(() => {
@@ -231,12 +247,9 @@ if (fin && !reduce) {
         const r = t.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width, py = (ev.clientY - r.top) / r.height;
         if (!t.querySelector(':scope > .glare')) t.insertAdjacentHTML('beforeend', '<i class="glare"></i>');
         t.classList.add('tilt'); cur = t;
-        t.style.transform = `perspective(900px) rotateX(${(.5 - py) * 7}deg) rotateY(${(px - .5) * 9}deg) translateY(-3px)`;
+        t.style.transform = `perspective(1000px) rotateX(${(.5 - py) * 4}deg) rotateY(${(px - .5) * 5}deg) translateY(-3px)`;
         t.style.setProperty('--gx', px * 100 + '%'); t.style.setProperty('--gy', py * 100 + '%');
       }
-      const b = ev.target.closest && ev.target.closest('.btn:not(.sm):not([disabled])');
-      document.querySelectorAll('.btn.mag').forEach(x => { if (x !== b) { x.style.translate = ''; x.classList.remove('mag'); } });
-      if (b) { const r = b.getBoundingClientRect(); b.classList.add('mag'); b.style.translate = `${(ev.clientX - r.left - r.width / 2) * .12}px ${(ev.clientY - r.top - r.height / 2) * .25}px`; }
       const h = ev.target.closest && ev.target.closest('.hero');
       if (h) { if (!h.querySelector(':scope > .spot')) h.insertAdjacentHTML('beforeend', '<i class="spot"></i>'); const r = h.getBoundingClientRect(); h.style.setProperty('--mx', ev.clientX - r.left + 'px'); h.style.setProperty('--my', ev.clientY - r.top + 'px'); }
     });
@@ -252,7 +265,7 @@ addEventListener('scroll', () => {
 }, { passive: true });
 
 // Boutons principaux : reflet qui passe de temps en temps
-function reflets() { app.querySelectorAll('#int:not([disabled]), #go, #gon, .inst1, form .btn.block:not(.ghost)').forEach(b => b.classList.add('shine')); }
+function reflets() { app.querySelectorAll('#int:not([disabled]), .inst1').forEach(b => b.classList.add('shine')); }
 
 new MutationObserver(() => { if (app.classList.contains('page-in')) { titres(); reflets(); } }).observe(app, { attributes: true, attributeFilter: ['class'] });
 titres(); reflets();

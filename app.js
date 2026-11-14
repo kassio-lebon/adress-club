@@ -378,7 +378,7 @@ function brancherInstall(root) {
 }
 
 // ---------- découverte : film de présentation, visite guidée, lecteur vidéo plein écran ----------
-const FILM = { src: 'videos/film-adress-club.mp4', poster: 'videos/film-adress-club.jpg', duree: '40 s' };
+const FILM = { src: 'videos/film-adress-club.mp4?v=2', poster: 'videos/film-adress-club.jpg?v=2', duree: '40 s' };
 export function lecteurVideo(src, { poster = '', titre = 'Vidéo' } = {}) {
   const d = document.createElement('div'); d.className = 'lv'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', titre);
   d.innerHTML = `<div class="lv-box"><video controls playsinline autoplay preload="auto" ${poster ? `poster="${esc(poster)}"` : ''} src="${esc(src)}"></video>
@@ -884,7 +884,7 @@ async function residences() {
     ${im.length ? `<div class="rs" data-imgs="${esc(JSON.stringify(im))}" role="img" aria-label="Photos de ${esc(r.nom)}">
       ${im.length > 1 ? `<div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div>` : ''}
       ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}${r.video_path ? `<button type="button" class="rs-vid" data-vid="${r.id}" aria-label="Voir la vidéo de ${esc(r.nom)}"><span class="rs-play" aria-hidden="true"></span>Vidéo</button>` : ''}</div>` : ''}
-    <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc(r.quartier || '')}${r.type_bien ? ' · ' + esc(r.type_bien) : ''}</div>
+    <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc([r.quartier, r.type_bien].filter(Boolean).join(' · '))}</div>
     ${r.description && !/^résidence adress immobilier\.?$/i.test(r.description.trim()) ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">${vi ? 'Découvrir les villas' : 'Découvrir la résidence'} ↗</a>` : ''}</div></div>`; };
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>${V.length ? 'Nos résidences et villas' : 'Nos résidences'}</h1>
   ${V.length && A.length ? '<h2 class="res-sec">Résidences</h2>' : ''}<div class="list" style="margin-top:12px">${A.map(carte).join('') || (V.length ? '' : '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>')}</div>
