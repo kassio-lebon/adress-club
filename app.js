@@ -752,7 +752,7 @@ function publier() {
       go.textContent = 'Publication…';
       const { data, error } = await sb.from('annonces').insert({ type, titre, categorie, etat, description: description || null, prix_fcfa: type === 'vente' ? px : null, photos: paths }).select('id').single();
       if (error) throw error;
-      toast('Votre annonce est en ligne.'); fete(); location.hash = `#/annonce/${data.id}`;
+      window.dispatchEvent(new CustomEvent('acl-publiee', { detail: { id: data.id, titre, prix: type === 'vente' ? fcfa(px) : 'GRATUIT', photo: URL.createObjectURL(files[0]) } })); location.hash = `#/annonce/${data.id}`;
     } catch (e) { go.disabled = false; go.textContent = 'Publier'; err(errMsg(e)); }
   };
 }

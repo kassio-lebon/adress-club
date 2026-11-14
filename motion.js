@@ -269,3 +269,25 @@ function reflets() { app.querySelectorAll('#int:not([disabled]), .inst1').forEac
 
 new MutationObserver(() => { if (app.classList.contains('page-in')) { titres(); reflets(); } }).observe(app, { attributes: true, attributeFilter: ['class'] });
 titres(); reflets();
+
+// ================= v107 : l'emblème ADRESS remplace le rond de chargement et les confettis de publication =================
+// Deux anneaux séparés (gris puis rouge) pour pouvoir les dessiner l'un après l'autre
+const emb = (cls) => { const v = '0 0 ' + MARK.vb[0] + ' ' + MARK.vb[1];
+  return '<span class="emb ' + cls + '" aria-hidden="true"><svg class="ring rg" viewBox="' + v + '"><path d="' + MARK.grey + '"/><path d="' + MARK.greyTop + '"/></svg><svg class="ring rr" viewBox="' + v + '"><path d="' + MARK.red + '"/></svg></span>'; };
+// Écran de démarrage
+{ const s = app.querySelector('.splash .spinner'); if (s) s.outerHTML = '<span role="status" aria-label="Chargement">' + emb('boucle') + '</span>'; }
+// Chargement d'un écran : l'emblème n'apparaît que si l'attente se prolonge (pas de clignotement sur les chargements rapides)
+addEventListener('acl-squelette', () => { const sk = app.querySelector('.sk'); if (sk && !sk.querySelector('.emb')) sk.insertAdjacentHTML('beforeend', '<span class="sk-emb" role="status" aria-label="Chargement">' + emb('boucle') + '</span>'); });
+// Annonce publiée : l'emblème se dessine une fois, puis le message
+addEventListener('acl-publiee', (e) => {
+  const d = e.detail || {}, h = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  document.querySelector('.publiee')?.remove();
+  const o = document.createElement('div'); o.className = 'publiee'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'pub-t');
+  o.innerHTML = emb('unefois') + '<div class="pub-txt"><h2 id="pub-t">Votre annonce<br>est en ligne.</h2><p>Vos voisins la voient dès maintenant dans le Market.</p>'
+    + (d.titre ? '<div class="pub-fiche">' + (d.photo ? '<img src="' + h(d.photo) + '" alt="">' : '') + '<span><b>' + h(d.titre) + '</b><small>' + h(d.prix) + '</small></span></div>' : '')
+    + '<button class="btn" type="button" data-pub="voir">Voir mon annonce</button><button class="pub-lien" type="button" data-pub="accueil">Retour à l’accueil</button></div>';
+  const fermer = () => { if (!o.isConnected) return; o.classList.add('sort'); setTimeout(() => o.remove(), reduce ? 0 : 260); };
+  o.addEventListener('click', (ev) => { const b = ev.target.closest('[data-pub]'); if (!b) return; if (b.dataset.pub === 'accueil') location.hash = '#/'; fermer(); });
+  addEventListener('hashchange', function f() { if (location.hash !== '#/annonce/' + d.id) { removeEventListener('hashchange', f); fermer(); } });
+  o.tabIndex = -1; document.body.appendChild(o); o.focus({ preventScroll: true });
+});

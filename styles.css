@@ -1614,3 +1614,36 @@ a>svg.ic:last-child,.badge>svg.ic{margin-right:.3em}
 .tab-pub:active .pub{background:var(--ink-2)}
 .tab-pub>span:last-child{display:inline}
 @media (prefers-color-scheme:dark){.tabbar{background:rgba(23,24,27,.8);border-top-color:rgba(255,255,255,.07)}.tabbar a{color:#8E9098}}
+
+/* ================= v107 : emblème ADRESS (chargement + annonce publiée) ================= */
+@property --a{syntax:'<angle>';inherits:false;initial-value:0deg}
+.emb{position:relative;display:block;width:56px;aspect-ratio:446/355}
+.emb .ring{position:absolute;inset:0;width:100%;height:100%;
+  -webkit-mask:conic-gradient(from 200deg at 50% 50%,#000 var(--a),transparent 0);mask:conic-gradient(from 200deg at 50% 50%,#000 var(--a),transparent 0)}
+.emb .rg{fill:#8A8D93}.emb .rr{fill:#D4101D}
+.emb.boucle .rr{animation:emb-trace 1.6s cubic-bezier(.65,0,.35,1) infinite}
+.emb.boucle .rg{animation:emb-trace 1.6s .18s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes emb-trace{0%{--a:0deg;opacity:1}55%{--a:360deg;opacity:1}80%,100%{--a:360deg;opacity:0}}
+.emb.unefois .ring{--a:360deg;animation:emb-une .9s cubic-bezier(.65,0,.35,1) both}
+.emb.unefois .rg{animation-delay:.15s}
+@keyframes emb-une{from{--a:0deg}to{--a:360deg}}
+.splash .emb{width:48px}
+.sk{position:relative}
+.sk-emb{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:5;opacity:0;animation:emb-vient .3s .35s var(--e-out,ease) forwards;pointer-events:none}
+@keyframes emb-vient{to{opacity:1}}
+.publiee{position:fixed;inset:0;z-index:80;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;padding:24px 28px calc(24px + env(safe-area-inset-bottom));text-align:center;animation:emb-vient .2s ease both}
+.publiee.sort{opacity:0;transition:opacity .25s ease}
+.publiee .emb{width:124px}
+.pub-txt{display:flex;flex-direction:column;align-items:center;gap:10px;animation:pub-txt .6s .7s var(--e-out,ease) both}
+@keyframes pub-txt{from{opacity:0;transform:translateY(10px)}}
+.pub-txt h2{margin:0;font-family:Newsreader,Georgia,serif;font-weight:400;font-size:34px;line-height:1.1;letter-spacing:-.01em;color:var(--ink)}
+.pub-txt p{margin:0;font-size:14px;color:var(--muted)}
+.pub-fiche{margin-top:14px;display:flex;align-items:center;gap:12px;padding:10px 14px 10px 10px;border-radius:14px;background:var(--surface);border:1px solid var(--line);text-align:left;max-width:100%}
+.pub-fiche img{width:48px;height:48px;border-radius:10px;object-fit:cover;flex:none}
+.pub-fiche span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pub-fiche b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pub-fiche small{font-size:12.5px;color:var(--muted)}
+.publiee .btn{margin-top:18px;min-width:220px}
+.pub-lien{background:none;border:0;height:44px;font:inherit;font-size:14px;font-weight:500;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.emb .ring{-webkit-mask:none;mask:none;animation:none!important}.pub-txt,.sk-emb,.publiee{animation:none;opacity:1}}
+.publiee:focus{outline:none}
