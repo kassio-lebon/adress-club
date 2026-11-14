@@ -425,10 +425,11 @@ async function accueil() {
   const lien = (h, ico, t, s) => '<a href="' + h + '">' + ico + '<span><b>' + t + '</b><small>' + s + '</small></span>' + ICO.chev + '</a>';
   app.innerHTML = '<div class="home">'
     + '<section class="hero' + (ph ? ' has-ph' : '') + '">' + (ph ? '<div class="bgz bgs">' + pics.slice(0, 12).map((p, i) => '<img alt="" referrerpolicy="no-referrer" ' + (i ? 'data-src' : 'class="on" src') + '="' + esc(publicUrl(p)) + '">').join('') + '</div>' : '')
+    + (pics.length > 1 ? '<div class="hero-dots" aria-hidden="true">' + pics.slice(0, 12).map((_, i) => '<i' + (i ? '' : ' class="on"') + '></i>').join('') + '</div>' : '')
     + '<p>' + esc(res.nom || 'ADRESS IMMOBILIER') + '</p><h1>Bonjour ' + esc(state.profil.nom_affichage || '') + '</h1></section>'
     + (nl ? '<a class="notice" href="#/mes-annonces"><b>' + nl + '</b>' + (nl > 1 ? 'nouvelles demandes' : 'nouvelle demande') + ' sur vos annonces</a>' : '')
-    + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'
-    + ((recents || []).length ? '<div class="strip">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
+    + '<section><div class="sec-h"><h2>Le Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
+    + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
     + '</section>' + carteDecouverte() + carteInstall() + carteNotif() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
     + lien('#/residences', ICO.residences, (rr || []).some(estVillas) ? 'Nos résidences et villas' : 'Nos résidences', 'Photos et contact')
@@ -438,11 +439,29 @@ async function accueil() {
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
   brancherInstall(app); brancherNotif(app); brancherDecouverte(app);
-  fondDefilant(app.querySelector('.hero .bgs'));
+  fondDefilant(app.querySelector('.hero .bgs'), app.querySelector('.hero-dots'));
+  defiler(app.querySelector('.strip.defile'), app.querySelectorAll('[data-sn]'));
+}
+// Bande « Le Market » de l'accueil : défile seule, une annonce toutes les 3 s ; s'arrête dès qu'on la touche ou la survole
+function defiler(strip, fleches) {
+  if (!strip) return;
+  const pas = () => { const c = strip.children; return c[1] ? c[1].offsetLeft - c[0].offsetLeft : strip.clientWidth; };
+  const aller = (sens) => { const fin = strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 8, debut = strip.scrollLeft <= 4;
+    strip.scrollTo({ left: sens > 0 ? (fin ? 0 : strip.scrollLeft + pas()) : (debut ? strip.scrollWidth : strip.scrollLeft - pas()), behavior: 'smooth' }); };
+  let pause = 0, survol = false; const stop = () => { pause = Date.now(); };
+  fleches.forEach(b => b.onclick = () => { stop(); aller(+b.dataset.sn); });
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  ['pointerdown', 'touchstart', 'wheel', 'focusin'].forEach(e => strip.addEventListener(e, stop, { passive: true }));
+  strip.addEventListener('mouseenter', () => { survol = true; }); strip.addEventListener('mouseleave', () => { survol = false; });
+  const t = setInterval(() => {
+    if (!strip.isConnected) return clearInterval(t);
+    if (document.hidden || survol || Date.now() - pause < 7000 || strip.scrollWidth <= strip.clientWidth + 4) return;
+    aller(1);
+  }, 3000);
 }
 // Arrière-plan de l'accueil : photos des résidences en fondu très lent (une photo n'apparaît qu'une fois prête)
-function fondDefilant(box) {
-  const imgs = box ? [...box.querySelectorAll('img')] : [];
+function fondDefilant(box, points) {
+  const imgs = box ? [...box.querySelectorAll('img')] : [], pts = points ? [...points.children] : [];
   if (imgs.length < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const charger = (im) => { if (!im.getAttribute('src')) im.src = im.dataset.src; return im.decode ? im.decode() : Promise.resolve(); };
   let k = 0; charger(imgs[1]).catch(() => {});
@@ -450,24 +469,48 @@ function fondDefilant(box) {
     if (!box.isConnected) return clearInterval(t);
     if (document.hidden) return;
     const n = (k + 1) % imgs.length, im = imgs[n];
-    try { await charger(im); } catch (_) { imgs.splice(n, 1); if (imgs.length < 2) clearInterval(t); return; }
+    try { await charger(im); } catch (_) { imgs.splice(n, 1); pts.splice(n, 1)[0]?.remove(); if (imgs.length < 2) clearInterval(t); return; }
     if (!box.isConnected) return;
     imgs[k].classList.replace('on', 'off');
     im.classList.remove('off'); void im.offsetWidth; im.classList.add('on'); k = n;
+    pts.forEach((d, i) => d.classList.toggle('on', i === k));
     charger(imgs[(k + 1) % imgs.length]).catch(() => {});
-  }, 8000);
+  }, 6000);
 }
 
 // ---------- Le Market (§3, §4) ----------
+const svgC = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const ICO_CAT = {
+  Tout: svgC('<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>'),
+  'Meubles': svgC('<path d="M5 11V8a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3"/><path d="M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M6 19v2M18 19v2"/>'),
+  'Électroménager': svgC('<rect x="4.5" y="2.5" width="15" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.5"/><path d="M8 6h.01M11 6h2"/>'),
+  'Décoration': svgC('<path d="M9 3h6l3 8H6z"/><path d="M12 11v7M8 21h8"/>'),
+  'Enfants et bébé': svgC('<circle cx="12" cy="13" r="7"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="6.5" r="2.5"/><path d="M9.5 15.5c1.5 1.2 3.5 1.2 5 0M10 11.5h.01M14 11.5h.01"/>'),
+  'Vêtements et accessoires': svgC('<path d="M8 3 4 6l2 4 2-1v12h8V9l2 1 2-4-4-3a4 4 0 0 1-8 0z"/>'),
+  'Électronique': svgC('<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20.5h8M12 16.5v4"/>'),
+  'Sport et loisirs': svgC('<circle cx="12" cy="12" r="9"/><path d="M12 3a14 14 0 0 1 0 18M3 12h18M5.6 5.6c3.6 2.4 9.2 2.4 12.8 0M5.6 18.4c3.6-2.4 9.2-2.4 12.8 0"/>'),
+  'Maison et jardin': svgC('<path d="M12 21v-8M12 13c0-4 3-7 7-7 0 4-3 7-7 7zM12 15c0-3-2.5-5.5-6-5.5 0 3 2.5 5.5 6 5.5zM7 21h10"/>'),
+  'Autre': svgC('<circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/>') };
 async function market() {
-  const p = qs(); const type = p.get('type') || ''; const q = (p.get('q') || '').trim(); const vue = p.get('vue') || '';
+  const p = qs(); const type = p.get('type') || ''; const q = (p.get('q') || '').trim(); const vue = p.get('vue') || '', cat = p.get('cat') || '';
   let req = sb.from(vue === 'favoris' ? 'v_favoris' : 'v_market').select('*').order('date_publication', { ascending: false }).limit(80);
   if (type) req = req.eq('type', type);
   const [{ data, error }, fav] = await Promise.all([req, sb.from('favoris').select('annonce_id')]);
   if (error) throw error;
   const favs = new Set((fav.data || []).map(f => f.annonce_id));
   const urls = await photosUrls((data || []).map(a => a.photos[0]), true);
-  const lien = (o) => '#/market?' + new URLSearchParams(Object.fromEntries(Object.entries({ type, q, vue, ...o }).filter(([, v]) => v))).toString();
+  const lien = (o) => '#/market?' + new URLSearchParams(Object.fromEntries(Object.entries({ type, q, vue, cat, ...o }).filter(([, v]) => v))).toString();
+  // rayons par catégorie (vue par défaut) ; une catégorie choisie, une recherche ou les favoris passent en grille
+  const urlDe = new Map((data || []).map((a, i) => [a.id, urls[i]]));
+  const parCat = CATEGORIES.map(c => [c, data.filter(a => a.categorie === c)]).filter(([, l]) => l.length);
+  const liste = cat ? data.filter(a => a.categorie === cat) : data, rayons = !q && !cat && vue !== 'favoris' && parCat.length > 1;
+  const carte = (a) => `
+    <div class="card item${a.statut === 'reserve' ? ' is-res' : ''}">
+      <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urlDe.get(a.id))}')" role="img" aria-label="${esc(a.titre)}">${a.statut === 'reserve' ? '<span class="stamp">Réservé</span>' : ''}</div>
+      ${a.est_a_moi ? '<span class="badge st">Votre annonce</span>' : a.type === 'don' ? '<span class="badge st">À donner</span>' : ''}
+      <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc([a.categorie, a.residence || (a.is_adress ? 'ADRESS IMMOBILIER' : '')].filter(Boolean).join(' · '))}</div></div></a>
+      ${a.est_a_moi ? '' : `<button class="fav" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${favs.has(a.id) ? '♥' : '♡'}</button>`}
+    </div>`;
   app.innerHTML = `
   <a class="back" href="#/">‹ Accueil</a><h1>Le Market</h1><p class="muted">Les objets à vendre ou à donner entre résidents</p>
   <form id="s" role="search" style="margin-top:10px"><label class="sr" for="q">Rechercher</label><input id="q" type="search" placeholder="Rechercher un objet…" value="${esc(q)}"></form>
@@ -475,15 +518,12 @@ async function market() {
     <a class="chip ${!type && !vue ? 'on' : ''}" href="${lien({ type: '', vue: '' })}">Tout</a>
     <a class="chip ${type === 'vente' ? 'on' : ''}" href="${lien({ type: 'vente', vue: '' })}">À vendre</a>
     <a class="chip ${type === 'don' ? 'on' : ''}" href="${lien({ type: 'don', vue: '' })}">À donner</a>
-    <a class="chip ${vue === 'favoris' ? 'on' : ''}" href="${lien({ vue: 'favoris', type: '' })}">♥ Favoris</a>
+    <a class="chip ${vue === 'favoris' ? 'on' : ''}" href="${lien({ vue: 'favoris', type: '', cat: '' })}">♥ Favoris</a>
   </div>
-  ${data.length ? `<div class="grid2 grid3">${data.map((a, i) => `
-    <div class="card item${a.statut === 'reserve' ? ' is-res' : ''}">
-      <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urls[i])}')" role="img" aria-label="${esc(a.titre)}">${a.statut === 'reserve' ? '<span class="stamp">Réservé</span>' : ''}</div>
-      ${a.est_a_moi ? '<span class="badge st">Votre annonce</span>' : a.type === 'don' ? '<span class="badge st">À donner</span>' : ''}
-      <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc([a.categorie, a.residence || (a.is_adress ? 'ADRESS IMMOBILIER' : '')].filter(Boolean).join(' · '))}</div></div></a>
-      ${a.est_a_moi ? '' : `<button class="fav" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${favs.has(a.id) ? '♥' : '♡'}</button>`}
-    </div>`).join('')}</div>`
+  ${vue !== 'favoris' && parCat.length > 1 ? `<nav class="cat-bar" aria-label="Catégories"><a class="${!cat ? 'on' : ''}" href="${lien({ cat: '' })}" ${!cat ? 'aria-current="page"' : ''}>${ICO_CAT.Tout}<span>Tout</span></a>${parCat.map(([c, l]) => `<a class="${cat === c ? 'on' : ''}" href="${lien({ cat: c })}" ${cat === c ? 'aria-current="page"' : ''}>${ICO_CAT[c] || ICO_CAT.Autre}<span>${esc(c)}</span><em>${l.length}</em></a>`).join('')}</nav>` : ''}
+  ${cat && liste.length ? `<div class="cat-h"><span class="rayon-i">${ICO_CAT[cat] || ICO_CAT.Autre}</span><h2>${esc(cat)}</h2><span class="rayon-n">${liste.length} annonce${liste.length > 1 ? 's' : ''}</span></div>` : ''}
+  ${rayons ? `<div class="rayons">${parCat.map(([c, l]) => `<section class="rayon"><div class="rayon-h"><span class="rayon-i">${ICO_CAT[c] || ICO_CAT.Autre}</span><h2>${esc(c)}</h2><span class="rayon-n">${l.length}</span><a href="${lien({ cat: c })}">Tout voir</a></div><div class="rail">${l.map(carte).join('')}</div></section>`).join('')}</div>` : ''}
+  ${liste.length ? `<div class="grid2 grid3" ${rayons ? 'hidden' : ''}>${liste.map(carte).join('')}</div>`
   : vue === 'favoris'
     ? `<div class="card center pad empty-fav"><div class="ef-heart">♡</div><b>Aucun favori pour le moment</b><p class="muted">Touchez le cœur ♡ sur une annonce d’un autre résident pour la retrouver ici.<br>Vos propres annonces n’ont pas de cœur : elles sont dans « Mes annonces ».</p><a class="btn" href="#/market">Parcourir le Market</a></div>`
     : `<div class="card center pad">${q ? 'Aucune annonce ne correspond à « ' + esc(q) + ' ».' : 'Aucune annonce pour le moment.'}<br><br><a class="btn" href="#/publier">+ Publier</a></div>`}`;
@@ -491,12 +531,14 @@ async function market() {
   const qi = app.querySelector('#q'), grille = app.querySelector('.grid2');
   if (grille) { const vide = document.createElement('p'); vide.className = 'muted center no-res'; vide.hidden = true; grille.after(vide);
     filtreLive(qi, () => grille.querySelectorAll('.item'), vide);
+    // recherche depuis les rayons : on passe en grille le temps de la recherche
+    const ry = app.querySelector('.rayons'); if (ry) qi.addEventListener('input', () => { const r = !!qi.value.trim(); ry.hidden = r; grille.hidden = !r; });
     qi.addEventListener('input', () => { try { history.replaceState(null, '', lien({ q: qi.value.trim() })); } catch (_) {} }); }
   app.querySelectorAll('[data-fav]').forEach(b => b.onclick = async () => {
     const id = b.dataset.fav, on = b.textContent === '♥';
     const r = on ? await sb.from('favoris').delete().eq('annonce_id', id) : await sb.from('favoris').insert({ user_id: state.session.user.id, annonce_id: id });
     if (r.error) return toast(errMsg(r.error));
-    b.textContent = on ? '♡' : '♥'; b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+    app.querySelectorAll(`[data-fav="${id}"]`).forEach(x => { x.textContent = on ? '♡' : '♥'; x.setAttribute('aria-label', on ? 'Ajouter aux favoris' : 'Retirer des favoris'); }); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
   });
 }
 

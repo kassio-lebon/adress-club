@@ -105,8 +105,42 @@ export async function renderAdmin(app, ong) {
 }
 // Téléphone : chaque cellule de tableau reçoit l'intitulé de sa colonne (affiché au-dessus quand le tableau devient une fiche),
 // et le domaine actif de la navigation est ramené au centre
-const etiqueter = (root) => root.querySelectorAll('table.adm').forEach(t => { const h = [...(t.querySelector('thead tr') || t.querySelector('tr:has(> th)') || { children: [] }).children].map(th => th.textContent.trim());
+const etiqueter = (root) => root.querySelectorAll('table.adm').forEach(t => { triable(t); const h = [...(t.querySelector('thead tr') || t.querySelector('tr:has(> th)') || { children: [] }).children].map(th => th.textContent.trim());
     t.querySelectorAll('tr').forEach(tr => [...tr.children].forEach((td, i) => { if (td.tagName === 'TD' && h[i] && !td.hasAttribute('data-l')) td.setAttribute('data-l', h[i]); })); });
+// Tri des colonnes : toucher un en-tête trie (croissant puis décroissant) ; sur téléphone, un menu « Trier par »
+const COLL = new Intl.Collator('fr', { numeric: true, sensitivity: 'base' }), TRI = new Map();
+const cleTri = (td) => { const t = (td?.dataset.tri ?? td?.innerText ?? '').replace(/[\u202f\u00a0]/g, ' ').trim();
+  if (!t || t === '—') return null;
+  const d = t.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if (d) return +new Date(+d[3], d[2] - 1, +d[1]);
+  if (/^-?[\d .,]+(\s*(FCFA|%|\/.*))?$/i.test(t)) { const v = parseFloat(t.replace(/\s/g, '').replace(',', '.')); if (!isNaN(v)) return v; }
+  return t; };
+const compTri = (a, b) => a === null ? (b === null ? 0 : 1) : b === null ? -1 : typeof a === 'number' && typeof b === 'number' ? a - b : typeof a === 'number' ? -1 : typeof b === 'number' ? 1 : COLL.compare(a, b);
+function triable(t) {
+  if (t.dataset.tri || t.classList.contains('imp-t')) return;
+  const hr = t.querySelector('thead tr') || t.querySelector('tr:has(> th)'); if (!hr) return;
+  const ths = [...hr.children], cols = ths.map((th, i) => [i, th.textContent.trim()]).filter(([, l]) => l);
+  const corps = t.tBodies[0] || t; t.dataset.tri = '1';
+  if (cols.length < 1 || corps.querySelectorAll('tr:not(:has(> th))').length < 2) return;
+  const k = location.hash.split('?')[0] + '|' + ths.map(th => th.textContent.trim()).join(',');
+  [...corps.rows].forEach((r, i) => { if (!r.dataset.o) r.dataset.o = i; });
+  const appliquer = (col, dir, garder) => {
+    const lignes = [...corps.rows].filter(r => !r.querySelector(':scope > th'));
+    lignes.sort((a, b) => col < 0 ? a.dataset.o - b.dataset.o : (compTri(cleTri(a.cells[col]), cleTri(b.cells[col])) * dir || a.dataset.o - b.dataset.o));
+    lignes.forEach(r => corps.appendChild(r));
+    ths.forEach((th, i) => { if (th.querySelector('.th-tri')) th.setAttribute('aria-sort', i === col ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
+    if (!garder) { if (col < 0) TRI.delete(k); else TRI.set(k, [col, dir]); }
+    const m = t._triM; if (m) m.value = col < 0 ? '' : col + ':' + dir;
+  };
+  cols.forEach(([i, l]) => { const th = ths[i]; th.innerHTML = `<button type="button" class="th-tri" title="Trier par ${esc(l)}">${esc(l)}</button>`; th.setAttribute('aria-sort', 'none');
+    th.firstChild.onclick = () => { const [c, d] = TRI.get(k) || [-1, 1]; appliquer(i, c === i ? -d : 1); }; });
+  // téléphone : les en-têtes sont masqués, un menu les remplace
+  const box = t.parentElement && getComputedStyle(t.parentElement).overflowX === 'auto' ? t.parentElement : t;
+  const m = document.createElement('label'); m.className = 'tri-m';
+  m.innerHTML = `<span>Trier par</span><select><option value="">Ordre normal</option>${cols.map(([i, l]) => `<option value="${i}:1">${esc(l)} (A → Z, 0 → 9)</option><option value="${i}:-1">${esc(l)} (Z → A, 9 → 0)</option>`).join('')}</select>`;
+  box.before(m); t._triM = m.querySelector('select');
+  t._triM.onchange = () => { const [c, d] = t._triM.value ? t._triM.value.split(':').map(Number) : [-1, 1]; appliquer(c, d); };
+  const deja = TRI.get(k); if (deja) appliquer(deja[0], deja[1], true);
+}
 let obsTab = null;
 function mobile(root) {
   etiqueter(root);
