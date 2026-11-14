@@ -85,9 +85,11 @@ export async function renderAdmin(app, ong) {
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Espace ADRESS</h1>
   <nav class="adm-nav"><div class="adm-g">${GROUPES.map(([n, o]) => `<a class="${n === g[0] ? 'on' : ''}" href="#/admin/${o[0][0]}">${n}</a>`).join('')}</div>
   ${g[1].length > 1 ? `<div class="tabs chips adm-s">${g[1].map(([k, l]) => `<a class="chip ${k === ong ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div>` : ''}</nav>
-  ${but ? `<section class="aide" aria-label="Comment faire"><p class="aide-but"><b>${esc(titre)}</b> ${esc(but)}</p>${etapes.length ? `<ol class="aide-et">${etapes.map(e => `<li>${insec(esc(e))}</li>`).join('')}</ol>` : ''}</section>` : ''}
+  ${but ? `<section class="aide" aria-label="Comment faire"><p class="aide-but"><b>${esc(titre)}</b> ${esc(but)}</p>${etapes.length ? `<button type="button" class="aide-ouvrir" aria-expanded="false">Comment faire ? <span>${etapes.length} étapes</span></button><ol class="aide-et">${etapes.map(e => `<li>${insec(esc(e))}</li>`).join('')}</ol>` : ''}</section>` : ''}
   <div id="adm"></div>`;
   const box = app.querySelector('#adm');
+  // téléphone : les étapes d'aide sont repliées (un toucher les déplie) pour voir tout de suite l'écran de travail
+  const ao = app.querySelector('.aide-ouvrir'); if (ao) ao.onclick = () => { const s = ao.closest('.aide'), o = s.classList.toggle('ouvert'); ao.setAttribute('aria-expanded', String(o)); };
   await ({ jour, plan, express, stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, villas, partenaires, avis, parametres }[ong] || stats)(box);
   mobile(app);
   if (!['parametres', 'jour', 'plan', 'express'].includes(ong)) {
@@ -876,26 +878,35 @@ async function comptes(box) {
 
 // ---------- Modération (§3) ----------
 async function moderation(box) {
-  const { data } = await sb.from('signalements').select('*, annonces(id,titre,statut,retiree_par_adress)').order('created_at', { ascending: false }).limit(200);
-  const D = data || [], parAnn = new Map(); D.forEach(s => parAnn.set(s.annonce_id, (parAnn.get(s.annonce_id) || 0) + 1));
-  box.innerHTML = `<div class="list no-q" id="mod">${D.map(s => `<div class="card" data-a="${s.annonce_id}" data-f="${s.decision === 'en_attente' ? 'attente' : 'traite'}">
+  const { data } = await sb.from('signalements').select('*, annonces(id,titre,statut,retiree_par_adress,photos)').order('created_at', { ascending: false }).limit(200);
+  const D = data || [], ph = await vignettesAnnonces(D.map(s => (s.annonces?.photos || [])[0])), parAnn = new Map(); D.forEach(s => parAnn.set(s.annonce_id, (parAnn.get(s.annonce_id) || 0) + 1));
+  box.innerHTML = `<div class="list no-q" id="mod">${D.map(s => `<div class="card mod-c" data-a="${s.annonce_id}" data-f="${s.decision === 'en_attente' ? 'attente' : 'traite'}">${s.annonces ? imgAnn(ph.get((s.annonces.photos || [])[0]), s.annonce_id, s.annonces.titre) : ''}<div class="mod-b">
     <div class="row" style="justify-content:space-between;align-items:baseline"><b>${esc(s.annonces?.titre || 'Annonce supprimée')}</b><span class="st-l ${s.decision === 'en_attente' ? 'actif' : ''}">${s.decision === 'en_attente' ? 'À traiter' : s.decision === 'retiree' ? 'Retirée' : 'Maintenue'}</span></div>
     <div class="muted small">Signalé le ${dateFr(s.created_at, true)} · ${esc(s.motif)}${parAnn.get(s.annonce_id) > 1 ? ` · ${parAnn.get(s.annonce_id)} signalements pour cette annonce` : ''}</div>${s.commentaire ? `<p>${esc(s.commentaire)}</p>` : ''}
-    <div class="row" style="margin-top:8px">${s.annonces ? `<a class="btn sm soft" href="#/annonce/${s.annonce_id}">Voir l’annonce</a>` : ''}${s.decision === 'en_attente' && s.annonces ? `<button class="btn sm danger" data-r="1">Retirer l'annonce</button><button class="btn sm ghost" data-r="0">Maintenir</button>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucun signalement.</div>'}</div>`;
+    <div class="row" style="margin-top:8px">${s.annonces ? `<a class="btn sm soft" href="#/annonce/${s.annonce_id}">Voir l’annonce</a>` : ''}${s.decision === 'en_attente' && s.annonces ? `<button class="btn sm danger" data-r="1">Retirer l'annonce</button><button class="btn sm ghost" data-r="0">Maintenir</button>` : ''}</div></div></div>`).join('') || '<div class="card center pad">Aucun signalement.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#mod'), [['attente', 'À traiter', 1], ['traite', 'Traités']], 'moderation', 'Rechercher une annonce, un motif…');
   box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => (b.dataset.r === '0' || confirm('Retirer cette annonce du Market ?')) && action(async () => check(await sb.rpc('admin_retirer_annonce', { p_id: b.closest('[data-a]').dataset.a, p_retirer: b.dataset.r === '1' }))));
 }
 
+// Photos des annonces (stockage privé) : vignette légère si elle existe, sinon la photo d'origine
+async function vignettesAnnonces(paths) {
+  const ps = [...new Set(paths.filter(Boolean))]; if (!ps.length) return new Map();
+  const t = (p) => p.endsWith('.jpg') && !p.endsWith('_t.jpg') ? p.replace(/\.jpg$/, '_t.jpg') : p;
+  const { data } = await sb.storage.from('annonces').createSignedUrls([...new Set([...ps.map(t), ...ps])], 6 * 3600);
+  const u = new Map((data || []).filter(x => x.signedUrl).map(x => [x.path, x.signedUrl]));
+  return new Map(ps.map(p => [p, u.get(t(p)) || u.get(p) || '']));
+}
+const imgAnn = (url, id, titre) => `<a class="t-ph" href="#/annonce/${id}" aria-label="${esc(titre)}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async">` : '<span aria-hidden="true">📷</span>'}</a>`;
 // ---------- Toutes les annonces : retrait ADRESS après publication (§3) ----------
 const STATUT_ANN = { disponible: 'En ligne', reserve: 'Réservée', vendu: 'Vendue', don_effectue: 'Don effectué', retire: 'Retirée par le vendeur', expire: 'Expirée' };
 async function annonces(box) {
-  const { data } = await sb.from('annonces').select('id,titre,type,prix_fcfa,statut,is_adress,retiree_par_adress,date_publication,date_expiration,signalee').order('date_publication', { ascending: false }).limit(300);
-  const D = data || [];
+  const { data } = await sb.from('annonces').select('id,titre,type,prix_fcfa,statut,is_adress,retiree_par_adress,date_publication,date_expiration,signalee,photos').order('date_publication', { ascending: false }).limit(300);
+  const D = data || [], ph = await vignettesAnnonces(D.map(a => (a.photos || [])[0]));
   const tags = (a) => { const t = []; const d = dans(a.date_expiration);
     if (a.retiree_par_adress) t.push('retiree'); else if (['disponible', 'reserve'].includes(a.statut)) { t.push('ligne'); if (a.statut === 'reserve') t.push('reserve'); if (d != null && d <= 7) t.push('bientot'); } else t.push('close');
     if (a.signalee) t.push('signalee'); if (a.is_adress) t.push('adress'); return t.join(' '); };
-  box.innerHTML = `<div tabindex="0" style="overflow-x:auto" id="anns"><table class="adm no-q"><thead><tr><th>Annonce</th><th>Statut</th><th>Expire</th><th></th></tr></thead><tbody>
-  ${D.map(a => { const d = dans(a.date_expiration), ouverte = !a.retiree_par_adress && ['disponible', 'reserve'].includes(a.statut); return `<tr data-id="${a.id}" data-f="${tags(a)}"><td><a href="#/annonce/${a.id}" class="t-lien"><b>${esc(a.titre)}</b></a>${a.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${a.type === 'don' ? 'Don' : fcfa(a.prix_fcfa)} · publiée le ${dateFr(a.date_publication)}</div>${a.signalee ? alerte('Signalée : à traiter dans Modération') : ''}</td>
+  box.innerHTML = `<div tabindex="0" style="overflow-x:auto" id="anns"><table class="adm no-q ann-t"><thead><tr><th></th><th>Annonce</th><th>Statut</th><th>Expire</th><th></th></tr></thead><tbody>
+  ${D.map(a => { const d = dans(a.date_expiration), ouverte = !a.retiree_par_adress && ['disponible', 'reserve'].includes(a.statut); return `<tr data-id="${a.id}" data-f="${tags(a)}"><td class="c-ph">${imgAnn(ph.get((a.photos || [])[0]), a.id, a.titre)}</td><td class="c-t"><a href="#/annonce/${a.id}" class="t-lien"><b>${esc(a.titre)}</b></a>${a.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${a.type === 'don' ? 'Don' : fcfa(a.prix_fcfa)} · publiée le ${dateFr(a.date_publication)}</div>${a.signalee ? alerte('Signalée : à traiter dans Modération') : ''}</td>
     <td><span class="st-l ${ouverte ? 'actif' : ''}">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUT_ANN[a.statut] || esc(a.statut)}</span></td><td>${dateFr(a.date_expiration)}${ouverte && d != null ? `<div class="muted small">${d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`}</div>` : ''}</td>
     <td>${a.retiree_par_adress ? '<button class="btn sm ghost" data-r="0">Rétablir</button>' : ouverte ? '<button class="btn sm danger" data-r="1">Retirer</button>' : ''}</td></tr>`; }).join('')}</tbody></table></div>`;
   filtres(box.querySelector('#anns'), [['ligne', 'En ligne'], ['reserve', 'Réservées'], ['bientot', 'Expirent ≤ 7 j'], ['signalee', 'Signalées', 1], ['close', 'Clôturées'], ['retiree', 'Retirées par ADRESS'], ['adress', 'ADRESS']], 'annonces', 'Rechercher une annonce…');

@@ -1282,3 +1282,39 @@ body.vg-on{overflow:hidden}
   .imp-t td,.imp-t th{white-space:normal}
   .imp-cols{font-size:12.5px}
 }
+
+/* v94 : photos des annonces dans l'Espace ADRESS (liste des annonces, signalements) */
+.t-ph{display:grid;place-items:center;width:56px;height:56px;border-radius:10px;overflow:hidden;background:var(--sunken);color:var(--muted);text-decoration:none;flex:none}
+.t-ph img{width:100%;height:100%;object-fit:cover;display:block}
+table.adm td.c-ph{width:72px;padding-right:0}
+.mod-c{display:flex;gap:14px;align-items:flex-start}.mod-b{flex:1;min-width:0}
+/* v94 : téléphone — fiches compactes : titre en tête, valeurs courtes côte à côte, actions en bas */
+@media (max-width:600px){
+  table.adm tr{display:grid;grid-template-columns:1fr 1fr;column-gap:4px;padding:8px 0}
+  table.adm td{padding:5px 14px;min-width:0;overflow-wrap:anywhere}
+  table.adm td:first-child,table.adm td:last-child{grid-column:1/-1}
+  table.adm td:first-child::before{display:none}
+  table.adm td:last-child:not([data-l])::before{display:none}
+  table.adm td:last-child .row,table.adm td:last-child>.btn{margin-top:2px}
+  /* annonces : photo à gauche du titre */
+  table.adm.ann-t tr{grid-template-columns:70px 1fr 1fr}
+  table.adm.ann-t td.c-ph{grid-column:1;grid-row:1/3;width:auto;padding:4px 0 4px 14px}
+  table.adm.ann-t td.c-t{grid-column:2/-1;padding-left:10px}
+  table.adm.ann-t td.c-t::before{display:none}
+  table.adm.ann-t td:nth-child(3){grid-column:2;padding-left:10px}
+  table.adm.ann-t td:nth-child(4){grid-column:3}
+  table.adm.ann-t td:last-child{grid-column:1/-1}
+  table.adm.ann-t td:last-child:empty{display:none}
+  .mod-c .t-ph{width:64px;height:64px}
+}
+/* v94 : aide de l'Espace ADRESS repliée sur téléphone */
+.aide-ouvrir{display:none}
+@media (max-width:600px){
+  .aide{margin:10px 0 4px;padding:12px 14px}
+  .aide-ouvrir{display:flex;align-items:center;gap:8px;margin-top:8px;padding:6px 0;border:0;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--red);cursor:pointer}
+  .aide-ouvrir span{font-weight:500;color:var(--muted);font-size:13px}
+  .aide-ouvrir::after{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .25s var(--ease)}
+  .aide.ouvert .aide-ouvrir::after{transform:rotate(-135deg) translateY(-2px)}
+  .aide .aide-et{display:none}
+  .aide.ouvert .aide-et{display:grid;animation:rise .35s var(--ease) both}
+}
