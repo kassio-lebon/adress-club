@@ -371,7 +371,7 @@ async function accueil() {
   const urls = await photosUrls((recents || []).map(a => a.photos[0]), true);
   const res = state.profil.residence || {};
   // photos d'arrière-plan : d'abord la résidence du locataire, puis les autres résidences ADRESS
-  const { data: rr } = await sb.from('residences').select('nom,photo_path,photos').eq('visible', true).order('ordre');
+  const { data: rr } = await sb.from('residences').select('nom,photo_path,photos,type_bien').eq('visible', true).order('ordre');
   const pics = []; const ajout = (r) => [r.photo_path, ...(r.photos || [])].forEach(p => { if (p && !/test/i.test(p) && !pics.includes(p)) pics.push(p); });
   (rr || []).filter(r => r.nom === res.nom).forEach(ajout); if (!pics.length && res.photo_path) pics.push(res.photo_path); (rr || []).forEach(ajout);
   const ph = pics[0];
@@ -384,7 +384,7 @@ async function accueil() {
     + ((recents || []).length ? '<div class="strip">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
     + '</section>' + carteInstall() + carteNotif() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
-    + lien('#/residences', ICO.residences, 'Nos résidences', 'Photos et contact')
+    + lien('#/residences', ICO.residences, (rr || []).some(estVillas) ? 'Nos résidences et villas' : 'Nos résidences', 'Photos et contact')
     + lien('#/flip-immo', ICO.flip, 'Le Flip Immo', 'Le magazine ADRESS')
     + lien('#/nouveautes', ICO.news, 'Les nouveautés', 'Programmes et actualités')
     + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Les bons plans</b><small>La sélection ADRESS pour vivre Abidjan</small></span>' + ICO.arrow + '</a>'
@@ -757,16 +757,21 @@ async function mesAnnonces() {
 }
 
 // ---------- Contenus ADRESS (§7, §7 bis) ----------
+// Les ensembles de villas ne sont jamais présentés comme des résidences
+const estVillas = (r) => /villa/i.test(r?.type_bien || '') || /^VILLAS?\b/i.test(String(r?.nom || '').trim());
 async function residences() {
   const { data } = await sb.from('residences').select('*').eq('visible', true).order('ordre');
   const imgs = (r) => [...new Set([r.photo_path, ...(r.photos || [])].filter(Boolean).map(publicUrl))];
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos résidences</h1>
-  <div class="list" style="margin-top:12px">${(data || []).map((r, k) => { const im = imgs(r); return `<div class="card item res-card" style="--k:${k}">
+  const V = (data || []).filter(estVillas), A = (data || []).filter(r => !estVillas(r));
+  const carte = (r, k) => { const im = imgs(r); const vi = estVillas(r); return `<div class="card item res-card" style="--k:${k}">
     ${im.length ? `<div class="rs" data-imgs="${esc(JSON.stringify(im))}" role="img" aria-label="Photos de ${esc(r.nom)}">
       ${im.length > 1 ? `<div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div>` : ''}
       ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}</div>` : ''}
     <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc(r.quartier || '')}${r.type_bien ? ' · ' + esc(r.type_bien) : ''}</div>
-    ${r.description && !/^résidence adress immobilier\.?$/i.test(r.description.trim()) ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">Découvrir la résidence ↗</a>` : ''}</div></div>`; }).join('') || '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>'}</div>`;
+    ${r.description && !/^résidence adress immobilier\.?$/i.test(r.description.trim()) ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">${vi ? 'Découvrir les villas' : 'Découvrir la résidence'} ↗</a>` : ''}</div></div>`; };
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>${V.length ? 'Nos résidences et villas' : 'Nos résidences'}</h1>
+  ${V.length && A.length ? '<h2 class="res-sec">Résidences</h2>' : ''}<div class="list" style="margin-top:12px">${A.map(carte).join('') || (V.length ? '' : '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>')}</div>
+  ${V.length ? `<h2 class="res-sec">Villas</h2><div class="list" style="margin-top:12px">${V.map((r, k) => carte(r, k + A.length)).join('')}</div>` : ''}`;
   (data || []).forEach(r => track('vue_residence', r.id));
   app.querySelectorAll('[data-r]').forEach(a => a.addEventListener('click', () => track('clic_residence', a.dataset.r)));
   app.querySelectorAll('.rs').forEach(diaporama);

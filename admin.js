@@ -4,7 +4,7 @@ import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES
 // Navigation en 4 groupes (au lieu de 11 onglets à plat) : on choisit d'abord le domaine, puis l'écran
 const GROUPES = [
   ['Aujourd’hui', [['jour', 'Aujourd’hui']]],
-  ['Locataires', [['plan', 'Plan des résidences'], ['residences', 'Résidences'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
+  ['Locataires', [['plan', 'Plan des résidences'], ['residences', 'Résidences'], ['villas', 'Villas'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
   ['Le Market', [['annonces', 'Annonces'], ['moderation', 'Signalements']]],
   ['Vitrine', [['contenus', 'Actualités'], ['partenaires', 'Bons plans']]],
   ['Pilotage', [['stats', 'Indicateurs'], ['avis', 'Avis'], ['parametres', 'Paramètres']]]];
@@ -42,11 +42,16 @@ const AIDE = {
     'Touchez « Voir l’annonce ».',
     'Non conforme : « Retirer l’annonce ». Conforme : « Maintenir ».',
     'L’annonce reste en ligne tant que vous n’avez pas décidé.']],
-  residences: ['Les résidences ADRESS : leur fiche sur l’accueil des résidents et le nombre de logements suivis.', [
-    'Nouvelle résidence ou ensemble de villas : bouton rouge « Créer une résidence », puis choisissez le type. Un import Excel crée aussi les villas tout seul.',
+  residences: ['Les résidences d’appartements ADRESS : leur fiche sur l’accueil des résidents et le nombre de logements suivis. Les villas ont leur propre rubrique « Villas ».', [
+    'Nouvelle résidence : bouton rouge « Créer une résidence », puis choisissez le type.',
     'Ensuite, ajoutez ses logements dans Nos locataires (import Excel ou « Ajouter un logement »).',
     '« Photo » change la photo, « Masquer » la cache aux résidents sans rien perdre.',
     '« Supprimer » efface la résidence et ses logements, définitivement (double confirmation).']],
+  villas: ['Les ensembles de villas ADRESS (LUMIERE, HERMES…), séparés des résidences : chaque ensemble a sa fiche et ses villas.', [
+    'Le plus simple : importez le fichier Excel des villas dans Nos locataires. Chaque nom de villa devient un ensemble ici, tout seul.',
+    'Ou bien : bouton rouge « Créer un ensemble de villas », puis ajoutez ses villas dans Nos locataires.',
+    '« Photo » change la photo, « Masquer » le cache aux résidents sans rien perdre.',
+    '« Supprimer » efface l’ensemble et ses villas, définitivement (double confirmation).']],
   contenus: ['Les actualités et magazines (Flip Immo) affichés aux résidents.', [
     'Publiez avec le formulaire en haut : type, titre, image et, pour un Flip Immo, le lien du flipbook.',
     '« Masquer » retire un contenu sans le perdre ; « Supprimer » l’efface.']],
@@ -83,7 +88,7 @@ export async function renderAdmin(app, ong) {
   ${but ? `<section class="aide" aria-label="Comment faire"><p class="aide-but"><b>${esc(titre)}</b> ${esc(but)}</p>${etapes.length ? `<ol class="aide-et">${etapes.map(e => `<li>${insec(esc(e))}</li>`).join('')}</ol>` : ''}</section>` : ''}
   <div id="adm"></div>`;
   const box = app.querySelector('#adm');
-  await ({ jour, plan, express, stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, partenaires, avis, parametres }[ong] || stats)(box);
+  await ({ jour, plan, express, stats, invitations, annuaire, comptes, moderation, annonces, contenus, residences, villas, partenaires, avis, parametres }[ong] || stats)(box);
   if (!['parametres', 'jour', 'plan', 'express'].includes(ong)) {
     box.querySelectorAll('table.adm:not(.no-q)').forEach(t => { if (t.querySelectorAll('tr').length > 3) barreRecherche(t.parentElement.matches('div[style*="overflow"]') ? t.parentElement : t, () => [...t.querySelectorAll('tr')].slice(1), 'Rechercher…'); });
     box.querySelectorAll('.list:not(.no-q)').forEach(l => { if (l.children.length > 3) barreRecherche(l, () => [...l.children], 'Rechercher…'); });
@@ -558,7 +563,7 @@ async function annuaire(box) {
     const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', villa ? 'Villas libres' : 'Logements libres']];
     box.innerHTML = `
     <div class="card">
-      <div class="ann-top"><div><label for="ar" style="margin-top:0">Résidence</label><select id="ar">${optionsRes(R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select></div>
+      <div class="ann-top"><div><label for="ar" style="margin-top:0">${resVilla(R.find(r => r.id === rid)) ? 'Ensemble de villas' : 'Résidence'}</label><select id="ar">${optionsRes(R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select></div>
       <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>${villa ? 'Ajouter une villa' : 'Ajouter un logement'}</button><label class="btn xl" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
     <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div ${villa ? 'hidden' : ''}><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div ${villa ? 'hidden' : ''}><label for="ae">Étage</label><input type="text" id="ae"></div><div><label for="aa">${villa ? 'Nom technique de la villa (ex. A1)' : 'Appartement (4 caractères max.)'}</label><input type="text" id="aa" placeholder="${villa ? 'A1' : 'A001'}"></div></div>
@@ -671,8 +676,8 @@ async function annuaire(box) {
           return [fiche({ nom: n.trim(), ...lireFeuille(rows) }, false)];
         }).filter(f => f.lignes.length);
         if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue. Résidences : colonnes BLOC, ETAGE, APP., LOCATAIRE, MAIL. Villas : NOM DE LA VILLA, NOM TECHNIQUE, LOCATAIRE, MAIL.</p>'; return; }
-        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} ${f.villa ? (f.lignes.length > 1 ? 'villas' : 'villa') + ` (${esc(f.lignes.map(x => x.appartement).join(', '))})` : 'logements'}${f.connue ? '' : ' <span class="badge warn">nouvelle résidence</span>'}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.connue ? `<div class="small">Locataires : <b>${f.avant}</b> aujourd’hui → <b>${f.apres}</b> après l’import${f.absents.length ? ` · <span class="err">${f.absents.length} logement${f.absents.length > 1 ? 's' : ''} absent${f.absents.length > 1 ? 's' : ''} du fichier retiré${f.absents.length > 1 ? 's' : ''}${f.absents.some(x => occupant.has(x.id)) ? `, dont ${f.absents.filter(x => occupant.has(x.id)).length} compte(s) actif(s) suspendu(s)` : ''}</span>` : ''}${f.vides.length ? ` · <span class="err">${f.vides.length} compte(s) actif(s) sur un logement désormais vide : accès suspendu</span>` : ''}${f.remplaces.length ? ` · <span class="err">${f.remplaces.length} logement(s) avec un nouveau locataire : l’ancien compte est suspendu</span>` : ''}${f.perdus.length ? `<div class="a-pb">Perdront l’accès (compte suspendu, réactivable) : ${esc(f.perdus.join(', '))}</div>` : ''}</div>` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}</li>`).join('')}</ul>
-          <p class="note small" style="margin:10px 0 0">Le fichier <b>remplace</b> la liste actuelle de chaque résidence qu’il contient : locataires, e-mails et logements. Ce qui n’y figure plus est retiré. Les résidences absentes du fichier ne changent pas. <b>Avant l’import, une sauvegarde de la liste actuelle est téléchargée</b> : en cas d’erreur, réimportez-la pour revenir en arrière.</p>
+        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} ${f.villa ? (f.lignes.length > 1 ? 'villas' : 'villa') + ` (${esc(f.lignes.map(x => x.appartement).join(', '))})` : 'logements'}${f.connue ? '' : ` <span class="badge warn">${f.villa ? 'nouvel ensemble de villas' : 'nouvelle résidence'}</span>`}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.connue ? `<div class="small">Locataires : <b>${f.avant}</b> aujourd’hui → <b>${f.apres}</b> après l’import${f.absents.length ? ` · <span class="err">${f.absents.length} logement${f.absents.length > 1 ? 's' : ''} absent${f.absents.length > 1 ? 's' : ''} du fichier retiré${f.absents.length > 1 ? 's' : ''}${f.absents.some(x => occupant.has(x.id)) ? `, dont ${f.absents.filter(x => occupant.has(x.id)).length} compte(s) actif(s) suspendu(s)` : ''}</span>` : ''}${f.vides.length ? ` · <span class="err">${f.vides.length} compte(s) actif(s) sur un logement désormais vide : accès suspendu</span>` : ''}${f.remplaces.length ? ` · <span class="err">${f.remplaces.length} logement(s) avec un nouveau locataire : l’ancien compte est suspendu</span>` : ''}${f.perdus.length ? `<div class="a-pb">Perdront l’accès (compte suspendu, réactivable) : ${esc(f.perdus.join(', '))}</div>` : ''}</div>` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}</li>`).join('')}</ul>
+          <p class="note small" style="margin:10px 0 0">Le fichier <b>remplace</b> la liste actuelle de chaque résidence ou ensemble de villas qu’il contient : locataires, e-mails, logements et villas. Ce qui n’y figure plus est retiré. Ce qui est absent du fichier ne change pas. <b>Avant l’import, une sauvegarde de la liste actuelle est téléchargée</b> : en cas d’erreur, réimportez-la pour revenir en arrière.</p>
           <div class="row" style="margin-top:10px"><button class="btn" type="button" id="ok">Importer</button><button class="btn ghost" type="button" id="no">Annuler</button></div></div>`;
         imp.querySelector('#no').onclick = () => imp.innerHTML = '';
         imp.querySelector('#ok').onclick = async (ev) => {
@@ -683,7 +688,8 @@ async function annuaire(box) {
             const okk = await dialogue({ titre: 'Vérifiez avant d’importer', ok: 'Importer', danger: true, saisie: { label: 'Tapez IMPORTER pour confirmer', attendu: 'IMPORTER' },
               corps: `<ul>${chute.map(f => li(`<b>${esc(f.nom)}</b> : ${f.avant} locataires aujourd’hui → <b>${f.apres}</b> après l’import. Si le fichier est incomplet ou n’est pas le bon, annulez.`)).join('')}
                 ${perdus.length ? li(`<b>${perdus.length} compte${perdus.length > 1 ? 's' : ''}</b> perdront l’accès (suspendus, réactivables avec un nouveau code) : ${esc(perdus.slice(0, 8).join(', '))}${perdus.length > 8 ? '…' : ''}`) : ''}
-                ${nouvelles.length ? li(`Nouvelle${nouvelles.length > 1 ? 's' : ''} résidence${nouvelles.length > 1 ? 's' : ''} créée${nouvelles.length > 1 ? 's' : ''} : <b>${esc(nouvelles.map(f => f.nom).join(', '))}</b>. Vérifiez l’orthographe : une faute de frappe crée un doublon.`) : ''}</ul>
+                ${nouvelles.filter(f => !f.villa).length ? li(`Nouvelle(s) résidence(s) créée(s) : <b>${esc(nouvelles.filter(f => !f.villa).map(f => f.nom).join(', '))}</b>. Vérifiez l’orthographe : une faute de frappe crée un doublon.`) : ''}
+                ${nouvelles.filter(f => f.villa).length ? li(`Nouvel(s) ensemble(s) de villas, rangé(s) dans la rubrique Villas : <b>${esc(nouvelles.filter(f => f.villa).map(f => f.nom).join(', '))}</b>. Vérifiez l’orthographe : une faute de frappe crée un doublon.`) : ''}</ul>
                 <p>Une sauvegarde de la liste actuelle sera téléchargée juste avant l’import.</p>` });
             if (!okk) return;
           }
@@ -864,31 +870,33 @@ async function contenus(box) {
 }
 
 // ---------- Résidences (§7) ----------
-async function residences(box) {
+const villas = (box) => residences(box, true);
+async function residences(box, villa = false) {
   const [{ data }, lg, pr] = await Promise.all([sb.from('residences').select('*').order('ordre'),
     sb.from('logements').select('residence_id,locataire').eq('actif', true),
     sb.from('profiles').select('residence_id').eq('statut', 'actif')]);
-  const D = data || [], L = lg.data || [], P = pr.data || [];
+  const T = data || [], D = T.filter(r => resVilla(r) === villa), L = lg.data || [], P = pr.data || [];
+  const mot = villa ? 'l’ensemble de villas' : 'la résidence', TYP = TYPES_BIEN.filter(t => /villa/i.test(t) === villa);
   const nbL = (id) => L.filter(x => x.residence_id === id).length, nbO = (id) => L.filter(x => x.residence_id === id && x.locataire).length, nbM = (id) => P.filter(x => x.residence_id === id).length;
   const pb = (r) => { const t = []; if (!r.photo_path) t.push('Sans photo'); if (!r.description) t.push('Sans description'); if (r.visible && !r.lien_decouvrir) t.push('Sans lien « Découvrir »');
-    if (!nbL(r.id)) t.push('Aucun logement dans Nos locataires : impossible d’inviter des locataires'); return t; };
-  const nV = D.filter(resVilla).length, nA = D.length - nV;
-  box.innerHTML = `<div class="res-top"><span class="muted">${nA} résidence${nA > 1 ? 's' : ''} · ${nV} ensemble${nV > 1 ? 's' : ''} de villas</span><button type="button" class="btn" id="newRes" aria-controls="resForm" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer une résidence</button></div>
-  <div class="card ann-add" id="resForm" hidden><h3>Nouvelle résidence ou ensemble de villas</h3><form id="f">
+    if (!nbL(r.id)) t.push(villa ? 'Aucune villa dans Nos locataires : impossible d’inviter des locataires' : 'Aucun logement dans Nos locataires : impossible d’inviter des locataires'); return t; };
+  const nD = D.length, pl = nD > 1 ? 's' : '';
+  box.innerHTML = `<div class="res-top"><span class="muted">${villa ? `${nD} ensemble${pl} de villas` : `${nD} résidence${pl}`}</span><button type="button" class="btn" id="newRes" aria-controls="resForm" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>${villa ? 'Créer un ensemble de villas' : 'Créer une résidence'}</button></div>
+  <div class="card ann-add" id="resForm" hidden><h3>${villa ? 'Nouvel ensemble de villas' : 'Nouvelle résidence'}</h3><form id="f">
     <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Quartier</label><input id="qu" type="text"></div></div>
-    <div class="grid2"><div><label for="tb">Type *</label><select id="tb"><option value="">Choisir : résidence ou villas</option>${TYPES_BIEN.map(t => `<option value="${t}">${LIB_TYPE[t]}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
+    <div class="grid2"><div><label for="tb">Type *</label><select id="tb">${TYP.length > 1 ? '<option value="">Choisir le type</option>' : ''}${TYP.map(t => `<option value="${t}">${LIB_TYPE[t]}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
     <label>Description</label><textarea id="de"></textarea>
     <label>Lien « Découvrir »</label><input id="li" type="url" placeholder="https://">
     <label data-lf>Photo</label><input id="ph" type="file" accept="image/*">
-    <div class="row" style="margin-top:12px"><button class="btn">Créer la résidence</button><button class="btn ghost" type="button" id="annul">Annuler</button></div></form></div>
-  <h2>Résidences et villas</h2><div class="list no-q" id="rsd">${D.map(r => `<div class="card" data-id="${r.id}" data-f="${[resVilla(r) ? 'villa' : 'appart', r.visible ? 'visible' : 'masque', pb(r).length ? 'pb' : ''].join(' ')}" style="display:flex;gap:12px;align-items:flex-start">
+    <div class="row" style="margin-top:12px"><button class="btn">${villa ? 'Créer l’ensemble' : 'Créer la résidence'}</button><button class="btn ghost" type="button" id="annul">Annuler</button></div></form></div>
+  <h2>${villa ? 'Ensembles de villas' : 'Résidences'}</h2><div class="list no-q" id="rsd">${D.map(r => `<div class="card" data-id="${r.id}" data-f="${[resVilla(r) ? 'villa' : 'appart', r.visible ? 'visible' : 'masque', pb(r).length ? 'pb' : ''].join(' ')}" style="display:flex;gap:12px;align-items:flex-start">
     <div class="ct-im" style="width:72px;height:54px;${r.photo_path ? `background-image:url('${esc(publicUrl(r.photo_path))}')` : ''}"></div>
     <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="type-b${resVilla(r) ? ' v' : ''}">${resVilla(r) ? 'Villas' : 'Résidence'}</span> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
     <div class="muted small">${nbL(r.id)} ${resVilla(r) ? 'villa' : 'logement'}${nbL(r.id) > 1 ? 's' : ''} · ${nbO(r.id)} occupé${nbO(r.id) > 1 ? 's' : ''} · ${nbM(r.id)} membre${nbM(r.id) > 1 ? 's' : ''} du Club</div>${pb(r).map(alerte).join('')}
     <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button>
       <label class="btn sm ghost" style="margin:0">Photo<input type="file" accept="image/*" data-photo class="sr"></label>
       <button class="btn sm ghost" data-edit>Modifier</button><a class="btn sm soft" href="#/admin/annuaire" data-ann>Nos locataires</a><button class="btn sm ghost rouge" data-supr>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
-  if (D.length) filtres(box.querySelector('#rsd'), [['appart', 'Résidences'], ['villa', 'Villas'], ['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', 'Masquées']], 'residences', 'Rechercher une résidence ou des villas…');
+  if (D.length) filtres(box.querySelector('#rsd'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', villa ? 'Masqués' : 'Masquées']], villa ? 'villas' : 'residences', villa ? 'Rechercher un ensemble de villas…' : 'Rechercher une résidence…');
   const $ = (s) => box.querySelector(s);
   let edit = null;
   const ouvrir = (on) => { $('#resForm').hidden = !on; $('#newRes').setAttribute('aria-expanded', on); if (on) $('#no').focus(); };
@@ -896,22 +904,22 @@ async function residences(box) {
   $('#annul').onclick = () => ouvrir(false);
   $('#f').onsubmit = (e) => { e.preventDefault();
     const nom = $('#no').value.trim();
-    if (!$('#tb').value) { $('#tb').focus(); return toast('Choisissez le type : résidence d’appartements ou ensemble de villas.'); }
-    if (!edit && D.some(r => norm(r.nom) === norm(nom))) return toast('Cette résidence existe déjà.');
+    if (!$('#tb').value) { $('#tb').focus(); return toast('Choisissez le type.'); }
+    if (!edit && T.some(r => norm(r.nom) === norm(nom))) return toast(`Ce nom existe déjà${T.some(r => norm(r.nom) === norm(nom) && resVilla(r) !== villa) ? (villa ? ' dans Résidences' : ' dans Villas') : ''}.`);
     action(async () => {
     const f = $('#ph').files[0]; const photo_path = f ? await uploadPublic(f, 'residences') : null;
     const v = { nom, quartier: $('#qu').value.trim() || null, type_bien: $('#tb').value || null, ordre: +$('#or').value || 100, description: $('#de').value.trim() || null, lien_decouvrir: $('#li').value.trim() || null };
     if (edit) { if (photo_path) v.photo_path = photo_path; check(await sb.from('residences').update(v).eq('id', edit.id)); }
     else check(await sb.from('residences').insert({ ...v, photo_path }));
-  }, edit ? 'Modifications enregistrées.' : 'Résidence ajoutée.'); };
+  }, edit ? 'Modifications enregistrées.' : villa ? 'Ensemble de villas ajouté.' : 'Résidence ajoutée.'); };
   box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => action(async () => check(await sb.from('residences').update({ visible: b.dataset.v === '1' }).eq('id', b.closest('[data-id]').dataset.id))));
   const rid = (el) => el.closest('[data-id]').dataset.id;
   box.querySelectorAll('[data-ann]').forEach(a => a.onclick = () => { annuaire._rid = rid(a); });
   box.querySelectorAll('[data-supr]').forEach(b => b.onclick = () => { const r = D.find(x => x.id === rid(b)); if (!r) return;
-    if (nbM(r.id)) return toast(`${r.nom} a ${nbM(r.id)} membre(s) du Club : retirez-les d’abord, ou masquez la résidence.`);
+    if (nbM(r.id)) return toast(`${r.nom} a ${nbM(r.id)} membre(s) du Club : retirez-les d’abord, ou masquez ${mot}.`);
     // Double confirmation : 1) l'impact, 2) saisie du nom de la résidence
-    if (!confirm(`⚠ Supprimer définitivement ${r.nom} ?\n\nCe qui sera effacé, sans retour possible :\n• la résidence (fiche, photo, description)\n• ses ${nbL(r.id)} logement(s) et leurs locataires dans Nos locataires\n• les codes d’invitation en attente\n\nAucune sauvegarde n’est conservée. Pour la cacher sans rien perdre, utilisez plutôt « Masquer ».`)) return;
-    const saisi = prompt(`Dernière confirmation — action irréversible.\n\nTapez le nom de la résidence pour la supprimer :\n${r.nom}`);
+    if (!confirm(`⚠ Supprimer définitivement ${r.nom} ?\n\nCe qui sera effacé, sans retour possible :\n• ${mot} (fiche, photo, description)\n• ses ${nbL(r.id)} ${villa ? 'villa(s)' : 'logement(s)'} et leurs locataires dans Nos locataires\n• les codes d’invitation en attente\n\nAucune sauvegarde n’est conservée. Pour la cacher sans rien perdre, utilisez plutôt « Masquer ».`)) return;
+    const saisi = prompt(`Dernière confirmation — action irréversible.\n\nTapez le nom de ${mot} pour confirmer la suppression :\n${r.nom}`);
     if (saisi == null) return;
     if (norm(saisi) !== norm(r.nom)) return toast('Nom différent : suppression annulée.');
     action(async () => check(await sb.rpc('admin_supprimer_residence', { p_id: r.id })), `${r.nom} supprimée.`); });
