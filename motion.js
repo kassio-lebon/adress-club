@@ -16,13 +16,14 @@ if (!reduce && !seen) {
   intro.innerHTML = '<div class="intro-stage"><img class="nl" src="logo-adress.png" alt="ADRESS IMMOBILIER"><div class="intro-in"><i></i><span>CLUB</span></div></div>';
   document.body.appendChild(intro);
   // impact ressenti : légère vibration quand les deux traits se croisent
-  setTimeout(() => { try { if (matchMedia('(pointer: coarse)').matches && navigator.vibrate) navigator.vibrate([14, 60, 22]); } catch (_) {} }, 950);
+  setTimeout(() => { try { if (matchMedia('(pointer: coarse)').matches && navigator.vibrate) navigator.vibrate([14, 60, 22]); } catch (_) {} }, 600);
 }
 const closeIntro = () => {
   if (!intro) return; const el = intro; intro = null;
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 900); }, Math.max(0, 2900 - (Date.now() - t0)));
+  // l'intro s'efface dès que le premier écran est prêt (au plus tôt 1,3 s, le temps que le logo se dessine)
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 600); }, Math.max(0, 1300 - (Date.now() - t0)));
 };
-setTimeout(closeIntro, 4200);
+setTimeout(closeIntro, 3000);
 
 // ---------- transitions entre écrans (View Transitions API) ----------
 document.addEventListener('click', (e) => {

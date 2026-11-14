@@ -1,5 +1,5 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
-import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, CAT_PARTENAIRES, FILTRES_BP, compress, barreRecherche } from './app.js';
+import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, FILTRES_BP, compress, barreRecherche } from './app.js';
 
 // Navigation en 4 groupes (au lieu de 11 onglets à plat) : on choisit d'abord le domaine, puis l'écran
 const GROUPES = [
@@ -434,7 +434,7 @@ async function retirerLocataire(x, { compte, codeEnAttente }) {
 // Supprimer le locataire : il quitte définitivement la résidence. Le logement reste (libre) ; deux confirmations.
 async function supprimerLocataire(x) {
   const { data: P } = await sb.from('profiles').select('id,nom_affichage,statut').eq('logement_id', x.id);
-  const comptes = P || [], actif = comptes.some(p => p.statut === 'actif');
+  const comptes = P || [];
   const nom = x.locataire || comptes[0]?.nom_affichage || x.email || 'ce locataire';
   const r1 = await dialogue({ titre: `Supprimer ${nom} ?`, ok: 'Continuer', danger: true,
     corps: `<p>À utiliser quand ${esc(nom)} <b>quitte définitivement la résidence</b>. Le logement <b>${esc(x.code)}</b> reste et redevient libre.</p><ul>

@@ -9,7 +9,6 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSess
 export const CATEGORIES = ['Meubles','Électroménager','Décoration','Enfants et bébé','Vêtements et accessoires','Électronique','Sport et loisirs','Maison et jardin','Autre'];
 export const ETATS = ['Neuf','Très bon état','Bon état','Usagé','À réparer'];
 export const FILTRES_BP = ['Rideaux et décoration','Aménagement et revêtements'];
-export const CAT_PARTENAIRES = ['Rideaux et décoration','Aménagement et revêtements','Électroménager','Boutiques et inspirations'];
 const STATUTS = { disponible:'Disponible', reserve:'Réservé', vendu:'Vendu', don_effectue:'Don effectué', retire:'Retiré', expire:'Expiré' };
 
 export const state = { session: null, profil: null, params: {}, compteurs: { demandes_non_lues: 0, notifications_non_lues: 0 } };
@@ -98,13 +97,13 @@ async function chargerProfil() {
   const { data: { session } } = await sb.auth.getSession();
   state.session = session; state.profilKo = false;
   if (!session) { state.profil = null; return; }
-  const { data, error } = await sb.from('profiles').select('*, residence:residences(nom,photo_path)').eq('id', session.user.id).maybeSingle();
+  // profil et paramètres demandés en même temps (un seul aller-retour réseau au lieu de deux)
+  const [{ data, error }, { data: p }] = await Promise.all([
+    sb.from('profiles').select('*, residence:residences(nom,photo_path)').eq('id', session.user.id).maybeSingle(),
+    sb.from('parametres').select('cle,valeur')]);
   if (error && !data) { state.profilKo = true; if (state.profil?.id === session.user.id) state.profilKo = false; return; }
   state.profil = data;
-  if (data?.statut === 'actif') {
-    const { data: p } = await sb.from('parametres').select('cle,valeur');
-    state.params = Object.fromEntries((p || []).map(x => [x.cle, Number(x.valeur)]));
-  }
+  if (data?.statut === 'actif') state.params = Object.fromEntries((p || []).map(x => [x.cle, Number(x.valeur)]));
 }
 export async function majCompteurs() {
   if (state.profil?.statut !== 'actif') return;
@@ -140,7 +139,7 @@ async function router() {
   if (view.constructor.name === 'AsyncFunction') app.innerHTML = '<div class="skel"><i></i><i></i><i></i></div>';
   try { await view(param); } catch (e) { console.error(e); app.innerHTML = `<div class="card">${esc(errMsg(e))}</div>`; }
   void app.offsetWidth; app.classList.add('page-in');
-  majCompteurs();
+  if (view !== accueil) majCompteurs(); // l'accueil vient déjà de les mettre à jour
 }
 
 // Réseau absent ou trop lent au démarrage : écran d'attente qui réessaie tout seul
@@ -294,7 +293,6 @@ function nouveauMdp() {
   };
 }
 // Android hors Chrome (Firefox, Brave, Opera, Samsung…) : l'installation en 1 clic n'existe que dans Chrome → bouton pour y ouvrir l'appli
-const estChrome = () => /Chrome\//.test(navigator.userAgent) && !/SamsungBrowser|EdgA|OPR|Opera|Firefox|FxiOS|YaBrowser|UCBrowser|MiuiBrowser|HeyTap|Vivaldi|DuckDuckGo|wv\)/i.test(navigator.userAgent) && !navigator.brave;
 const lienChrome = () => 'intent://' + location.host + location.pathname + '?inst=1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent('https://play.google.com/store/apps/details?id=com.android.chrome') + ';end';
 export async function installer(auto) {
   auto = auto === true;
@@ -365,13 +363,15 @@ function brancherInstall(root) {
 }
 
 async function accueil() {
-  await majCompteurs();
+  // compteurs, dernières annonces et résidences chargés en même temps
+  const [, { data: recents }, { data: rr }] = await Promise.all([
+    majCompteurs(),
+    sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8),
+    sb.from('residences').select('nom,photo_path,photos,type_bien').eq('visible', true).order('ordre')]);
   const nl = state.compteurs.demandes_non_lues || 0;
-  const { data: recents } = await sb.from('v_market').select('id,titre,type,prix_fcfa,photos,statut').order('date_publication', { ascending: false }).limit(8);
   const urls = await photosUrls((recents || []).map(a => a.photos[0]), true);
   const res = state.profil.residence || {};
   // photos d'arrière-plan : d'abord la résidence du locataire, puis les autres résidences ADRESS
-  const { data: rr } = await sb.from('residences').select('nom,photo_path,photos,type_bien').eq('visible', true).order('ordre');
   const pics = []; const ajout = (r) => [r.photo_path, ...(r.photos || [])].forEach(p => { if (p && !/test/i.test(p) && !pics.includes(p)) pics.push(p); });
   (rr || []).filter(r => r.nom === res.nom).forEach(ajout); if (!pics.length && res.photo_path) pics.push(res.photo_path); (rr || []).forEach(ajout);
   const ph = pics[0];
@@ -851,7 +851,7 @@ async function bonnesAdresses() {
     + '<div class="bp-txt"><b>' + esc(p.nom) + '</b><div class="muted small">' + esc(p.categorie) + '</div>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>'
     + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(sur(p.lien)) + '" target="_blank" rel="noopener">Découvrir</a>' : '') + '</div>';
   const flipCard = (p) => '<a class="flipcard" data-p="' + p.id + '" href="' + esc(lienFlip(p.lien, p.nom)) + '">'
-    + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><i class="orb o1"></i><i class="orb o2"></i><em>' + esc(p.nom) + '</em></span>'
+    + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><em>' + esc(p.nom) + '</em></span>'
     + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(p.nom) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
   app.innerHTML = '<a class="back" href="#/">‹ Accueil</a><h1>Les bons plans</h1><p class="muted">La sélection ADRESS pour vivre Abidjan</p>'
     + '<div class="chips"><a class="chip ' + (!cat ? 'on' : '') + '" href="#/bonnes-adresses">Tout</a>' + FILTRES_BP.map(c => '<a class="chip ' + (cat === c ? 'on' : '') + '" href="#/bonnes-adresses?cat=' + encodeURIComponent(c) + '">' + c + '</a>').join('') + '</div>'
@@ -959,7 +959,6 @@ function avis() {
 }
 
 // ---------- démarrage ----------
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window._installPrompt = e; });
 window.addEventListener('appinstalled', () => { window._installPrompt = null; document.querySelectorAll('.install-card').forEach(x => x.remove()); });
 window.addEventListener('hashchange', router);
 setTimeout(() => { if (state.session) activerPush(false); }, 4000);
@@ -995,6 +994,7 @@ if ('serviceWorker' in navigator) {
   document.addEventListener('visibilitychange', () => { if (attente && document.visibilityState === 'hidden') location.reload(); });
   navigator.serviceWorker.register('sw.js').then(reg => {
     const verifier = () => reg.update().catch(() => {});
+    verifier(); // à chaque ouverture : une nouvelle version est cherchée tout de suite
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verifier(); });
     setInterval(verifier, 30 * 60 * 1000);
   }).catch(() => {});

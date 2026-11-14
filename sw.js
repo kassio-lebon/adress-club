@@ -1,7 +1,8 @@
 // ADRESS CLUB — service worker : l'interface fonctionne hors ligne, les données restent toujours en direct.
-const CACHE = 'acl-v87';
+const CACHE = 'acl-v88';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'admin.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png', 'motion.js'];
-self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
+// À chaque version publiée, CHANGER CACHE (acl-vNN) : c'est ce qui fait télécharger la nouvelle version aux téléphones.
+self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE && x !== 'acl-img' && x !== 'acl-lib').map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
@@ -18,7 +19,10 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (e.request.method !== 'GET' || u.origin !== location.origin) return; // Supabase et CDN : jamais mis en cache ici
-  e.respondWith(fetch(e.request, { cache: 'no-cache' }).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; }).catch(() => caches.match(e.request)));
+  // Fichiers de l'application : servis tout de suite depuis le téléphone (version complète et cohérente,
+  // téléchargée d'un bloc à l'installation). Les fichiers absents du cache sont pris sur le réseau puis gardés.
+  const cle = e.request.mode === 'navigate' ? 'index.html' : e.request;
+  e.respondWith(caches.open(CACHE).then(c => c.match(cle, { ignoreSearch: true }).then(r => r || fetch(e.request).then(rep => { if (rep.ok && rep.type === 'basic') c.put(cle, rep.clone()); return rep; }).catch(() => e.request.mode === 'navigate' ? c.match('index.html') : Response.error()))));
 });
 self.addEventListener('push', (e) => {
   let d = { titre: 'ADRESS CLUB' }; try { d = e.data ? e.data.json() : d; } catch (_) {}

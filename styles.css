@@ -83,7 +83,6 @@ h3{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
 .hero>*{position:relative}
 .hero h1{color:#fff;margin:0}
 .hero p{margin:0 0 2px;font-size:13px;font-weight:600;opacity:.85}
-.hero .kicker{display:none}
 .notice{display:flex;align-items:center;gap:10px;margin:14px 0 0;padding:12px 14px;border-radius:var(--r);background:var(--red-tint);color:var(--red-ink);text-decoration:none;font-size:14px;font-weight:600}
 .notice b{display:grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:var(--red);color:#fff;font-size:12px}
 .sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
@@ -107,13 +106,6 @@ h3{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
 .feature small{display:block;color:rgba(255,255,255,.65);font-size:12.5px;margin-top:2px}
 .feature b{font-size:16px;font-weight:700}
 .feature svg{color:#fff}
-/* anciennes tuiles conservées pour compatibilité */
-.entry{position:relative;min-height:120px;display:flex;flex-direction:column;justify-content:flex-end;text-decoration:none}
-.entry .ico{position:absolute;top:14px;left:14px;color:var(--red)}
-.entry b{font-size:16px;font-weight:700}
-.entry span:not(.ico):not(.badge){color:var(--muted);font-size:12.5px}
-.entry .badge{position:absolute;top:14px;right:14px}
-.banner{display:flex;justify-content:space-between;align-items:center;gap:12px;text-decoration:none;margin-top:12px}
 
 /* ---------- connexion ---------- */
 .login{max-width:400px;margin:7vh auto 0}
@@ -138,7 +130,6 @@ h3{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
 .btn.sm{min-height:38px;padding:7px 13px;font-size:13.5px;border-radius:9px}
 .btn.block{width:100%}
 .btn[disabled]{opacity:.5;cursor:default;transform:none}
-.btn .ripple{display:none}
 
 /* ---------- filtres ---------- */
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 18px}
@@ -162,7 +153,6 @@ h3{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
 .fav{position:absolute;top:8px;right:8px;z-index:2;width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.95);font-size:16px;line-height:1;color:var(--ink);cursor:pointer;transition:transform .12s}
 .fav:active{transform:scale(.88)}
 .fav.pop{animation:heart .35s var(--ease)}
-@keyframes heart{40%{transform:scale(1.25)}100%{transform:scale(1)}}
 input[type=search]{background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2374777F' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") 13px center/18px no-repeat;padding-left:40px!important}
 
 /* ---------- détail d'une annonce ---------- */
@@ -219,7 +209,6 @@ table.adm th,table.adm td{border-bottom:1px solid var(--line);padding:10px 12px;
 /* ---------- toast, chargement ---------- */
 .toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav-h) + 14px + env(safe-area-inset-bottom));margin:0 auto;max-width:460px;background:var(--ink);color:#fff;
   padding:13px 16px;border-radius:10px;font-size:14px;font-weight:500;z-index:60;animation:toast .25s var(--ease) both}
-@keyframes toast{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .splash{display:grid;place-items:center;gap:24px;min-height:62vh;align-content:center}
 .splash img{height:64px;width:auto}
 .spinner{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--red);animation:spin .7s linear infinite}
@@ -230,10 +219,8 @@ table.adm th,table.adm td{border-bottom:1px solid var(--line);padding:10px 12px;
 @keyframes shimmer{to{background-position:-200% 0}}
 
 /* ---------- mouvement : discret et court ---------- */
-@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .page-in{animation:rise .28s var(--ease) both}
 .ph,.gal img{animation:fade .4s ease both}
-@keyframes fade{from{opacity:0}to{opacity:1}}
 
 a:focus-visible,.btn:focus-visible,.chip:focus-visible,.icon-btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 
@@ -404,11 +391,8 @@ html.vt .page-in>*,html.vt .page-in .home>*{animation:none}
 .intro{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:#fff;transition:opacity .6s ease,visibility .6s}
 .intro.out{opacity:0;visibility:hidden}
 .intro-in{display:flex;flex-direction:column;align-items:center;gap:14px}
-.intro img{height:70px;width:auto;clip-path:inset(0 100% 0 0);animation:wipe 1s .15s cubic-bezier(.65,0,.35,1) forwards}
-.intro i{display:block;height:2px;width:0;background:var(--red);animation:line2 .7s .9s cubic-bezier(.65,0,.35,1) forwards}
-.intro span{font-size:12px;font-weight:700;letter-spacing:.5em;padding-left:.5em;color:var(--ink-2);opacity:0;animation:reveal .7s 1.1s cubic-bezier(.16,1,.3,1) forwards}
-@keyframes wipe{to{clip-path:inset(0 0 0 0)}}
-@keyframes line2{to{width:120px}}
+.intro i{display:block;height:4px;width:0;background:var(--red)}
+.intro span{opacity:0;font-weight:800;font-size:clamp(30px,8vw,44px);letter-spacing:.38em;margin-right:-.38em;color:var(--ink)}
 
 /* bouton principal : reflet au survol */
 @media (hover:hover){
@@ -418,19 +402,7 @@ html.vt .page-in>*,html.vt .page-in .home>*{animation:none}
 
 @media (prefers-reduced-motion:reduce){.ph,.gal img{filter:none!important;transform:none!important}.intro{display:none}}
 
-/* ---------- anneaux en orbite (rappel du logo) ---------- */
-.hero .orb{position:absolute;border-radius:50%;pointer-events:none;z-index:2}
-.hero .o1{right:-70px;top:-60px;width:260px;height:160px;border:2px solid rgba(255,255,255,.2);animation:orbit1 16s linear infinite}
-.hero .o2{right:-30px;top:-44px;width:210px;height:130px;border:2px solid rgba(212,16,29,.85);animation:orbit2 22s linear infinite}
-@keyframes orbit1{from{transform:rotate(-28deg)}to{transform:rotate(332deg)}}
-@keyframes orbit2{from{transform:rotate(-38deg)}to{transform:rotate(-398deg)}}
 .hero>p,.hero>h1{z-index:3}
-.hero .orb{opacity:0;animation-delay:0s;transition:opacity 1s .3s}
-.hero .orb.on{opacity:1}
-@media (min-width:960px){.hero .o1{width:420px;height:260px;right:-60px;top:-80px}.hero .o2{width:340px;height:210px;right:10px;top:-60px}}
-.intro-in{position:relative}
-.intro-in::before{content:"";position:absolute;left:50%;top:34px;width:230px;height:120px;margin:-60px 0 0 -115px;border:2px solid rgba(212,16,29,.7);border-radius:50%;opacity:0;animation:introorb 1.6s .2s cubic-bezier(.16,1,.3,1) forwards}
-@keyframes introorb{from{opacity:0;transform:rotate(-90deg) scale(.6)}to{opacity:1;transform:rotate(-20deg) scale(1)}}
 
 /* ---------- mobile : retours tactiles et performances ---------- */
 html{touch-action:manipulation}
@@ -464,9 +436,6 @@ html{touch-action:manipulation}
 .fc-cover{position:relative;aspect-ratio:3/4;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,#30323a,#16171a) center/cover;display:flex;align-items:flex-end;padding:10px;
   box-shadow:0 12px 26px -10px rgba(0,0,0,.7);transform:rotate(-3deg);transition:transform .5s var(--ease)}
 .fc-cover em{position:relative;z-index:3;font-style:normal;font-weight:800;font-size:12.5px;line-height:1.15;letter-spacing:.05em;text-transform:uppercase}
-.fc-cover .orb{position:absolute;border-radius:50%;pointer-events:none}
-.fc-cover .o1{right:-50px;top:-28px;width:150px;height:92px;border:2px solid rgba(255,255,255,.2);animation:orbit1 16s linear infinite}
-.fc-cover .o2{right:-26px;top:-18px;width:120px;height:74px;border:2px solid rgba(212,16,29,.85);animation:orbit2 22s linear infinite}
 .fc-txt{display:flex;flex-direction:column;gap:4px;min-width:0}
 .fc-txt small{color:#FF8A92;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
 .fc-txt b{font-size:18px;font-weight:700}
@@ -476,14 +445,8 @@ html{touch-action:manipulation}
 .flipcard:active{transform:scale(.985)}
 @media (hover:hover){.flipcard:hover .fc-cover{transform:rotate(0) scale(1.04)}.flipcard:hover u svg{transform:translateX(5px)}}
 
-/* ---------- vidéo d'ouverture ---------- */
-.intro-vid{position:absolute;inset:0;margin:auto;width:min(92vw,520px);height:auto;aspect-ratio:1/1;opacity:0;transition:opacity .25s;mix-blend-mode:multiply;z-index:0;pointer-events:none}
-.intro.has-vid .intro-vid{opacity:1}
-.intro-in{z-index:1}
-.intro.has-vid .intro-in::before{display:none}
 
 /* ---------- emblème ADRESS animé (tracé conforme au logo) ---------- */
-.hero .orb,.fc-cover .orb{display:none}
 .mark-anim{position:absolute;z-index:2;pointer-events:none;overflow:visible;height:auto;fill:initial;stroke:none}
 .mark-anim path{transform-box:fill-box;transform-origin:50% 50%}
 .mark-anim .mr{fill:#D4101D}
@@ -500,15 +463,8 @@ html{touch-action:manipulation}
 .fc-cover .mark-anim .mg{animation:mk-sway2 10s ease-in-out infinite alternate}
 @media (min-width:960px){.hero .mark-anim{width:300px;right:36px;top:28px}}
 
-/* vidéo d'ouverture : le logo officiel apparaît quand l'emblème est tracé */
-.intro.has-vid:not(.show-logo) .intro-in{opacity:0}
-.intro.show-logo .intro-in img{animation:wipe-b .9s cubic-bezier(.65,0,.35,1) forwards}
-.intro.show-logo .intro-in i{animation:line-b .6s .5s cubic-bezier(.65,0,.35,1) forwards}
-.intro.show-logo .intro-in span{animation:reveal-b .6s .7s cubic-bezier(.16,1,.3,1) forwards}
-@keyframes wipe-b{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
 @keyframes line-b{from{width:0}to{width:120px}}
 @keyframes reveal-b{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.intro.show-logo .intro-in{opacity:1}
 
 /* v11 : cartes claires, statuts lisibles */
 .feature{background:#fff;color:var(--ink);border:1px solid var(--line)}
@@ -532,21 +488,10 @@ html{touch-action:manipulation}
 /* v13 : intro animée de marque (sans vidéo, visible sur tous les téléphones) */
 .intro2{background:radial-gradient(120% 80% at 50% 40%,#fff 55%,#F4F4F6)}
 .intro-stage{position:relative;display:flex;flex-direction:column;align-items:center}
-.intro-mark{position:relative;width:min(72vw,360px);height:auto;overflow:visible;fill:initial;stroke:none;margin-bottom:-6px}
-.intro-mark path{transform-box:fill-box;transform-origin:50% 50%}
-.intro-mark .mr{fill:#D4101D;animation:im-red 1.05s .1s cubic-bezier(.16,1,.3,1) both}
-.intro-mark .mg{fill:#8A8D93;animation:im-grey 1.05s .28s cubic-bezier(.16,1,.3,1) both}
-.intro2 .intro-mark{animation:im-hit .7s .95s cubic-bezier(.3,1.6,.5,1) both}
-@keyframes im-red{0%{opacity:0;transform:rotate(-150deg) scale(.25);clip-path:inset(0 100% 0 0)}60%{opacity:1}100%{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}
-@keyframes im-grey{0%{opacity:0;transform:rotate(130deg) scale(.25);clip-path:inset(0 0 0 100%)}60%{opacity:1}100%{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}
-@keyframes im-hit{0%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(212,16,29,0))}35%{transform:scale(1.07);filter:drop-shadow(0 14px 28px rgba(212,16,29,.35))}100%{transform:scale(1);filter:drop-shadow(0 10px 22px rgba(212,16,29,.18))}}
 .intro2 .intro-in{opacity:1}
-.intro2 .intro-in img{height:62px;clip-path:inset(0 100% 0 0);animation:wipe-b .8s 1.25s cubic-bezier(.65,0,.35,1) forwards}
-.intro2 .intro-in i{animation:line-b .6s 1.7s cubic-bezier(.65,0,.35,1) forwards}
-.intro2 .intro-in span{opacity:0;animation:reveal-b .6s 1.85s cubic-bezier(.16,1,.3,1) forwards}
-.intro2 .intro-in::before{display:none}
-.intro2.out{opacity:0;visibility:hidden;transition:opacity .8s ease .15s,visibility .9s}
-.intro2.out .intro-mark{animation:none;transform:scale(5);opacity:0;transition:transform .9s cubic-bezier(.7,0,.3,1),opacity .7s ease .1s}
+.intro2 .intro-in i{animation:line-b .45s .5s cubic-bezier(.65,0,.35,1) forwards}
+.intro2 .intro-in span{animation:reveal-b .45s .62s cubic-bezier(.16,1,.3,1) forwards}
+.intro2.out{opacity:0;visibility:hidden;transition:opacity .45s ease,visibility .5s}
 .intro2.out .intro-in{transform:translateY(10px);opacity:0;transition:all .45s ease}
 
 /* v14 : favoris vides */
@@ -615,7 +560,6 @@ details.adv summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--in
 .login>p{animation:reveal .8s .6s var(--ease) both}
 .login form .btn{position:relative;overflow:hidden}
 .login form .btn::after{content:"";position:absolute;top:0;bottom:0;width:40%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-18deg);animation:shine 3.8s 1.8s ease-in-out infinite}
-@keyframes shine{0%{left:-60%}35%,100%{left:130%}}
 .login .linkbtn{animation:nudge 2.6s 2.2s ease-in-out infinite}
 @keyframes nudge{0%,80%,100%{transform:none}86%{transform:translateY(-3px)}92%{transform:translateY(0)}}
 @media (prefers-reduced-motion:reduce){.login-mark,.login-logo,.login form .btn::after,.login .linkbtn{animation:none}}
@@ -643,10 +587,6 @@ details.adv summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--in
 .rs.pause .rs-s.on,.rs.pause .rs-bars i.go b{animation-play-state:paused}
 .rs-s.k0{--kb:kb0}.rs-s.k1{--kb:kb1}.rs-s.k2{--kb:kb2}.rs-s.k3{--kb:kb3}
 @keyframes rsFade{from{opacity:0;filter:blur(6px)}to{opacity:1;filter:none}}
-@keyframes kb0{from{transform:scale(1.02)}to{transform:scale(1.14) translate(-2%,-1%)}}
-@keyframes kb1{from{transform:scale(1.15) translate(2%,1%)}to{transform:scale(1.03)}}
-@keyframes kb2{from{transform:scale(1.04) translate(-2%,1%)}to{transform:scale(1.15) translate(2%,-1%)}}
-@keyframes kb3{from{transform:scale(1.14) translate(0,-2%)}to{transform:scale(1.04) translate(0,1%)}}
 .rs-bars{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:4px;z-index:3}
 .rs-bars i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.4);overflow:hidden}
 .rs-bars i b{display:block;height:100%;width:0;background:#fff}
@@ -664,7 +604,6 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 /* v30 : photos de résidences nettes, format portrait */
 .rs{aspect-ratio:4/5;max-height:min(78vh,640px)}
 .rs-s.on{animation:rsFade2 .9s ease both,var(--kb) 4.8s linear both}
-@keyframes rsFade2{from{opacity:0}}
 @keyframes kb0{from{transform:scale(1)}to{transform:scale(1.07) translate(-1%,-1%)}}
 @keyframes kb1{from{transform:scale(1.07) translate(1%,1%)}to{transform:scale(1)}}
 @keyframes kb2{from{transform:scale(1) translate(-1%,1%)}to{transform:scale(1.07) translate(1%,-1%)}}
@@ -677,7 +616,7 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 .rs-s.on{opacity:1}
 
 /* v32 : emblème — les deux anneaux bougent d'un seul bloc (entrelacement du logo respecté) */
-.mark-anim path,.login-mark path,.intro-mark path{transform-box:view-box;transform-origin:50% 50%}
+.mark-anim path,.login-mark path{transform-box:view-box;transform-origin:50% 50%}
 .hero .mark-anim .mg{animation:mk-in2 1.1s .35s cubic-bezier(.16,1,.3,1) both,mk-sway 9s 1.3s ease-in-out infinite alternate}
 .hero .mark-anim .mr{animation:mk-in 1.1s .2s cubic-bezier(.16,1,.3,1) both,mk-sway 9s 1.3s ease-in-out infinite alternate}
 .fc-cover .mark-anim .mr,.fc-cover .mark-anim .mg{animation:mk-sway 8s ease-in-out infinite alternate}
@@ -715,10 +654,8 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 .card.editing{outline:2px solid var(--red);outline-offset:2px;animation:reveal .45s cubic-bezier(.16,1,.3,1)}
 .card.editing h3{color:var(--red)}
 
-/* v40 : intro sans petit logo, CLUB plus grand ; mot de passe oublié */
+/* v40 : mot de passe oublié */
 .intro2 .intro-in{margin-top:6px}
-.intro2 .intro-in span{font-size:clamp(30px,8vw,44px);font-weight:800;letter-spacing:.38em;margin-right:-.38em;color:var(--ink)}
-.intro2 .intro-in i{height:4px}
 .aide-mdp{margin-top:16px;padding:12px 14px;border-radius:12px;background:#F6F6F7;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
 
 /* v41 : œil pour afficher le mot de passe */
@@ -729,8 +666,6 @@ img.bgz{width:100%;height:100%;object-fit:cover;display:block}
 .pw-eye{color:#3F424A}
 .pw-eye svg{width:22px;height:22px}
 
-/* v43 : intro — nom ADRESS IMMOBILIER conservé, seul le petit emblème du logo est masqué */
-.intro2 .intro-in img.wm{height:70px;-webkit-mask-image:linear-gradient(90deg,transparent 33.5%,#000 33.5%),linear-gradient(180deg,transparent 81.5%,#000 81.5%);mask-image:linear-gradient(90deg,transparent 33.5%,#000 33.5%),linear-gradient(180deg,transparent 81.5%,#000 81.5%);-webkit-mask-composite:source-over;mask-composite:add}
 
 /* v44 : bouton d'installation en 1 clic dans la fenêtre d'aide */
 .sheet .inst1{margin:6px 0 10px;animation:reveal .45s cubic-bezier(.16,1,.3,1)}
@@ -766,8 +701,6 @@ h1.wd .w>span{display:inline-block;animation:wordUp .7s cubic-bezier(.16,1,.3,1)
 @keyframes stampIn{from{opacity:0;transform:translate(-50%,-50%) rotate(-12deg) scale(1.9)}}
 .item.is-res .ph{opacity:1}
 .item.is-res .ph::after{filter:grayscale(.55) brightness(1.04)}
-.res-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--warn-tint);color:var(--warn);font-size:13.5px;line-height:1.45}
-.res-note b{color:#6E4700}
 
 /* v48 : suivi des demandes envoyées */
 .suivi{list-style:none;display:flex;margin:14px 0 10px;padding:0;counter-reset:s}
@@ -811,12 +744,10 @@ details.gerer>summary::-webkit-details-marker{display:none}
 .dem-list{margin-top:6px}
 
 /* v51 : intro avec le logo officiel ADRESS IMMOBILIER, CLUB en dessous */
-.intro2 .nl{display:block;clip-path:none;width:min(80vw,400px);height:auto;margin-bottom:20px;opacity:0;animation:nlIn 1s .15s cubic-bezier(.16,1,.3,1) forwards}
+.intro2 .nl{display:block;width:min(80vw,400px);height:auto;margin-bottom:20px;opacity:0;animation:nlIn .6s .05s cubic-bezier(.16,1,.3,1) forwards}
 @keyframes nlIn{from{opacity:0;transform:scale(.94);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
 .intro2 .intro-stage>.nl~.intro-in{margin-top:0}
-.intro2 .intro-stage>.nl~.intro-in i{animation-delay:1.05s}
-.intro2 .intro-stage>.nl~.intro-in span{animation-delay:1.2s}
-.intro2.out .nl{transform:scale(1.06);opacity:0;transition:transform .8s cubic-bezier(.7,0,.3,1),opacity .6s ease}
+.intro2.out .nl{transform:scale(1.06);opacity:0;transition:transform .5s cubic-bezier(.7,0,.3,1),opacity .4s ease}
 
 /* v52 : moins de répétitions — « ‹ Accueil » déjà dans la navigation */
 a.back[href="#/"]{display:none}
@@ -912,8 +843,6 @@ a.back[href="#/"]{display:none}
 .card-res{border:1.5px solid var(--ink);background:var(--surface)}
 .card-res .pill.reserve{background:var(--ink);color:#fff;border:0}
 .stamp{border-color:var(--ink);color:var(--ink);background:rgba(255,255,255,.94)}
-.res-note{background:var(--sunken);color:var(--ink-2)}
-.res-note b{color:var(--ink)}
 .sv-etat.ok{background:var(--sunken);color:var(--ink)}
 .sv-etat.res{background:var(--sunken);color:var(--ink)}
 .suivi li.fait i,.suivi li.fait::before{background:var(--ink);border-color:var(--ink)}
