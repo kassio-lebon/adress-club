@@ -1119,3 +1119,27 @@ body.dlg-on{overflow:hidden}
 .type-b.v{background:var(--ink);color:#fff}
 .j-grp{margin:10px 0 2px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .j-grp:first-of-type{margin-top:0}
+
+/* v90 : import Excel — guide des colonnes obligatoires, modèles, aperçu ligne par ligne */
+.imp-guide{margin-top:12px;padding:14px 16px;border-radius:12px;background:var(--sunken)}
+.imp-intro{margin:0 0 12px;font-size:14px}
+.imp-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.imp-2{grid-template-columns:1fr}}
+.imp-2 section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.imp-2 h4{margin:0 0 6px;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.imp-2 .small{margin:0 0 8px}
+.imp-cols{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px}
+.imp-cols th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;padding:6px 6px 6px 0;border-bottom:1px solid var(--line)}
+.imp-cols td{padding:6px 6px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.imp-guide .lnk,.imp-guide [data-modele]{background:none;border:0;padding:0;color:var(--red);font-weight:600;font-size:13.5px;cursor:pointer;text-decoration:underline}
+.imp-err{margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--red-tint);color:var(--red-ink);font-size:14px}
+.imp-err ul{margin:6px 0 0;padding-left:18px;line-height:1.55}
+.imp-det{margin-top:8px}
+.imp-det summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-2)}
+.imp-t{margin-top:8px;font-size:13px}
+.imp-t td,.imp-t th{white-space:nowrap}
+.st-i{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--sunken);color:var(--ink-2)}
+.st-i.nouv{background:var(--ok-tint);color:var(--ok)}
+.st-i.modif{background:var(--warn-tint);color:var(--warn)}
+.st-i.ret{background:var(--red-tint);color:var(--red-ink)}
+.imp-ret td{opacity:.85}

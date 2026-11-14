@@ -24,7 +24,7 @@ const AIDE = {
     'Le filtre rouge « À corriger » montre les logements à compléter (e-mail ou nom manquant).',
     'Nouveau locataire sur un logement libre : « Affecter un locataire », puis « Affecter et inviter par WhatsApp ».',
     'Le locataire déménage : « Retirer » (compte suspendu, il peut revenir). Il quitte définitivement la résidence : « Supprimer ». Dans les deux cas le logement reste et redevient libre.',
-    'Mise à jour par Excel : « Importer un fichier Excel » (BASE RÉSIDENCE ou BASE VILLA). Le fichier remplace la liste : ce qui n’y est plus est retiré.']],
+    'Mise à jour par Excel : « Importer un fichier Excel » affiche les colonnes obligatoires et un modèle, puis un aperçu ligne par ligne avant d’importer. Le fichier remplace la liste : ce qui n’y est plus est retiré.']],
   invitations: ['Envoyer à un locataire son code personnel pour qu’il crée son compte ADRESS CLUB.', [
     'Choisissez la résidence, puis tapez le logement ou le nom du locataire : son nom et son e-mail se remplissent seuls.',
     'Touchez « Créer l’invitation », puis « Envoyer par WhatsApp » : le message est déjà rédigé.',
@@ -318,18 +318,38 @@ async function invitations(box) {
 const EMAIL_RE = /[a-z0-9._%+'-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 // Fichier BASE VILLA : NOM DE LA VILLA | NOM TECHNIQUE | LOCATAIRE | MAIL, toutes les villas sur une feuille.
 // Chaque « nom de villa » devient une résidence « VILLA <NOM> » ; chaque nom technique (A1, V3, 1…) un logement de type Villa.
-const estFeuilleVillas = (rows) => rows.some(r => (r || []).some(c => norm(c).startsWith('nom technique')));
 // Code d'une villa = PRÉFIXE-NOM TECHNIQUE (LUM-A1, HER-B1, EME-V3) : unique sans avoir à préciser l'ensemble
 const prefVilla = (nom) => (norm(nom).toUpperCase().replace(/^VILLAS?\s+/, '').replace(/[^A-Z0-9]/g, '') || 'VIL').slice(0, 3);
 const techVilla = (app, nom) => { const t = String(app || '').toUpperCase(), p = prefVilla(nom) + '-'; return t.startsWith(p) ? t.slice(p.length) : t; };
 const codeVilla = (nom, tech) => prefVilla(nom) + '-' + techVilla(tech, nom).replace(/[^A-Z0-9]/g, '');
 const nomResVilla = (n) => { const t = String(n || '').trim().replace(/\s+/g, ' ').toUpperCase(); return /^VILLAS?\b/.test(t) ? t : 'VILLA ' + t; };
-function lireVillas(rows) {
+// Colonnes attendues dans les fichiers d'import : [en-tête, variantes reconnues, valeur obligatoire sur chaque ligne, exemple]
+// Les 4 ou 5 colonnes doivent toutes exister. LOCATAIRE et MAIL peuvent rester vides sur une ligne (logement ou villa libre).
+const COLS_RES = [['BLOC', ['bloc'], 'oui (peut ne figurer que sur la 1re ligne du bloc)', 'A'], ['ETAGE', ['etage'], 'oui (ou APP.)', 'RDC, 1ER, 2E, PENTHOUSE'], ['APP.', ['app', 'appartement'], 'oui', 'A001'], ['LOCATAIRE', ['locataire'], 'non (vide = logement libre)', 'Awa Koné'], ['MAIL', ['mail', 'email', 'e-mail'], 'non, mais indispensable pour inviter', 'awa.kone@exemple.com']];
+const COLS_VIL = [['NOM DE LA VILLA', ['nom de la villa', 'villa'], 'oui (peut ne figurer que sur la 1re ligne)', 'LUMIERE'], ['NOM TECHNIQUE', ['nom technique'], 'oui', 'A1'], ['LOCATAIRE', ['locataire'], 'non (vide = villa libre)', 'Awa Koné'], ['MAIL', ['mail', 'email', 'e-mail'], 'non, mais indispensable pour inviter', 'awa.kone@exemple.com']];
+const NOM_FEUILLE_GENERIQUE = /^(feuil|feuille|sheet|tableau|onglet)\s*\d*$/i;
+// Contrôle d'une feuille avant import : format reconnu, colonnes manquantes, nom de feuille
+function controlerFeuille(nom, rows) {
+  const villa = rows.findIndex(r => (r || []).some(c => norm(c).startsWith('nom technique')));
+  const res = rows.findIndex(r => (r || []).some(c => norm(c) === 'bloc'));
+  if (villa < 0 && res < 0) {
+    const vide = !rows.some(r => (r || []).some(c => String(c ?? '').trim()));
+    return { nom, ignoree: true, raison: vide ? 'feuille vide' : 'aucune ligne d’en-tête reconnue (BLOC… ou NOM DE LA VILLA…)' };
+  }
+  const estV = villa >= 0, spec = estV ? COLS_VIL : COLS_RES;
+  const H = rows[estV ? rows.reduce((d, r, i) => (r || []).some(c => norm(c).startsWith('nom technique')) ? i : d, -1) : res].map(norm);
+  const manquantes = spec.filter(([, k]) => !H.some(h => k.some(x => h === x || h.startsWith(x)))).map(([t]) => t);
+  const erreurs = [];
+  if (manquantes.length) erreurs.push(`colonne${manquantes.length > 1 ? 's' : ''} manquante${manquantes.length > 1 ? 's' : ''} : ${manquantes.join(', ')}`);
+  if (!estV && NOM_FEUILLE_GENERIQUE.test(nom.trim())) erreurs.push(`le nom de la feuille devient le nom de la résidence : renommez « ${nom} » avec le nom de la résidence (ex. AYOKA)`);
+  return { nom, villa: estV, erreurs };
+}
+function lireVillas(rows, off = 1) {
   let hi = -1; rows.forEach((r, i) => { if ((r || []).some(c => norm(c).startsWith('nom technique'))) hi = i; }); // dernière ligne d'en-tête (le fichier en répète une)
   const H = rows[hi].map(norm), col = (...k) => H.findIndex(h => k.some(x => h === x || h.startsWith(x)));
   const iV = col('nom de la villa', 'villa'), iT = col('nom technique'), iL = col('locataire'), iM = col('mail', 'email', 'e-mail');
   const groupes = new Map(); let villa = '', prec = null;
-  for (const r of rows.slice(hi + 1)) {
+  for (const [k, r] of rows.slice(hi + 1).entries()) { const ligne = off + hi + 1 + k;
     const g = (i) => i < 0 || r?.[i] == null ? '' : String(r[i]).trim();
     if (![iV, iT, iL, iM].some(i => g(i))) continue;
     const mails = (g(iM).match(EMAIL_RE) || []).map(m => m.toLowerCase());
@@ -343,13 +363,13 @@ function lireVillas(rows) {
     const G = groupes.get(villa);
     if (mails.length > 1) G.autresMails.push({ code: tech, autres: mails.slice(1) });
     const deja = G.lignes.find(x => x.appartement === codeVilla(villa, tech));
-    const l = { bloc: '', etage: '', appartement: codeVilla(villa, tech), locataire: loc, email: mails[0] || '' };
+    const l = { bloc: '', etage: '', appartement: codeVilla(villa, tech), locataire: loc, email: mails[0] || '', ligne };
     if (deja) { if (l.locataire || l.email) { if (deja.locataire || deja.email) G.doublons.push({ code: tech, garde: l.locataire, ignores: [deja.locataire] }); Object.assign(deja, l); } prec = deja; }
     else { G.lignes.push(l); prec = l; }
   }
   return [...groupes.values()];
 }
-function lireFeuille(rows) {
+function lireFeuille(rows, off = 1) {
   const hi = rows.findIndex(r => (r || []).some(c => norm(c) === 'bloc'));
   if (hi < 0) return { lignes: [], doublons: [], autresMails: [] };
   const H = rows[hi].map(norm);
@@ -359,7 +379,7 @@ function lireFeuille(rows) {
     if (!s) return ''; if (/^PENT/.test(s)) return 'PENTHOUSE'; if (/^(RDJ|RDC)/.test(s)) return s.slice(0, 3);
     const m = s.match(/\d+/); if (m) return +m[0] === 1 ? '1ER' : m[0] + 'E'; return s.replace(/\s+/g, ''); };
   let bloc = '', vu = new Map(), ordre = [], autresMails = [];
-  for (const r of rows.slice(hi + 1)) {
+  for (const [k, r] of rows.slice(hi + 1).entries()) { const ligne = off + hi + 1 + k;
     const g = (i) => i < 0 || r?.[i] == null ? '' : String(r[i]).trim();
     if (![iB, iE, iA, iL, iM].some(i => g(i))) continue;
     let b = norm(g(iB)).toUpperCase().replace(/^BLOC\s*/, '').replace(/\s+/g, '');
@@ -372,7 +392,7 @@ function lireFeuille(rows) {
     const la = a.match(/^([A-Z])\d/); const bl = la ? la[1] : (pl ? pl[1] : bloc);
     if (!e && !a) continue;
     const mails = (g(iM).match(EMAIL_RE) || []).map(m => m.toLowerCase());
-    const l = { bloc: bl, etage: e, appartement: a, locataire: g(iL).replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim(), email: mails[0] || '' };
+    const l = { bloc: bl, etage: e, appartement: a, locataire: g(iL).replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim(), email: mails[0] || '', ligne };
     const code = [l.bloc, l.etage, l.appartement].filter(Boolean).join('-');
     if (mails.length > 1) autresMails.push({ code, autres: mails.slice(1) });
     if (!vu.has(code)) { vu.set(code, []); ordre.push(code); }
@@ -565,7 +585,7 @@ async function annuaire(box) {
     box.innerHTML = `
     <div class="card">
       <div class="ann-top"><div><label for="ar" style="margin-top:0">${resVilla(R.find(r => r.id === rid)) ? 'Ensemble de villas' : 'Résidence'}</label><select id="ar">${optionsRes(R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select></div>
-      <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>${villa ? 'Ajouter une villa' : 'Ajouter un logement'}</button><label class="btn xl" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
+      <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>${villa ? 'Ajouter une villa' : 'Ajouter un logement'}</button><button type="button" class="btn xl" id="xlGo" aria-expanded="false" aria-controls="imp" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</button><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
     <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div ${villa ? 'hidden' : ''}><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div ${villa ? 'hidden' : ''}><label for="ae">Étage</label><input type="text" id="ae"></div><div><label for="aa">${villa ? 'Nom technique de la villa (ex. A1)' : 'Appartement (4 caractères max.)'}</label><input type="text" id="aa" placeholder="${villa ? 'A1' : 'A001'}"></div></div>
       <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
@@ -652,6 +672,26 @@ async function annuaire(box) {
       if (!wb.SheetNames.length) return false;
       const d = new Date(), z = (n) => String(n).padStart(2, '0');
       X.writeFile(wb, `Sauvegarde-avant-import-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}h${z(d.getMinutes())}.xlsx`); return true; };
+    // Guide d'import : colonnes obligatoires pour chaque type de fichier, modèles à télécharger, puis choix du fichier
+    const tabCols = (spec) => `<table class="imp-cols"><thead><tr><th>Colonne (en-tête exact)</th><th>Valeur obligatoire sur chaque ligne</th><th>Exemple</th></tr></thead><tbody>${spec.map(([t, , o, ex]) => `<tr><td><b>${esc(t)}</b></td><td>${esc(o)}</td><td class="muted">${esc(ex)}</td></tr>`).join('')}</tbody></table>`;
+    const guide = (msg = '') => `<div class="imp-guide">${msg}
+      <p class="imp-intro"><b>Toutes les colonnes ci-dessous doivent exister</b> dans le fichier (même vides). Sinon l’import est refusé et la colonne manquante vous est indiquée.</p>
+      <div class="imp-2"><section><h4>Fichier Résidences <span class="badge soft">BASE RÉSIDENCE</span></h4>
+        <p class="small">Une feuille par résidence : <b>le nom de la feuille = le nom de la résidence</b> (ex. AYOKA). Une ligne par appartement.</p>${tabCols(COLS_RES)}
+        <button type="button" class="lnk" data-modele="res">Télécharger le modèle Résidences</button></section>
+      <section><h4>Fichier Villas <span class="badge soft">BASE VILLA</span></h4>
+        <p class="small">Toutes les villas sur une seule feuille. Chaque NOM DE LA VILLA devient un ensemble de villas (LUMIERE → VILLA LUMIERE).</p>${tabCols(COLS_VIL)}
+        <button type="button" class="lnk" data-modele="vil">Télécharger le modèle Villas</button></section></div>
+      <p class="small muted">Après le choix du fichier, un aperçu ligne par ligne s’affiche : rien n’est enregistré avant d’avoir cliqué sur « Importer ».</p>
+      <div class="row" style="margin-top:10px"><label class="btn xl" for="xl" style="margin:0">Choisir le fichier Excel</label><button class="btn ghost" type="button" data-fermer>Fermer</button></div></div>`;
+    const brancherGuide = () => { const imp = $('#imp');
+      imp.querySelectorAll('[data-modele]').forEach(b => b.onclick = async () => { const X = await chargerXlsx(), wb = X.utils.book_new();
+        if (b.dataset.modele === 'vil') X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([COLS_VIL.map(c => c[0]), ['LUMIERE', 'A1', 'Awa Koné', 'awa.kone@exemple.com'], ['LUMIERE', 'A2', '', ''], ['HERMES', 'B1', 'Yao Kouassi', 'yao.kouassi@exemple.com']]), 'NOS VILLAS');
+        else X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([COLS_RES.map(c => c[0]), ['A', 'RDC', 'A001', 'Awa Koné', 'awa.kone@exemple.com'], ['', '1ER', 'A101', '', ''], ['B', 'RDC', 'B001', 'Yao Kouassi', 'yao.kouassi@exemple.com']]), 'NOM DE LA RESIDENCE');
+        X.writeFile(wb, b.dataset.modele === 'vil' ? 'Modele-import-VILLAS.xlsx' : 'Modele-import-RESIDENCES.xlsx'); });
+      imp.querySelectorAll('[data-fermer]').forEach(b => b.onclick = () => { imp.innerHTML = ''; $('#xlGo').setAttribute('aria-expanded', 'false'); }); };
+    $('#xlGo').onclick = () => { const imp = $('#imp'), ouvert = !!imp.querySelector('.imp-guide');
+      imp.innerHTML = ouvert ? '' : guide(); $('#xlGo').setAttribute('aria-expanded', String(!ouvert)); if (!ouvert) brancherGuide(); };
     $('#xl').onchange = async (e) => {
       const file = e.target.files[0]; e.target.value = ''; if (!file) return;
       const imp = $('#imp'); imp.innerHTML = '<p class="muted small">Lecture du fichier…</p>';
@@ -671,13 +711,28 @@ async function annuaire(box) {
           const perdus = [...absents.filter(x => occupant.has(x.id)), ...vides, ...remplaces].map(x => `${occupant.get(x.id) || x.locataire || 'un résident'} (${x.code})`);
           const avant = r ? L.filter(x => x.residence_id === r.id && (x.locataire || x.email || occupant.has(x.id))).length : 0;
           return { ...f, villa, connue: !!r, absents, vides, remplaces, perdus, avant, apres: f.lignes.filter(x => x.locataire || x.email).length, invalides: f.lignes.filter(x => x.email && !EMAIL_OK(x.email)).length, sans: f.lignes.filter(x => x.locataire && !x.email).length }; };
-        const feuilles = wb.SheetNames.flatMap(n => {
-          const rows = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' });
-          if (estFeuilleVillas(rows)) return lireVillas(rows).map(f => fiche(f, true));
-          return [fiche({ nom: n.trim(), ...lireFeuille(rows) }, false)];
-        }).filter(f => f.lignes.length);
-        if (!feuilles.length) { imp.innerHTML = '<p class="err">Aucune ligne reconnue. Résidences : colonnes BLOC, ETAGE, APP., LOCATAIRE, MAIL. Villas : NOM DE LA VILLA, NOM TECHNIQUE, LOCATAIRE, MAIL.</p>'; return; }
-        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} ${f.villa ? (f.lignes.length > 1 ? 'villas' : 'villa') + ` (${esc(f.lignes.map(x => x.appartement).join(', '))})` : 'logements'}${f.connue ? '' : ` <span class="badge warn">${f.villa ? 'nouvel ensemble de villas' : 'nouvelle résidence'}</span>`}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.connue ? `<div class="small">Locataires : <b>${f.avant}</b> aujourd’hui → <b>${f.apres}</b> après l’import${f.absents.length ? ` · <span class="err">${f.absents.length} logement${f.absents.length > 1 ? 's' : ''} absent${f.absents.length > 1 ? 's' : ''} du fichier retiré${f.absents.length > 1 ? 's' : ''}${f.absents.some(x => occupant.has(x.id)) ? `, dont ${f.absents.filter(x => occupant.has(x.id)).length} compte(s) actif(s) suspendu(s)` : ''}</span>` : ''}${f.vides.length ? ` · <span class="err">${f.vides.length} compte(s) actif(s) sur un logement désormais vide : accès suspendu</span>` : ''}${f.remplaces.length ? ` · <span class="err">${f.remplaces.length} logement(s) avec un nouveau locataire : l’ancien compte est suspendu</span>` : ''}${f.perdus.length ? `<div class="a-pb">Perdront l’accès (compte suspendu, réactivable) : ${esc(f.perdus.join(', '))}</div>` : ''}</div>` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}</li>`).join('')}</ul>
+        const lues = wb.SheetNames.map(n => { const ws = wb.Sheets[n]; const off = ws['!ref'] ? X.utils.decode_range(ws['!ref']).s.r + 1 : 1;
+          const rows = X.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true }); return { n, off, rows, ctl: controlerFeuille(n, rows) }; });
+        const ignorees = lues.filter(x => x.ctl.ignoree), fautives = lues.filter(x => x.ctl.erreurs?.length);
+        const listeIgn = ignorees.length ? `<p class="small muted">Feuille${ignorees.length > 1 ? 's' : ''} ignorée${ignorees.length > 1 ? 's' : ''} : ${ignorees.map(x => `« ${esc(x.n)} » (${esc(x.ctl.raison)})`).join(', ')}.</p>` : '';
+        if (fautives.length || ignorees.length === lues.length) {
+          imp.innerHTML = guide(`<div class="imp-err"><b>Import refusé : corrigez le fichier puis choisissez-le de nouveau.</b><ul>${fautives.map(x => li(`Feuille « ${esc(x.n)} » (${x.ctl.villa ? 'villas' : 'résidence'}) : ${esc(x.ctl.erreurs.join(' ; '))}`)).join('')}${ignorees.length === lues.length ? li('Aucune feuille au format attendu : vérifiez les en-têtes de colonnes ci-dessous.') : ''}</ul>${listeIgn}</div>`);
+          brancherGuide(); return; }
+        const feuilles = lues.filter(x => !x.ctl.ignoree).flatMap(({ n, off, rows, ctl }) => ctl.villa ? lireVillas(rows, off).map(f => fiche(f, true)) : [fiche({ nom: n.trim(), ...lireFeuille(rows, off) }, false)]).filter(f => f.lignes.length);
+        if (!feuilles.length) { imp.innerHTML = guide('<div class="imp-err"><b>Aucune ligne à importer</b> : les colonnes sont présentes mais aucune ligne ne contient de logement (APP. / NOM TECHNIQUE vides).</div>'); brancherGuide(); return; }
+        // Aperçu ligne par ligne : ce que chaque ligne du fichier va faire (nouveau, modifié, inchangé) et ce qui sera retiré
+        const detail = (f) => { const r = R.find(z => norm(z.nom) === norm(f.nom));
+          const cle = (x) => [x.bloc, x.etage, x.appartement].filter(Boolean).join('-').toUpperCase();
+          const exist = new Map((r ? L.filter(x => x.residence_id === r.id) : []).map(x => [String(x.code || '').toUpperCase(), x]));
+          const lignesT = f.lignes.map(x => { const o = exist.get(cle(x)); const st = !o ? 'nouveau' : norm(o.locataire) === norm(x.locataire) && norm(o.email) === norm(x.email) ? 'inchange' : 'modifie'; return { x, o, st }; });
+          const n = (k) => lignesT.filter(t => t.st === k).length;
+          const mail = (m) => !m ? '<span class="err small">sans e-mail</span>' : EMAIL_OK(m) ? esc(m) : `<span class="err">${esc(m)} (invalide)</span>`;
+          const ET = { nouveau: '<span class="st-i nouv">Nouveau</span>', modifie: '<span class="st-i modif">Modifié</span>', inchange: '<span class="st-i">Inchangé</span>' };
+          return `<details class="imp-det"${feuilles.length === 1 || n('modifie') || f.absents.length ? ' open' : ''}><summary>Voir les ${f.lignes.length} ligne${f.lignes.length > 1 ? 's' : ''} : ${[[n('nouveau'), 'nouveau(x)'], [n('modifie'), 'modifié(s)'], [n('inchange'), 'inchangé(s)'], [f.absents.length, 'retiré(s)']].filter(([k]) => k).map(([k, t]) => `${k} ${t}`).join(' · ')}</summary>
+            <div style="overflow-x:auto"><table class="adm no-q imp-t"><thead><tr><th>Ligne Excel</th><th>${f.villa ? 'Villa' : 'Logement'}</th><th>Locataire</th><th>E-mail</th><th>Effet</th></tr></thead><tbody>
+            ${lignesT.map(({ x, o, st }) => `<tr><td class="muted">${x.ligne || ''}</td><td><b>${esc(cle(x))}</b></td><td>${x.locataire ? esc(x.locataire) : '<span class="muted">— libre</span>'}${st === 'modifie' && o.locataire !== x.locataire ? `<div class="muted small">avant : ${esc(o.locataire || '—')}</div>` : ''}</td><td>${x.locataire || x.email ? mail(x.email) : ''}${st === 'modifie' && norm(o.email) !== norm(x.email) ? `<div class="muted small">avant : ${esc(o.email || '—')}</div>` : ''}</td><td>${ET[st]}</td></tr>`).join('')}
+            ${f.absents.map(o => `<tr class="imp-ret"><td class="muted">—</td><td><b>${esc(o.code)}</b></td><td>${esc(o.locataire || '—')}</td><td>${esc(o.email || '')}</td><td><span class="st-i ret">Retiré</span></td></tr>`).join('')}</tbody></table></div></details>`; };
+        imp.innerHTML = `<div class="imp-prev"><b>Aperçu de l’import</b><ul>${feuilles.map(f => `<li><b>${esc(f.nom)}</b> : ${f.lignes.length} ${f.villa ? (f.lignes.length > 1 ? 'villas' : 'villa') + ` (${esc(f.lignes.map(x => x.appartement).join(', '))})` : 'logements'}${f.connue ? '' : ` <span class="badge warn">${f.villa ? 'nouvel ensemble de villas' : 'nouvelle résidence'}</span>`}${f.sans ? ` · ${f.sans} sans e-mail` : ''}${f.connue ? `<div class="small">Locataires : <b>${f.avant}</b> aujourd’hui → <b>${f.apres}</b> après l’import${f.absents.length ? ` · <span class="err">${f.absents.length} logement${f.absents.length > 1 ? 's' : ''} absent${f.absents.length > 1 ? 's' : ''} du fichier retiré${f.absents.length > 1 ? 's' : ''}${f.absents.some(x => occupant.has(x.id)) ? `, dont ${f.absents.filter(x => occupant.has(x.id)).length} compte(s) actif(s) suspendu(s)` : ''}</span>` : ''}${f.vides.length ? ` · <span class="err">${f.vides.length} compte(s) actif(s) sur un logement désormais vide : accès suspendu</span>` : ''}${f.remplaces.length ? ` · <span class="err">${f.remplaces.length} logement(s) avec un nouveau locataire : l’ancien compte est suspendu</span>` : ''}${f.perdus.length ? `<div class="a-pb">Perdront l’accès (compte suspendu, réactivable) : ${esc(f.perdus.join(', '))}</div>` : ''}</div>` : ''}${f.invalides ? ` · <span class="err">${f.invalides} e-mail invalide${f.invalides > 1 ? 's' : ''}</span>` : ''}${f.doublons.length ? `<div class="a-pb">${f.doublons.map(d => `${esc(d.code)} : ${d.ignores.length + 1} locataires listés, gardé « ${esc(d.garde)} » (le dernier)`).join('<br>')}</div>` : ''}${f.autresMails.length ? `<div class="muted small">${f.autresMails.length} logement${f.autresMails.length > 1 ? 's' : ''} avec plusieurs e-mails : le premier sert à se connecter.</div>` : ''}${detail(f)}</li>`).join('')}</ul>${listeIgn}
           <p class="note small" style="margin:10px 0 0">Le fichier <b>remplace</b> la liste actuelle de chaque résidence ou ensemble de villas qu’il contient : locataires, e-mails, logements et villas. Ce qui n’y figure plus est retiré. Ce qui est absent du fichier ne change pas. <b>Avant l’import, une sauvegarde de la liste actuelle est téléchargée</b> : en cas d’erreur, réimportez-la pour revenir en arrière.</p>
           <div class="row" style="margin-top:10px"><button class="btn" type="button" id="ok">Importer</button><button class="btn ghost" type="button" id="no">Annuler</button></div></div>`;
         imp.querySelector('#no').onclick = () => imp.innerHTML = '';
