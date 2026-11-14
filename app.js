@@ -122,6 +122,17 @@ const routes = {
   'residences': residences, 'nouveautes': nouveautes, 'flip-immo': flip, 'bonnes-adresses': bonnesAdresses,
   'notifications': notifications, 'profil': profil, 'avis': avis, 'lire': lire, 'admin': async (p) => (await import('./admin.js')).renderAdmin(app, p)
 };
+// Squelettes de chargement à la forme de l'écran qui arrive (affichés seulement si l'attente dépasse 120 ms)
+const SQ = {
+  '': '<div class="sk"><i class="sk-hero"></i><i class="sk-h2"></i><div class="sk-row"><i></i><i></i><i></i></div><i class="sk-card"></i></div>',
+  market: '<div class="sk"><i class="sk-t"></i><i class="sk-s"></i><i class="sk-in"></i><div class="sk-chips"><i></i><i></i><i></i><i></i></div><div class="sk-grid"><i></i><i></i><i></i><i></i></div></div>',
+  annonce: '<div class="sk"><i class="sk-back"></i><i class="sk-photo"></i><i class="sk-t"></i><i class="sk-s"></i><i class="sk-btn"></i></div>',
+  residences: '<div class="sk"><i class="sk-back"></i><i class="sk-t"></i><i class="sk-res"></i><i class="sk-res"></i></div>',
+  'mes-annonces': '<div class="sk"><i class="sk-t"></i><i class="sk-tabs"></i><i class="sk-line"></i><i class="sk-line"></i><i class="sk-line"></i></div>',
+  'bonnes-adresses': '<div class="sk"><i class="sk-t"></i><div class="sk-chips"><i></i><i></i><i></i></div><i class="sk-line"></i><i class="sk-line"></i><i class="sk-line"></i></div>',
+  notifications: '<div class="sk"><i class="sk-t"></i><i class="sk-line"></i><i class="sk-line"></i><i class="sk-line"></i></div>'
+};
+const SQ_DEF = '<div class="sk"><i class="sk-t"></i><i class="sk-card"></i><i class="sk-card"></i></div>';
 async function router() {
   const [path] = location.hash.replace(/^#\/?/, '').split('?');
   const [name, param] = path.split('/');
@@ -136,8 +147,11 @@ async function router() {
   if (!actif()) return activation();
   const view = routes[name] || accueil;
   app.classList.remove('page-in');
-  if (view.constructor.name === 'AsyncFunction') app.innerHTML = '<div class="skel"><i></i><i></i><i></i></div>';
+  let skT = 0;
+  if (view.constructor.name === 'AsyncFunction') { const avant = app.firstElementChild;
+    skT = setTimeout(() => { if (app.firstElementChild === avant) { app.innerHTML = name === 'admin' ? SQ_DEF : (SQ[name] ?? SQ_DEF); window.dispatchEvent(new Event('acl-squelette')); } }, 120); }
   try { await view(param); } catch (e) { console.error(e); app.innerHTML = `<div class="card">${esc(errMsg(e))}</div>`; }
+  clearTimeout(skT);
   void app.offsetWidth; app.classList.add('page-in');
   if (view !== accueil) majCompteurs(); // l'accueil vient déjà de les mettre à jour
 }
@@ -362,6 +376,38 @@ function brancherInstall(root) {
   root.querySelectorAll('[data-later]').forEach(b => b.onclick = () => { try { localStorage.setItem('acl-install-later', String(Date.now())); } catch (_) {} b.closest('.install-card').remove(); });
 }
 
+// ---------- découverte : film de présentation, visite guidée, lecteur vidéo plein écran ----------
+const FILM = { src: 'videos/film-adress-club.mp4', poster: 'videos/film-adress-club.jpg', duree: '40 s' };
+export function lecteurVideo(src, { poster = '', titre = 'Vidéo' } = {}) {
+  const d = document.createElement('div'); d.className = 'lv'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', titre);
+  d.innerHTML = `<div class="lv-box"><video controls playsinline autoplay preload="auto" ${poster ? `poster="${esc(poster)}"` : ''} src="${esc(src)}"></video>
+    <div class="lv-bar"><b>${esc(titre)}</b><button type="button" class="lv-x" aria-label="Fermer la vidéo">✕</button></div></div>`;
+  document.body.appendChild(d); document.body.classList.add('dlg-on');
+  const v = d.querySelector('video'), prev = document.activeElement;
+  const fermer = () => { try { v.pause(); } catch (_) {} d.classList.add('out'); document.body.classList.remove('dlg-on'); removeEventListener('keydown', clav, true); setTimeout(() => d.remove(), 300); prev?.focus?.({ preventScroll: true }); };
+  const clav = (e) => { if (e.key === 'Escape') { e.preventDefault(); fermer(); } };
+  d.querySelector('.lv-x').onclick = fermer; d.onclick = (e) => { if (e.target === d) fermer(); };
+  addEventListener('keydown', clav, true); requestAnimationFrame(() => d.classList.add('in')); d.querySelector('.lv-x').focus({ preventScroll: true });
+  v.play?.().catch(() => {});
+}
+const visiteFaite = () => { try { const v = localStorage.getItem('acl-visite') || ''; return v === 'faite' || v === 'passee' || (v.startsWith('tard:') && Date.now() - Number(v.slice(5)) < 3 * 864e5); } catch (_) { return true; } };
+export const visite = async () => { if (location.hash && !/^#\/?$/.test(location.hash)) { location.hash = '#/'; await new Promise(r => setTimeout(r, 700)); } (await import('./visite.js')).lancerVisite({ fin: () => app.querySelectorAll('.decouvre').forEach(x => x.remove()) }); };
+// Le film n'est proposé que s'il est bien en ligne (vérifié une fois par session)
+let filmOk = null;
+const filmDispo = () => filmOk ??= (() => { try { const v = sessionStorage.getItem('acl-film'); if (v) return Promise.resolve(v === '1'); } catch (_) {}
+  return fetch(FILM.src, { method: 'HEAD', cache: 'no-store' }).then(r => r.ok, () => false).then(ok => { try { sessionStorage.setItem('acl-film', ok ? '1' : '0'); } catch (_) {} return ok; }); })();
+const voirFilm = () => { track('film_presentation'); lecteurVideo(FILM.src, { poster: FILM.poster, titre: 'ADRESS CLUB en ' + FILM.duree }); };
+function carteDecouverte() {
+  if (visiteFaite()) return '';
+  return `<div class="card decouvre"><div class="dc-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg></div>
+    <div class="dc-t"><b>Nouveau sur ADRESS CLUB ?</b><small>Découvrez l’essentiel en 4 étapes, en 30 secondes.</small></div>
+    <div class="dc-b"><button type="button" class="btn sm" data-visite>Visite guidée</button><button type="button" class="btn sm soft" data-film hidden>▶ Le film</button><button type="button" class="lnk small" data-tard>Plus tard</button></div></div>`;
+}
+function brancherDecouverte(root) {
+  root.querySelectorAll('[data-visite]').forEach(b => b.onclick = () => { track('visite_guidee'); visite(); });
+  root.querySelectorAll('[data-film]').forEach(b => { b.onclick = voirFilm; filmDispo().then(ok => { b.hidden = !ok; }); });
+  root.querySelectorAll('[data-tard]').forEach(b => b.onclick = () => { try { localStorage.setItem('acl-visite', 'tard:' + Date.now()); } catch (_) {} const c = b.closest('.decouvre'); c.classList.add('out'); setTimeout(() => c.remove(), 280); });
+}
 async function accueil() {
   // compteurs, dernières annonces et résidences chargés en même temps
   const [, { data: recents }, { data: rr }] = await Promise.all([
@@ -383,14 +429,14 @@ async function accueil() {
     + '<section><div class="sec-h"><h2>Le Market</h2><a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(a.titre) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
       : '<div class="card muted">Aucune annonce pour le moment. <a href="#/publier">Publier la première</a></div>')
-    + '</section>' + carteInstall() + carteNotif() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
+    + '</section>' + carteDecouverte() + carteInstall() + carteNotif() + '<section><h2>ADRESS IMMOBILIER</h2><nav class="menu">'
     + lien('#/residences', ICO.residences, (rr || []).some(estVillas) ? 'Nos résidences et villas' : 'Nos résidences', 'Photos et contact')
     + lien('#/flip-immo', ICO.flip, 'Le Flip Immo', 'Le magazine ADRESS')
     + lien('#/nouveautes', ICO.news, 'Les nouveautés', 'Programmes et actualités')
     + '</nav><a class="feature" href="#/bonnes-adresses"><span><b>Les bons plans</b><small>La sélection ADRESS pour vivre Abidjan</small></span>' + ICO.arrow + '</a>'
     + (state.profil.is_admin ? '<a class="btn ghost block" style="margin-top:12px" href="#/admin">Espace ADRESS · gestion</a>' : '')
     + '<p class="center small" style="margin-top:18px"><a class="muted" href="#/avis">Donner mon avis</a></p></section></div>';
-  brancherInstall(app); brancherNotif(app);
+  brancherInstall(app); brancherNotif(app); brancherDecouverte(app);
   fondDefilant(app.querySelector('.hero .bgs'));
 }
 // Arrière-plan de l'accueil : photos des résidences en fondu très lent (une photo n'apparaît qu'une fois prête)
@@ -766,7 +812,7 @@ async function residences() {
   const carte = (r, k) => { const im = imgs(r); const vi = estVillas(r); return `<div class="card item res-card" style="--k:${k}">
     ${im.length ? `<div class="rs" data-imgs="${esc(JSON.stringify(im))}" role="img" aria-label="Photos de ${esc(r.nom)}">
       ${im.length > 1 ? `<div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div>` : ''}
-      ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}</div>` : ''}
+      ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}${r.video_path ? `<button type="button" class="rs-vid" data-vid="${r.id}" aria-label="Voir la vidéo de ${esc(r.nom)}"><span class="rs-play" aria-hidden="true"></span>Vidéo</button>` : ''}</div>` : ''}
     <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc(r.quartier || '')}${r.type_bien ? ' · ' + esc(r.type_bien) : ''}</div>
     ${r.description && !/^résidence adress immobilier\.?$/i.test(r.description.trim()) ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">${vi ? 'Découvrir les villas' : 'Découvrir la résidence'} ↗</a>` : ''}</div></div>`; };
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>${V.length ? 'Nos résidences et villas' : 'Nos résidences'}</h1>
@@ -775,6 +821,8 @@ async function residences() {
   (data || []).forEach(r => track('vue_residence', r.id));
   app.querySelectorAll('[data-r]').forEach(a => a.addEventListener('click', () => track('clic_residence', a.dataset.r)));
   app.querySelectorAll('.rs').forEach(diaporama);
+  app.querySelectorAll('[data-vid]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); const r = (data || []).find(x => x.id === b.dataset.vid); if (!r) return;
+    track('video_residence', r.id); lecteurVideo(publicUrl(r.video_path), { poster: imgs(r)[0] || '', titre: r.nom }); }));
 }
 // Diaporama « envie » : fondu + zoom lent (Ken Burns), barres de progression façon story, toucher pour avancer
 const DUREE_DIAPO = 3800;
@@ -900,6 +948,8 @@ function profil() {
     <label for="m1">Nouveau mot de passe</label><input id="m1" type="password" autocomplete="new-password" minlength="8">
     <label for="m2">Confirmer</label><input id="m2" type="password" autocomplete="new-password" minlength="8">
     <p class="err" id="erm" hidden></p><button class="btn ghost block" style="margin-top:12px" id="gom">Changer le mot de passe</button></form>
+  <div class="card decouvre-p" style="margin-top:12px"><h2 style="margin-top:0">Découvrir ADRESS CLUB</h2><p class="muted small">Le tour de l’appli en 4 étapes, ou le film de présentation à montrer à un voisin.</p>
+    <div class="row"><button type="button" class="btn sm" data-visite>Revoir la visite guidée</button><button type="button" class="btn sm soft" data-film hidden>▶ Le film (${FILM.duree})</button></div></div>
   <div class="card" style="margin-top:12px"><h2 style="margin-top:0">Installer l'appli : les vidéos</h2><p class="muted small">À regarder ou à montrer à un voisin : 40 secondes pour avoir ADRESS CLUB sur l'écran d'accueil.</p>
     <div class="tuto-grid"><div><b>Android</b>${videoTuto('android')}</div><div><b>iPhone</b>${videoTuto('ios')}</div></div></div>
   <div class="card" style="margin-top:12px"><p class="muted small">Résidence : ${esc(p.residence?.nom || '—')}<br>Compte activé le ${dateFr(p.date_activation)}</p>
@@ -912,6 +962,7 @@ function profil() {
     await chargerProfil(); toast('Préférences enregistrées.');
   };
   $('#out').onclick = () => deconnecter($('#out'));
+  brancherDecouverte(app);
   const pr = $('#pushRow'), majPush = () => {
     if (!pushOk()) { pr.innerHTML = `<small class="muted">${estIOS() ? 'Sur iPhone, installez d’abord l’appli sur l’écran d’accueil pour recevoir les notifications.' : 'Ce navigateur ne permet pas les notifications.'}</small>`; return; }
     const st = Notification.permission;

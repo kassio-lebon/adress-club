@@ -957,6 +957,7 @@ async function residences(box, villa = false) {
     <div class="muted small">${nbL(r.id)} ${resVilla(r) ? 'villa' : 'logement'}${nbL(r.id) > 1 ? 's' : ''} · ${nbO(r.id)} occupé${nbO(r.id) > 1 ? 's' : ''} · ${nbM(r.id)} membre${nbM(r.id) > 1 ? 's' : ''} du Club</div>${pb(r).map(alerte).join('')}
     <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button>
       <label class="btn sm ghost" style="margin:0">Photo<input type="file" accept="image/*" data-photo class="sr"></label>
+      <label class="btn sm ghost" style="margin:0" title="MP4 de préférence, 50 Mo maximum">${r.video_path ? 'Changer la vidéo' : '+ Vidéo'}<input type="file" accept="video/mp4,video/webm,video/quicktime" data-video class="sr"></label>${r.video_path ? '<button class="btn sm ghost" data-novid>Retirer la vidéo</button>' : ''}
       <button class="btn sm ghost" data-edit>Modifier</button><a class="btn sm soft" href="#/admin/annuaire" data-ann>Nos locataires</a><button class="btn sm ghost rouge" data-supr>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#rsd'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', villa ? 'Masqués' : 'Masquées']], villa ? 'villas' : 'residences', villa ? 'Rechercher un ensemble de villas…' : 'Rechercher une résidence…');
   const $ = (s) => box.querySelector(s);
@@ -985,6 +986,14 @@ async function residences(box, villa = false) {
     if (saisi == null) return;
     if (norm(saisi) !== norm(r.nom)) return toast('Nom différent : suppression annulée.');
     action(async () => check(await sb.rpc('admin_supprimer_residence', { p_id: r.id })), `${r.nom} supprimée.`); });
+  // Vidéo de présentation : envoyée telle quelle (MP4 conseillé, 50 Mo max.), lue d'un toucher par les résidents
+  box.querySelectorAll('[data-video]').forEach(i => i.onchange = () => { const f = i.files[0]; i.value = ''; if (!f) return;
+    if (f.size > 50 * 1024 * 1024) return toast(`Vidéo trop lourde (${Math.round(f.size / 1048576)} Mo) : 50 Mo maximum. Compressez-la (ex. HandBrake, 720p) puis réessayez.`);
+    action(async () => { toast('Envoi de la vidéo… cela peut prendre une minute.', 60000);
+      const ext = (f.name.split('.').pop() || 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '') || 'mp4', path = `residences/${crypto.randomUUID()}.${ext}`;
+      const { error } = await sb.storage.from('videos').upload(path, f, { contentType: f.type || 'video/mp4' }); if (error) throw error;
+      check(await sb.from('residences').update({ video_path: sb.storage.from('videos').getPublicUrl(path).data.publicUrl }).eq('id', rid(i))); }, 'Vidéo en ligne : les résidents la voient sur la fiche.'); });
+  box.querySelectorAll('[data-novid]').forEach(b => b.onclick = () => action(async () => check(await sb.from('residences').update({ video_path: null }).eq('id', rid(b))), 'Vidéo retirée.'));
   box.querySelectorAll('[data-photo]').forEach(i => i.onchange = () => i.files[0] && action(async () => { toast('Envoi de la photo…'); const photo_path = await uploadPublic(i.files[0], 'residences'); check(await sb.from('residences').update({ photo_path }).eq('id', rid(i))); }, 'Photo mise à jour.'));
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
     const r = D.find(x => x.id === rid(b)); if (!r) return; edit = r;

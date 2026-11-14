@@ -1,12 +1,12 @@
 // ADRESS CLUB — service worker : l'interface fonctionne hors ligne, les données restent toujours en direct.
-const CACHE = 'acl-v90';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'admin.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png', 'motion.js'];
+const CACHE = 'acl-v91';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'admin.js', 'visite.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png', 'motion.js'];
 // À chaque version publiée, CHANGER CACHE (acl-vNN) : c'est ce qui fait télécharger la nouvelle version aux téléphones.
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE && x !== 'acl-img' && x !== 'acl-lib').map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
-  if (u.pathname.includes('/videos/')) return; // vidéos : lues directement (lecture par morceaux)
+  if (u.pathname.includes('/videos/')) return; // vidéos (appli et stockage « videos ») : lues directement, par morceaux, jamais mises en cache
   // Bibliothèque Supabase et polices : gardées sur le téléphone (l'appli démarre même si le CDN est lent ou hors ligne)
   if (e.request.method === 'GET' && /^(cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com)$/.test(u.hostname)) {
     e.respondWith(caches.open('acl-lib').then(c => c.match(e.request).then(r => r || fetch(e.request).then(rep => { if (rep.ok || rep.type === 'opaque') c.put(e.request, rep.clone()); return rep; }))));

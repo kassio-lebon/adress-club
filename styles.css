@@ -1143,3 +1143,72 @@ body.dlg-on{overflow:hidden}
 .st-i.modif{background:var(--warn-tint);color:var(--warn)}
 .st-i.ret{background:var(--red-tint);color:var(--red-ink)}
 .imp-ret td{opacity:.85}
+
+/* v91 : squelettes à la forme de chaque écran (reflet doux qui balaie, pas de clignotement) */
+.sk{display:grid;gap:14px;padding-top:4px}
+.sk i{display:block;border-radius:var(--r);background:#ECECEE;position:relative;overflow:hidden}
+.sk i::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent);animation:sk-balai 1.4s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes sk-balai{to{transform:translateX(100%)}}
+.sk-hero{height:180px}.sk-h2{height:20px;width:38%}.sk-card{height:120px}.sk-t{height:30px;width:55%}.sk-s{height:16px;width:80%}
+.sk-in{height:48px}.sk-back{height:14px;width:22%}.sk-photo{aspect-ratio:1/1}.sk-btn{height:50px}.sk-res{height:300px}.sk-tabs{height:46px}.sk-line{height:74px}
+.sk-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.sk-row i{aspect-ratio:3/4}
+.sk-chips{display:flex;gap:8px}.sk-chips i{height:36px;width:76px;border-radius:999px}
+.sk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sk-grid i{aspect-ratio:4/5}
+@media (min-width:960px){.sk-grid{grid-template-columns:repeat(4,1fr)}.sk-row{grid-template-columns:repeat(5,1fr)}.sk-photo{aspect-ratio:16/9}}
+@media (prefers-reduced-motion:reduce){.sk i::after{animation:none}}
+
+/* v91 : retour au toucher — tout ce qui se touche s'enfonce légèrement puis revient avec souplesse */
+@media (pointer:coarse){
+  .menu a,.feature,.chip,.card.notif,.notice,.install-card .btn,.res-card .btn,.back{transition:transform .32s cubic-bezier(.34,1.56,.64,1)}
+  .menu a:active,.feature:active,.card.notif:active,.notice:active{transform:scale(.975);transition-duration:.08s}
+  .chip:active,.back:active{transform:scale(.94);transition-duration:.08s}
+}
+
+/* v91 : carte « Nouveau sur ADRESS CLUB ? » */
+.decouvre{display:grid;grid-template-columns:auto 1fr;gap:12px 14px;align-items:center;margin-top:14px;padding:16px;border:1px solid var(--line);background:linear-gradient(135deg,#fff 60%,#FBEDEE);animation:rise .5s var(--ease) both}
+.decouvre.out{opacity:0;transform:translateY(-6px) scale(.98);transition:all .28s var(--ease)}
+.dc-ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--red);color:#fff}
+.dc-ic svg{width:22px;height:22px;fill:currentColor;animation:dc-scint 2.8s ease-in-out infinite}
+@keyframes dc-scint{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.12) rotate(18deg)}}
+.dc-t b{display:block;font-size:15px}.dc-t small{color:var(--muted);font-size:13px;line-height:1.4}
+.dc-b{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dc-b .lnk{margin-left:auto;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.dc-ic svg{animation:none}}
+
+/* v91 : visite guidée — projecteur qui glisse d'un élément à l'autre */
+.vg{position:fixed;inset:0;z-index:300;opacity:0;transition:opacity .25s ease}
+.vg.in{opacity:1}.vg.out{opacity:0}
+.vg-trou{position:fixed;border-radius:16px;box-shadow:0 0 0 200vmax rgba(17,18,20,.64);transition:left .45s cubic-bezier(.65,0,.35,1),top .45s cubic-bezier(.65,0,.35,1),width .45s cubic-bezier(.65,0,.35,1),height .45s cubic-bezier(.65,0,.35,1);pointer-events:none}
+.vg-trou::after{content:"";position:absolute;inset:-4px;border-radius:20px;border:2px solid rgba(255,255,255,.9);animation:vg-pulse 1.8s ease-out infinite}
+@keyframes vg-pulse{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.12)}}
+.vg-bulle{position:fixed;background:#fff;border-radius:16px;padding:16px 16px 12px;box-shadow:0 24px 60px -18px rgba(0,0,0,.45);transition:left .45s cubic-bezier(.65,0,.35,1),top .45s cubic-bezier(.65,0,.35,1)}
+.vg-prog{display:flex;gap:5px;margin-bottom:12px}
+.vg-prog i{flex:1;height:3px;border-radius:2px;background:var(--line);overflow:hidden;position:relative}
+.vg-prog i.ok{background:var(--ink)}
+.vg-prog i.on::after{content:"";position:absolute;inset:0;background:var(--red);transform-origin:left;animation:vg-bar .45s var(--ease) both}
+@keyframes vg-bar{from{transform:scaleX(0)}}
+.vg-txt h3{margin:0 0 4px;font-size:17px}.vg-txt p{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.45}
+.vg-txt.in{animation:vg-txt .35s var(--ease) both}
+@keyframes vg-txt{from{opacity:0;transform:translateY(6px)}}
+.vg-b{display:flex;align-items:center;gap:10px;margin-top:14px}
+.vg-passer{border:0;background:none;padding:6px 0;font:inherit;font-size:13.5px;color:var(--muted);cursor:pointer}
+.vg-n{margin-left:auto;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+body.vg-on{overflow:hidden}
+@media (prefers-reduced-motion:reduce){.vg-trou,.vg-bulle{transition:none}.vg-trou::after{animation:none}}
+
+/* v91 : lecteur vidéo plein écran (résidences, film de présentation) */
+.lv{position:fixed;inset:0;z-index:310;display:grid;place-items:center;background:rgba(10,10,12,.96);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;transition:opacity .25s ease;padding:16px}
+.lv.in{opacity:1}.lv.out{opacity:0}
+.lv-box{width:min(100%,900px);max-height:100%;display:flex;flex-direction:column;gap:10px;transform:scale(.96);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.lv.in .lv-box{transform:none}
+.lv video{width:100%;max-height:calc(100dvh - 90px);border-radius:14px;background:#000;object-fit:contain}
+.lv-bar{display:flex;align-items:center;justify-content:space-between;color:#fff;order:-1}
+.lv-x{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:16px;cursor:pointer}
+
+/* v91 : bouton Vidéo sur la fiche d'une résidence */
+.rs-vid{position:absolute;left:12px;top:26px;z-index:4;display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border:0;border-radius:999px;background:rgba(255,255,255,.94);color:var(--ink);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px -8px rgba(0,0,0,.4);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.rs-vid:active{transform:scale(.94)}
+.rs-play{width:26px;height:26px;border-radius:50%;background:var(--red);position:relative;box-shadow:0 0 0 0 rgba(212,16,29,.5);animation:rs-onde 2s ease-out infinite}
+.rs-play::after{content:"";position:absolute;left:10px;top:7px;border-left:9px solid #fff;border-top:6px solid transparent;border-bottom:6px solid transparent}
+@keyframes rs-onde{0%{box-shadow:0 0 0 0 rgba(212,16,29,.45)}100%{box-shadow:0 0 0 12px rgba(212,16,29,0)}}
+@media (prefers-reduced-motion:reduce){.rs-play{animation:none}}

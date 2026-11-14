@@ -37,12 +37,14 @@ document.addEventListener('click', (e) => {
   root.dataset.dir = a.classList.contains('back') ? 'back' : 'fwd';
   root.classList.add('vt');
   const t = document.startViewTransition(() => new Promise((res) => {
-    pending = res; setTimeout(() => { if (pending === res) { pending = null; res(); } }, 1600);
+    pending = res; setTimeout(() => { if (pending === res) { pending = null; res(); } }, 600);
     location.hash = href;
   }));
   t.finished.finally(() => { root.classList.remove('vt'); shared = false; document.querySelectorAll('[style*="view-transition-name"]').forEach(el => el.style.viewTransitionName = ''); });
 }, true);
 window.addEventListener('popstate', () => { root.dataset.dir = 'back'; });
+// La transition part dès que le squelette de l'écran suivant est affiché : l'écran ne reste jamais figé pendant le chargement
+addEventListener('acl-squelette', () => { if (pending) { const r = pending; pending = null; r(); } });
 
 // ---------- après chaque rendu d'écran ----------
 new MutationObserver(() => {
@@ -164,7 +166,7 @@ if (touch && !reduce) {
         buzz(); root.dataset.dir = 'back';
         if (document.startViewTransition) {
           root.classList.add('vt');
-          const v = document.startViewTransition(() => new Promise((res) => { pending = res; setTimeout(() => { if (pending === res) { pending = null; res(); } }, 1600); history.back(); }));
+          const v = document.startViewTransition(() => new Promise((res) => { pending = res; setTimeout(() => { if (pending === res) { pending = null; res(); } }, 600); history.back(); }));
           v.finished.finally(() => root.classList.remove('vt'));
         } else history.back();
       }
