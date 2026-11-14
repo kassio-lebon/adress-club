@@ -158,7 +158,7 @@ async function router() {
 
 // Réseau absent ou trop lent au démarrage : écran d'attente qui réessaie tout seul
 function horsLigne() {
-  app.innerHTML = `<div class="login"><div class="card center pad" style="margin-top:18vh"><div class="off-ico">⌁</div><b>Connexion impossible pour le moment</b><p class="muted">Vérifiez votre connexion Internet. ADRESS CLUB réessaie automatiquement.</p><button class="btn" id="rt" type="button">Réessayer</button></div></div>`;
+  app.innerHTML = `<div class="login"><div class="card center pad" style="margin-top:18vh"><div class="off-ico">${ICO.horsligne}</div><b>Connexion impossible pour le moment</b><p class="muted">Vérifiez votre connexion Internet. ADRESS CLUB réessaie automatiquement.</p><button class="btn" id="rt" type="button">Réessayer</button></div></div>`;
   const go = async () => { const b = app.querySelector('#rt'); if (b) { b.disabled = true; b.textContent = 'Connexion…'; } await chargerProfil(); router(); };
   app.querySelector('#rt').onclick = go;
   addEventListener('online', go, { once: true }); setTimeout(() => { if (app.querySelector('#rt:not([disabled])')) go(); }, 15000);
@@ -182,7 +182,7 @@ function connexion() {
     <p class="center small" id="oubliP" style="margin:12px 0 0"><a href="#" id="oubli">Mot de passe oublié ?</a></p>
   </form>
   <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p>
-  ${estInstallee() ? '' : '<p class="center" style="margin-top:6px"><button class="linkbtn" type="button" id="inst">📲 Installer l’application sur mon téléphone</button></p>'}</div>`;
+  ${estInstallee() ? '' : '<p class="center" style="margin-top:6px"><button class="linkbtn" type="button" id="inst">' + ic('tel') + 'Installer l’application sur mon téléphone</button></p>'}</div>`;
   const ib = app.querySelector('#inst'); if (ib) ib.onclick = installer;
   let mode = 'login';
   app.querySelectorAll('[data-m]').forEach(c => c.onclick = () => {
@@ -252,8 +252,20 @@ const ICO = {
   news: svg('M4 5h13v14H6a2 2 0 0 1-2-2zM17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5'),
   camera: svg('M4 8h3l2-3h6l2 3h3v11H4zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7'),
   chev: svg('m9 6 6 6-6 6'),
-  arrow: svg('M5 12h14M13 6l6 6-6 6')
+  arrow: svg('M5 12h14M13 6l6 6-6 6'),
+  tel: svg('M8 2.5h8a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2zM11 18h2'),
+  coeur: svg('M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z'),
+  pin: svg('M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5'),
+  check: svg('m5 12.5 4.5 4.5L19 7.5'),
+  x: svg('M6 6l12 12M18 6 6 18'),
+  menu: svg('M4 7h16M4 12h16M4 17h16'),
+  play: svg('M8 5.5v13l10.5-6.5z'),
+  ext: svg('M8 16 16 8M9 8h7v7'),
+  partage: svg('M12 15V4M8 7.5l4-4 4 4M6 11v8.5h12V11'),
+  horsligne: svg('M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16.2a5 5 0 0 1 6 0M12 20h.01M3 3l18 18')
 };
+// icône posée dans une phrase ou un bouton : à la taille du texte
+const ic = (k) => ICO[k].replace('<svg ', '<svg class="ic" ');
 // ---------- Installer l'application sur le téléphone ----------
 const estInstallee = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -286,7 +298,7 @@ function motDePasseOublie(email0) {
     const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + location.pathname });
     b.hidden = true; const ok = f.querySelector('#ok2'); ok.hidden = false;
     ok.innerHTML = error ? `<p class="err">L'e-mail n'a pas pu être envoyé pour le moment. Demandez un mot de passe provisoire à ADRESS IMMOBILIER (voir ci-dessous).</p>`
-      : `<div class="inv-ok" style="text-align:left"><b style="font-size:16px;letter-spacing:0;margin:0 0 6px">E-mail envoyé ✓</b>Si un compte existe pour ${esc(em)}, vous allez recevoir un lien. Ouvrez-le sur ce téléphone pour choisir un nouveau mot de passe. Pensez à regarder dans les courriers indésirables.</div>`;
+      : `<div class="inv-ok" style="text-align:left"><b style="font-size:16px;letter-spacing:0;margin:0 0 6px">E-mail envoyé ${ic('check')}</b>Si un compte existe pour ${esc(em)}, vous allez recevoir un lien. Ouvrez-le sur ce téléphone pour choisir un nouveau mot de passe. Pensez à regarder dans les courriers indésirables.</div>`;
   };
 }
 function nouveauMdp() {
@@ -320,15 +332,15 @@ export async function installer(auto) {
   const ua = navigator.userAgent, mobile = estIOS() || /android|mobile/i.test(ua);
   let etapes;
   if (!mobile) etapes = `<p>L’installation se fait sur votre <b>téléphone</b>. Ouvrez ce lien sur votre téléphone :</p><p class="inst-url"><b>${esc(location.origin + location.pathname)}</b></p><p>puis touchez « Installer sur mon téléphone ».</p>`;
-  else if (estIOS()) etapes = `<ol><li>Touchez le bouton <b>Partager</b> <span class="ico-share">⬆︎</span> (en bas de l’écran sur iPhone).</li><li>Faites défiler et choisissez <b>« Sur l’écran d’accueil »</b>.</li><li>Touchez <b>Ajouter</b>.</li></ol><p class="muted small">Sur iPhone, l’ajout se fait depuis Safari.</p>`;
-  else if (/SamsungBrowser/i.test(ua)) etapes = `<ol><li>Touchez le menu <b>☰</b> en bas à droite de l’écran.</li><li>Choisissez <b>« Ajouter la page à »</b>.</li><li>Puis <b>« Écran d’accueil »</b> et confirmez <b>Ajouter</b>.</li></ol>`;
+  else if (estIOS()) etapes = `<ol><li>Touchez le bouton <b>Partager</b> <span class="ico-share">${ICO.partage}</span> (en bas de l’écran sur iPhone).</li><li>Faites défiler et choisissez <b>« Sur l’écran d’accueil »</b>.</li><li>Touchez <b>Ajouter</b>.</li></ol><p class="muted small">Sur iPhone, l’ajout se fait depuis Safari.</p>`;
+  else if (/SamsungBrowser/i.test(ua)) etapes = `<ol><li>Touchez le menu <b>${ic('menu')}</b> en bas à droite de l’écran.</li><li>Choisissez <b>« Ajouter la page à »</b>.</li><li>Puis <b>« Écran d’accueil »</b> et confirmez <b>Ajouter</b>.</li></ol>`;
   else etapes = `<ol><li>Touchez le menu du navigateur <b>⋮</b> (en haut ou en bas de l’écran).</li><li>Choisissez <b>« Installer l’application »</b> ou <b>« Ajouter à l’écran d’accueil »</b>.</li><li>Confirmez avec <b>Installer</b> ou <b>Ajouter</b>.</li></ol>`;
   const d = document.createElement('div'); d.className = 'sheet-bg';
   const osv = estIOS() ? 'ios' : 'android';
   d.innerHTML = `<div class="sheet" role="dialog" aria-label="Installer l'application"><img src="icon-192.png" alt="" width="56" height="56"><h3>Installer ADRESS CLUB sur votre téléphone</h3>
     <div class="tuto-box" data-os="${osv}">${videoTuto(osv)}<a href="#" class="tuto-sw small">Voir la vidéo ${osv === 'ios' ? 'Android' : 'iPhone'}</a></div>
-    <button class="btn block inst1" type="button" id="inst1" hidden>📲 Installer en 1 clic</button>
-    ${mobile && !estIOS() && !window._installPrompt ? `<a class="btn block inst1" id="instChrome" href="${lienChrome()}">📲 Installer en 1 clic avec Chrome</a><p class="muted small center" style="margin-top:-4px">Votre navigateur ne permet pas l’installation directe : ce bouton ouvre ADRESS CLUB dans Chrome, où il suffit de toucher « Installer ». Ou suivez les étapes ci-dessous.</p>` : ''}
+    <button class="btn block inst1" type="button" id="inst1" hidden>${ic('tel')}Installer en 1 clic</button>
+    ${mobile && !estIOS() && !window._installPrompt ? `<a class="btn block inst1" id="instChrome" href="${lienChrome()}">${ic('tel')}Installer en 1 clic avec Chrome</a><p class="muted small center" style="margin-top:-4px">Votre navigateur ne permet pas l’installation directe : ce bouton ouvre ADRESS CLUB dans Chrome, où il suffit de toucher « Installer ». Ou suivez les étapes ci-dessous.</p>` : ''}
     ${etapes}
     ${mobile ? '<p class="muted small">L’icône ADRESS CLUB apparaîtra sur l’écran d’accueil de votre téléphone, comme une application.</p>' : ''}
     <button class="btn block" type="button">J'ai compris</button></div>`;
@@ -382,7 +394,7 @@ const FILM = { src: 'videos/film-adress-club.mp4?v=2', poster: 'videos/film-adre
 export function lecteurVideo(src, { poster = '', titre = 'Vidéo' } = {}) {
   const d = document.createElement('div'); d.className = 'lv'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', titre);
   d.innerHTML = `<div class="lv-box"><video controls playsinline autoplay preload="auto" ${poster ? `poster="${esc(poster)}"` : ''} src="${esc(src)}"></video>
-    <div class="lv-bar"><b>${esc(titre)}</b><button type="button" class="lv-x" aria-label="Fermer la vidéo">✕</button></div></div>`;
+    <div class="lv-bar"><b>${esc(titre)}</b><button type="button" class="lv-x" aria-label="Fermer la vidéo">${ICO.x}</button></div></div>`;
   document.body.appendChild(d); document.body.classList.add('dlg-on');
   const v = d.querySelector('video'), prev = document.activeElement;
   const fermer = () => { try { v.pause(); } catch (_) {} d.classList.add('out'); document.body.classList.remove('dlg-on'); removeEventListener('keydown', clav, true); setTimeout(() => d.remove(), 300); prev?.focus?.({ preventScroll: true }); };
@@ -402,7 +414,7 @@ function carteDecouverte() {
   if (visiteFaite()) return '';
   return `<div class="card decouvre"><div class="dc-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg></div>
     <div class="dc-t"><b>Nouveau sur ADRESS CLUB ?</b><small>Découvrez l’essentiel en 4 étapes, en 30 secondes.</small></div>
-    <div class="dc-b"><button type="button" class="btn sm" data-visite>Visite guidée</button><button type="button" class="btn sm soft" data-film hidden>▶ Le film</button><button type="button" class="lnk small" data-tard>Plus tard</button></div></div>`;
+    <div class="dc-b"><button type="button" class="btn sm" data-visite>Visite guidée</button><button type="button" class="btn sm soft" data-film hidden>${ic('play')}Le film</button><button type="button" class="lnk small" data-tard>Plus tard</button></div></div>`;
 }
 function brancherDecouverte(root) {
   root.querySelectorAll('[data-visite]').forEach(b => b.onclick = () => { track('visite_guidee'); visite(); });
@@ -527,7 +539,7 @@ async function market() {
       <a href="#/annonce/${a.id}" style="text-decoration:none"><div class="ph" style="background-image:url('${esc(urlDe.get(a.id))}')" role="img" aria-label="${esc(a.titre)}">${a.statut === 'reserve' ? '<span class="stamp">Réservé</span>' : ''}</div>
       ${a.est_a_moi ? '<span class="badge st">Votre annonce</span>' : a.type === 'don' ? '<span class="badge st">À donner</span>' : ''}
       <div class="bd"><div class="t">${esc(a.titre)}</div><div class="p">${prix(a)}</div><div class="muted small">${esc([a.categorie, a.residence || (a.is_adress ? 'ADRESS IMMOBILIER' : '')].filter(Boolean).join(' · '))}</div></div></a>
-      ${a.est_a_moi ? '' : `<button class="fav" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${favs.has(a.id) ? '♥' : '♡'}</button>`}
+      ${a.est_a_moi ? '' : `<button class="fav${favs.has(a.id) ? ' on' : ''}" data-fav="${a.id}" aria-label="${favs.has(a.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${ICO.coeur}</button>`}
     </div>`;
   app.innerHTML = `
   <a class="back" href="#/">‹ Accueil</a><h1>Le Market</h1><p class="muted">Les objets à vendre ou à donner entre résidents</p>
@@ -536,14 +548,14 @@ async function market() {
     <a class="chip ${!type && !vue ? 'on' : ''}" href="${lien({ type: '', vue: '' })}">Tout</a>
     <a class="chip ${type === 'vente' ? 'on' : ''}" href="${lien({ type: 'vente', vue: '' })}">À vendre</a>
     <a class="chip ${type === 'don' ? 'on' : ''}" href="${lien({ type: 'don', vue: '' })}">À donner</a>
-    <a class="chip ${vue === 'favoris' ? 'on' : ''}" href="${lien({ vue: 'favoris', type: '', cat: '' })}">♥ Favoris</a>
+    <a class="chip ${vue === 'favoris' ? 'on' : ''}" href="${lien({ vue: 'favoris', type: '', cat: '' })}">${ic('coeur')}Favoris</a>
   </div>
   ${vue !== 'favoris' && parCat.length > 1 ? `<nav class="cat-bar" aria-label="Catégories"><a class="${!cat ? 'on' : ''}" href="${lien({ cat: '' })}" ${!cat ? 'aria-current="page"' : ''}>${ICO_CAT.Tout}<span>Tout</span></a>${parCat.map(([c, l]) => `<a class="${cat === c ? 'on' : ''}" href="${lien({ cat: c })}" ${cat === c ? 'aria-current="page"' : ''}>${ICO_CAT[c] || ICO_CAT.Autre}<span>${esc(c)}</span><em>${l.length}</em></a>`).join('')}</nav>` : ''}
   ${cat && liste.length ? `<div class="cat-h"><span class="rayon-i">${ICO_CAT[cat] || ICO_CAT.Autre}</span><h2>${esc(cat)}</h2><span class="rayon-n">${liste.length} annonce${liste.length > 1 ? 's' : ''}</span></div>` : ''}
   ${rayons ? `<div class="rayons">${parCat.map(([c, l]) => `<section class="rayon"><div class="rayon-h"><span class="rayon-i">${ICO_CAT[c] || ICO_CAT.Autre}</span><h2>${esc(c)}</h2><span class="rayon-n">${l.length}</span><a href="${lien({ cat: c })}">Tout voir</a></div><div class="rail">${l.map(carte).join('')}</div></section>`).join('')}</div>` : ''}
   ${liste.length ? `<div class="grid2 grid3" ${rayons ? 'hidden' : ''}>${liste.map(carte).join('')}</div>`
   : vue === 'favoris'
-    ? `<div class="card center pad empty-fav"><div class="ef-heart">♡</div><b>Aucun favori pour le moment</b><p class="muted">Touchez le cœur ♡ sur une annonce d’un autre résident pour la retrouver ici.<br>Vos propres annonces n’ont pas de cœur : elles sont dans « Mes annonces ».</p><a class="btn" href="#/market">Parcourir le Market</a></div>`
+    ? `<div class="card center pad empty-fav"><div class="ef-heart">${ICO.coeur}</div><b>Aucun favori pour le moment</b><p class="muted">Touchez le cœur sur une annonce d’un autre résident pour la retrouver ici.<br>Vos propres annonces n’ont pas de cœur : elles sont dans « Mes annonces ».</p><a class="btn" href="#/market">Parcourir le Market</a></div>`
     : `<div class="card center pad">${q ? 'Aucune annonce ne correspond à « ' + esc(q) + ' ».' : 'Aucune annonce pour le moment.'}<br><br><a class="btn" href="#/publier">+ Publier</a></div>`}`;
   app.querySelector('#s').onsubmit = (e) => e.preventDefault();
   const qi = app.querySelector('#q'), grille = app.querySelector('.grid2');
@@ -553,10 +565,10 @@ async function market() {
     const ry = app.querySelector('.rayons'); if (ry) qi.addEventListener('input', () => { const r = !!qi.value.trim(); ry.hidden = r; grille.hidden = !r; });
     qi.addEventListener('input', () => { try { history.replaceState(null, '', lien({ q: qi.value.trim() })); } catch (_) {} }); }
   app.querySelectorAll('[data-fav]').forEach(b => b.onclick = async () => {
-    const id = b.dataset.fav, on = b.textContent === '♥';
+    const id = b.dataset.fav, on = b.classList.contains('on');
     const r = on ? await sb.from('favoris').delete().eq('annonce_id', id) : await sb.from('favoris').insert({ user_id: state.session.user.id, annonce_id: id });
     if (r.error) return toast(errMsg(r.error));
-    app.querySelectorAll(`[data-fav="${id}"]`).forEach(x => { x.textContent = on ? '♡' : '♥'; x.setAttribute('aria-label', on ? 'Ajouter aux favoris' : 'Retirer des favoris'); }); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+    app.querySelectorAll(`[data-fav="${id}"]`).forEach(x => { x.classList.toggle('on', !on); x.setAttribute('aria-label', on ? 'Ajouter aux favoris' : 'Retirer des favoris'); }); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
   });
 }
 
@@ -580,7 +592,7 @@ async function annonce(id) {
   ${a.description ? `<p style="white-space:pre-line">${esc(a.description)}</p>` : ''}
   <p class="muted">Publié par ${esc(a.vendeur)} le ${dateFr(a.date_publication)}</p>
   ${a.est_a_moi ? `<div class="row"><a class="btn block" href="#/modifier/${a.id}">Modifier</a><a class="btn ghost block" href="#/mes-annonces">Gérer (réservé, vendu…)</a></div>`
-    : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}>${dejaDemande ? 'C’est zooo ! Demande envoyée ✓' : 'Ça m’intéresse, ça m’enjaille !'}</button><div id="zoo"></div>
+    : a.statut === 'disponible' ? `<button class="btn block" id="int" ${dejaDemande ? 'disabled' : ''}> ${dejaDemande ? 'C’est zooo ! Demande envoyée ' + ic('check') : 'Ça m’intéresse, ça m’enjaille !'}</button><div id="zoo"></div>
       <p class="muted small">Ce clic n'est pas une réservation : le vendeur contacte les intéressés dans l'ordre d'arrivée des demandes.</p>`
     : `<p class="muted">Le vendeur a réservé cet objet.</p>`}
   ${a.est_a_moi ? '' : `<p class="center" style="margin-top:18px"><a href="#" id="sig" class="muted small">Signaler cette annonce</a></p>`}</div></div>`;
@@ -613,9 +625,9 @@ async function annonce(id) {
     b.disabled = true; b.textContent = 'Envoi…';
     const { data: rang, error } = await sb.rpc('je_suis_interesse', { p_annonce: a.id });
     if (error) { b.disabled = false; b.textContent = 'Ça m’intéresse, ça m’enjaille !'; return toast(errMsg(error)); }
-    b.textContent = 'C’est zooo ! Demande envoyée ✓';
+    b.innerHTML = 'C’est zooo ! Demande envoyée ' + ic('check');
     const tel = state.profil.consentement_contact && state.profil.telephone;
-    app.querySelector('#zoo').innerHTML = `<div class="zoo"><b>C’est zooo ! 🎉</b><p>Le vendeur a reçu votre demande n° ${rang}. ${tel ? `Il vous contactera au <b>${esc(state.profil.telephone)}</b>.` : 'Pour qu’il puisse vous joindre, <a href="#/profil">ajoutez votre numéro dans Mon compte</a> et autorisez son partage.'}</p><p class="muted">Suivez-la dans <a href="#/mes-annonces?o=envoyees">Mes annonces › Mes demandes envoyées</a> : vous verrez quand le vendeur l’a vue et quand il vous contacte. Une notification vous prévient aussi.</p></div>`;
+    app.querySelector('#zoo').innerHTML = `<div class="zoo"><b>C’est zooo !</b><p>Le vendeur a reçu votre demande n° ${rang}. ${tel ? `Il vous contactera au <b>${esc(state.profil.telephone)}</b>.` : 'Pour qu’il puisse vous joindre, <a href="#/profil">ajoutez votre numéro dans Mon compte</a> et autorisez son partage.'}</p><p class="muted">Suivez-la dans <a href="#/mes-annonces?o=envoyees">Mes annonces › Mes demandes envoyées</a> : vous verrez quand le vendeur l’a vue et quand il vous contacte. Une notification vous prévient aussi.</p></div>`;
     try { navigator.vibrate && navigator.vibrate([12, 40, 18]); } catch (_) {}
     fete();
   };
@@ -873,9 +885,9 @@ async function residences() {
   const carte = (r, k) => { const im = imgs(r); const vi = estVillas(r); return `<div class="card item res-card" style="--k:${k}">
     ${im.length ? `<div class="rs" data-imgs="${esc(JSON.stringify(im))}" role="img" aria-label="Photos de ${esc(r.nom)}">
       ${im.length > 1 ? `<div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div>` : ''}
-      ${r.quartier ? `<span class="rs-loc">📍 ${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}${r.video_path ? `<button type="button" class="rs-vid" data-vid="${r.id}" aria-label="Voir la vidéo de ${esc(r.nom)}"><span class="rs-play" aria-hidden="true"></span>Vidéo</button>` : ''}</div>` : ''}
+      ${r.quartier ? `<span class="rs-loc">${ic('pin')}${esc(r.quartier)}</span>` : ''}${im.length > 1 ? `<span class="rs-n">1 / ${im.length}</span>` : ''}${r.video_path ? `<button type="button" class="rs-vid" data-vid="${r.id}" aria-label="Voir la vidéo de ${esc(r.nom)}"><span class="rs-play" aria-hidden="true"></span>Vidéo</button>` : ''}</div>` : ''}
     <div class="bd" style="padding:14px"><h3>${esc(r.nom)}</h3><div class="muted small">${esc([r.quartier, r.type_bien].filter(Boolean).join(' · '))}</div>
-    ${r.description && !/^résidence adress immobilier\.?$/i.test(r.description.trim()) ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">${vi ? 'Découvrir les villas' : 'Découvrir la résidence'} ↗</a>` : ''}</div></div>`; };
+    ${r.description && !/^résidence adress immobilier\.?$/i.test(r.description.trim()) ? `<p>${esc(r.description)}</p>` : ''}${r.lien_decouvrir ? `<a class="btn sm" data-r="${r.id}" href="${esc(sur(r.lien_decouvrir))}" target="_blank" rel="noopener">${vi ? 'Découvrir les villas' : 'Découvrir la résidence'} ${ic('ext')}</a>` : ''}</div></div>`; };
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>${V.length ? 'Nos résidences et villas' : 'Nos résidences'}</h1>
   ${V.length && A.length ? '<h2 class="res-sec">Résidences</h2>' : ''}<div class="list" style="margin-top:12px">${A.map(carte).join('') || (V.length ? '' : '<div class="card center pad">Les résidences seront bientôt présentées ici.</div>')}</div>
   ${V.length ? `<h2 class="res-sec">Villas</h2><div class="list" style="margin-top:12px">${V.map((r, k) => carte(r, k + A.length)).join('')}</div>` : ''}`;
@@ -1012,7 +1024,7 @@ function profil() {
     <label for="m2">Confirmer</label><input id="m2" type="password" autocomplete="new-password" minlength="8">
     <p class="err" id="erm" hidden></p><button class="btn ghost block" style="margin-top:12px" id="gom">Changer le mot de passe</button></form>
   <div class="card decouvre-p" style="margin-top:12px"><h2 style="margin-top:0">Découvrir ADRESS CLUB</h2><p class="muted small">Le tour de l’appli en 4 étapes, ou le film de présentation à montrer à un voisin.</p>
-    <div class="row"><button type="button" class="btn sm" data-visite>Revoir la visite guidée</button><button type="button" class="btn sm soft" data-film hidden>▶ Le film (${FILM.duree})</button></div></div>
+    <div class="row"><button type="button" class="btn sm" data-visite>Revoir la visite guidée</button><button type="button" class="btn sm soft" data-film hidden>${ic('play')}Le film (${FILM.duree})</button></div></div>
   <div class="card" style="margin-top:12px"><h2 style="margin-top:0">Installer l'appli : les vidéos</h2><p class="muted small">À regarder ou à montrer à un voisin : 40 secondes pour avoir ADRESS CLUB sur l'écran d'accueil.</p>
     <div class="tuto-grid"><div><b>Android</b>${videoTuto('android')}</div><div><b>iPhone</b>${videoTuto('ios')}</div></div></div>
   <div class="card" style="margin-top:12px"><p class="muted small">Résidence : ${esc(p.residence?.nom || '—')}<br>Compte activé le ${dateFr(p.date_activation)}</p>
@@ -1029,7 +1041,7 @@ function profil() {
   const pr = $('#pushRow'), majPush = () => {
     if (!pushOk()) { pr.innerHTML = `<small class="muted">${estIOS() ? 'Sur iPhone, installez d’abord l’appli sur l’écran d’accueil pour recevoir les notifications.' : 'Ce navigateur ne permet pas les notifications.'}</small>`; return; }
     const st = Notification.permission;
-    pr.innerHTML = st === 'granted' ? '<span class="badge ok">✓ Activées</span> <small class="muted">sur cet appareil</small><button class="btn sm ghost" type="button" id="pushTest">Envoyer un test</button>'
+    pr.innerHTML = st === 'granted' ? '<span class="badge ok">' + ic('check') + 'Activées</span> <small class="muted">sur cet appareil</small><button class="btn sm ghost" type="button" id="pushTest">Envoyer un test</button>'
       : st === 'denied' ? '<small class="muted">Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.</small>'
       : '<button class="btn sm" type="button" id="pushOn">Activer les notifications</button>';
     const b = pr.querySelector('#pushOn'); if (b) b.onclick = async () => { b.disabled = true; const ok = await activerPush(true); toast(ok ? 'Notifications activées.' : 'Notifications non activées.'); majPush(); };
@@ -1049,8 +1061,8 @@ function profil() {
     $('#m1').value = $('#m2').value = ''; toast('Mot de passe changé.');
   };
   const ir = $('#instRow'), tel = estIOS() || /android|mobile/i.test(navigator.userAgent);
-  ir.innerHTML = estInstallee() ? '<span class="badge ok">✓ Installée</span> <small class="muted">sur cet appareil</small>'
-    : `<small class="muted">${tel ? 'Pas encore sur l’écran d’accueil de ce téléphone.' : 'Vous êtes sur un ordinateur : installez-la sur votre téléphone.'}</small><button class="btn sm" type="button" id="install">📲 Installer${tel ? '' : ' sur mon téléphone'}</button>`;
+  ir.innerHTML = estInstallee() ? '<span class="badge ok">' + ic('check') + 'Installée</span> <small class="muted">sur cet appareil</small>'
+    : `<small class="muted">${tel ? 'Pas encore sur l’écran d’accueil de ce téléphone.' : 'Vous êtes sur un ordinateur : installez-la sur votre téléphone.'}</small><button class="btn sm" type="button" id="install">${ic('tel')}Installer${tel ? '' : ' sur mon téléphone'}</button>`;
   const ib2 = $('#install'); if (ib2) ib2.onclick = installer;
 }
 
@@ -1093,7 +1105,7 @@ setTimeout(() => { if (state.session) activerPush(false); }, 4000);
 // Arrivée depuis le bouton « Installer avec Chrome » : la fenêtre d'installation s'ouvre d'elle-même
 if (new URLSearchParams(location.search).has('inst')) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (_) {} setTimeout(() => { if (!estInstallee()) installer(true); }, 1800); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) majCompteurs(); });
-// Œil 👁 sur tous les champs mot de passe : afficher / masquer ce qu'on tape
+// Œil sur tous les champs mot de passe : afficher / masquer ce qu'on tape
 const OEIL = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const OEIL_BARRE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4"/><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 function yeux(root) {

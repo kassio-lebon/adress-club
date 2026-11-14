@@ -938,7 +938,7 @@ async function vignettesAnnonces(paths) {
   const u = new Map((data || []).filter(x => x.signedUrl).map(x => [x.path, x.signedUrl]));
   return new Map(ps.map(p => [p, u.get(t(p)) || u.get(p) || '']));
 }
-const imgAnn = (url, id, titre) => `<a class="t-ph" href="#/annonce/${id}" aria-label="${esc(titre)}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async">` : '<span aria-hidden="true">📷</span>'}</a>`;
+const imgAnn = (url, id, titre) => `<a class="t-ph" href="#/annonce/${id}" aria-label="${esc(titre)}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async">` : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/></svg>'}</a>`;
 // ---------- Toutes les annonces : retrait ADRESS après publication (§3) ----------
 const STATUT_ANN = { disponible: 'En ligne', reserve: 'Réservée', vendu: 'Vendue', don_effectue: 'Don effectué', retire: 'Retirée par le vendeur', expire: 'Expirée' };
 async function annonces(box) {
@@ -1049,7 +1049,7 @@ async function residences(box, villa = false) {
   box.querySelectorAll('[data-supr]').forEach(b => b.onclick = () => { const r = D.find(x => x.id === rid(b)); if (!r) return;
     if (nbM(r.id)) return toast(`${r.nom} a ${nbM(r.id)} membre(s) du Club : retirez-les d’abord, ou masquez ${mot}.`);
     // Double confirmation : 1) l'impact, 2) saisie du nom de la résidence
-    if (!confirm(`⚠ Supprimer définitivement ${r.nom} ?\n\nCe qui sera effacé, sans retour possible :\n• ${mot} (fiche, photo, description)\n• ses ${nbL(r.id)} ${villa ? 'villa(s)' : 'logement(s)'} et leurs locataires dans Nos locataires\n• les codes d’invitation en attente\n\nAucune sauvegarde n’est conservée. Pour la cacher sans rien perdre, utilisez plutôt « Masquer ».`)) return;
+    if (!confirm(`Supprimer définitivement ${r.nom} ?\n\nCe qui sera effacé, sans retour possible :\n• ${mot} (fiche, photo, description)\n• ses ${nbL(r.id)} ${villa ? 'villa(s)' : 'logement(s)'} et leurs locataires dans Nos locataires\n• les codes d’invitation en attente\n\nAucune sauvegarde n’est conservée. Pour la cacher sans rien perdre, utilisez plutôt « Masquer ».`)) return;
     const saisi = prompt(`Dernière confirmation — action irréversible.\n\nTapez le nom de ${mot} pour confirmer la suppression :\n${r.nom}`);
     if (saisi == null) return;
     if (norm(saisi) !== norm(r.nom)) return toast('Nom différent : suppression annulée.');

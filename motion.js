@@ -216,7 +216,7 @@ addEventListener('acl-fete', () => { const b = document.querySelector('#int, .zo
 
 // Cœur des favoris : petite gerbe de particules
 document.addEventListener('animationstart', (e) => {
-  if (reduce || e.animationName !== 'heart' || e.target.textContent !== '♥') return;
+  if (reduce || e.animationName !== 'heart' || !e.target.classList.contains('on')) return;
   const b = e.target, r = b.getBoundingClientRect();
   for (let i = 0; i < 9; i++) {
     const p = document.createElement('i'); p.className = 'spark'; p.style.left = r.left + r.width / 2 + 'px'; p.style.top = r.top + r.height / 2 + 'px';
