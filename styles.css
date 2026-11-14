@@ -1348,3 +1348,13 @@ table.adm td.c-ph{width:72px;padding-right:0}
   .tsw.t3 button svg{display:none}
   .ann-top .tsw{width:100%}
 }
+
+/* v96 : Mon compte — carte « Mon appli » (installation et notifications toujours visibles) */
+.mon-appli{display:grid;gap:4px}
+.mon-appli .ma-l{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
+.mon-appli h2+.ma-l{border-top:0;padding-top:4px}
+.mon-appli .ma-l>div{flex:1;min-width:0}
+.mon-appli .ma-l b{display:block;font-size:15px}
+.ma-i{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--red-tint);color:var(--red);flex:none}
+.ma-i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#instRow,.mon-appli .push-row{margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}

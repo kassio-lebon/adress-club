@@ -8,8 +8,8 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const root = document.documentElement;
 let pending = null, shared = false;
 
-// ---------- intro (une fois par session) ----------
-let seen = false; try { seen = sessionStorage.getItem('acl-intro') === '1'; sessionStorage.setItem('acl-intro', '1'); } catch (_) {}
+// ---------- intro : à chaque ouverture de l'appli (logo puis « CLUB ») ----------
+let seen = false; try { seen = sessionStorage.getItem('acl-intro') === 'off'; } catch (_) {}
 let intro = null; const t0 = Date.now();
 if (!reduce && !seen) {
   intro = document.createElement('div'); intro.className = 'intro intro2';

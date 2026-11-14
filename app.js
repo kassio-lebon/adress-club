@@ -366,10 +366,11 @@ function brancherNotif(root) {
   root.querySelectorAll('[data-push-later]').forEach(b => b.onclick = () => { try { localStorage.setItem('acl-push-later', String(Date.now())); } catch (_) {} b.closest('.push-card').remove(); });
 }
 function carteInstall() {
-  if (estInstallee() || !(estIOS() || /android|mobile/i.test(navigator.userAgent))) return '';
+  if (estInstallee()) return '';
+  const tel = estIOS() || /android|mobile/i.test(navigator.userAgent);
   let plusTard = 0; try { plusTard = +localStorage.getItem('acl-install-later') || 0; } catch (_) {}
   if (Date.now() - plusTard < 7 * 864e5) return '';
-  return '<div class="card install-card"><img src="icon-192.png" alt="" width="44" height="44"><div><b>Installez ADRESS CLUB</b><small>Retrouvez l’application sur l’écran d’accueil de votre téléphone.</small></div><div class="ic-act"><button class="btn sm" type="button" data-inst>Installer</button><button class="btn sm ghost" type="button" data-later>Plus tard</button></div></div>';
+  return `<div class="card install-card"><img src="icon-192.png" alt="" width="44" height="44"><div><b>Installez ADRESS CLUB${tel ? '' : ' sur votre téléphone'}</b><small>${tel ? 'Retrouvez l’application sur l’écran d’accueil de votre téléphone.' : 'Vous êtes sur un ordinateur : le bouton vous donne le lien à ouvrir sur votre téléphone.'}</small></div><div class="ic-act"><button class="btn sm" type="button" data-inst>Installer</button><button class="btn sm ghost" type="button" data-later>Plus tard</button></div></div>`;
 }
 function brancherInstall(root) {
   root.querySelectorAll('[data-inst]').forEach(b => b.onclick = installer);
@@ -934,6 +935,9 @@ async function notifications() {
 function profil() {
   const p = state.profil;
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Mon compte</h1>
+  <section class="card mon-appli" style="margin-top:12px" aria-label="Mon appli"><h2 style="margin-top:0">Mon appli</h2>
+    <div class="ma-l"><span class="ma-i" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg></span><div><b>Installation</b><div id="instRow"></div></div></div>
+    <div class="ma-l"><span class="ma-i" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><div><b>Notifications</b><div class="push-row" id="pushRow"></div></div></div></section>
   <form id="f" class="card" style="margin-top:12px">
     <label for="nom">Nom d'affichage (visible des autres résidents)</label><input id="nom" type="text" maxlength="40" value="${esc(p.nom_affichage)}">
     <label for="tel">Téléphone (privé, nécessaire pour être recontacté sur le Market)</label><input id="tel" type="tel" value="${esc(p.telephone || '')}" placeholder="+225 07 00 00 00 00">
@@ -941,7 +945,6 @@ function profil() {
     <h2>Alertes</h2>
     <label class="check"><input id="nq" type="checkbox" ${p.notif_quotidienne ? 'checked' : ''}> Résumé quotidien des nouvelles annonces (une fois par jour au maximum)</label>
     <label class="check"><input id="ni" type="checkbox" ${p.notif_interet ? 'checked' : ''}> M'alerter quand un résident est intéressé par mon annonce</label>
-    <div class="push-row" id="pushRow"></div>
     <button class="btn block" style="margin-top:12px">Enregistrer</button>
   </form>
   <form class="card" id="fmdp" style="margin-top:12px" novalidate><h2 style="margin-top:0">Changer mon mot de passe</h2>
@@ -953,7 +956,7 @@ function profil() {
   <div class="card" style="margin-top:12px"><h2 style="margin-top:0">Installer l'appli : les vidéos</h2><p class="muted small">À regarder ou à montrer à un voisin : 40 secondes pour avoir ADRESS CLUB sur l'écran d'accueil.</p>
     <div class="tuto-grid"><div><b>Android</b>${videoTuto('android')}</div><div><b>iPhone</b>${videoTuto('ios')}</div></div></div>
   <div class="card" style="margin-top:12px"><p class="muted small">Résidence : ${esc(p.residence?.nom || '—')}<br>Compte activé le ${dateFr(p.date_activation)}</p>
-  <div class="row"><a class="btn ghost" href="#/avis">Donner mon avis</a><button class="btn ghost" id="install" hidden>📲 Installer sur mon téléphone</button><button class="btn danger" id="out">Se déconnecter</button></div></div>`;
+  <div class="row"><a class="btn ghost" href="#/avis">Donner mon avis</a><button class="btn danger" id="out">Se déconnecter</button></div></div>`;
   const $ = (s) => app.querySelector(s);
   $('#f').onsubmit = async (e) => {
     e.preventDefault();
@@ -966,9 +969,9 @@ function profil() {
   const pr = $('#pushRow'), majPush = () => {
     if (!pushOk()) { pr.innerHTML = `<small class="muted">${estIOS() ? 'Sur iPhone, installez d’abord l’appli sur l’écran d’accueil pour recevoir les notifications.' : 'Ce navigateur ne permet pas les notifications.'}</small>`; return; }
     const st = Notification.permission;
-    pr.innerHTML = st === 'granted' ? '<span class="badge ok">Activées</span> <small class="muted">sur ce téléphone</small><button class="btn sm ghost" type="button" id="pushTest">Envoyer un test</button>'
+    pr.innerHTML = st === 'granted' ? '<span class="badge ok">✓ Activées</span> <small class="muted">sur cet appareil</small><button class="btn sm ghost" type="button" id="pushTest">Envoyer un test</button>'
       : st === 'denied' ? '<small class="muted">Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.</small>'
-      : '<button class="btn sm" type="button" id="pushOn">Activer les notifications sur ce téléphone</button>';
+      : '<button class="btn sm" type="button" id="pushOn">Activer les notifications</button>';
     const b = pr.querySelector('#pushOn'); if (b) b.onclick = async () => { b.disabled = true; const ok = await activerPush(true); toast(ok ? 'Notifications activées.' : 'Notifications non activées.'); majPush(); };
     const t = pr.querySelector('#pushTest'); if (t) t.onclick = async () => {
       t.disabled = true; t.textContent = 'Envoi…'; await activerPush(false);
@@ -985,7 +988,10 @@ function profil() {
     if (error) { er.textContent = errMsg(error); er.hidden = false; return; }
     $('#m1').value = $('#m2').value = ''; toast('Mot de passe changé.');
   };
-  if (!estInstallee()) { $('#install').hidden = false; $('#install').onclick = installer; }
+  const ir = $('#instRow'), tel = estIOS() || /android|mobile/i.test(navigator.userAgent);
+  ir.innerHTML = estInstallee() ? '<span class="badge ok">✓ Installée</span> <small class="muted">sur cet appareil</small>'
+    : `<small class="muted">${tel ? 'Pas encore sur l’écran d’accueil de ce téléphone.' : 'Vous êtes sur un ordinateur : installez-la sur votre téléphone.'}</small><button class="btn sm" type="button" id="install">📲 Installer${tel ? '' : ' sur mon téléphone'}</button>`;
+  const ib2 = $('#install'); if (ib2) ib2.onclick = installer;
 }
 
 // ---------- Avis (§8) ----------
