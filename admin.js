@@ -43,7 +43,7 @@ const AIDE = {
     'Non conforme : « Retirer l’annonce ». Conforme : « Maintenir ».',
     'L’annonce reste en ligne tant que vous n’avez pas décidé.']],
   residences: ['Les résidences ADRESS : leur fiche sur l’accueil des résidents et le nombre de logements suivis.', [
-    'Nouvelle résidence : bouton rouge « Créer une résidence ».',
+    'Nouvelle résidence ou ensemble de villas : bouton rouge « Créer une résidence », puis choisissez le type. Un import Excel crée aussi les villas tout seul.',
     'Ensuite, ajoutez ses logements dans Nos locataires (import Excel ou « Ajouter un logement »).',
     '« Photo » change la photo, « Masquer » la cache aux résidents sans rien perdre.',
     '« Supprimer » efface la résidence et ses logements, définitivement (double confirmation).']],
@@ -62,6 +62,14 @@ const AIDE = {
 const insec = (t) => t.replace(/« /g, '«&nbsp;').replace(/ ([»:;?!])/g, '&nbsp;$1');
 const TYPES_CONTENU = ['Nouvelle résidence','Programme à venir','Actualité ADRESS','Flip Immo'];
 const TYPES_BIEN = ['Appartements','Villas en résidence','Villas individuelles','Mixte'];
+const LIB_TYPE = { 'Appartements': 'Résidence d’appartements', 'Villas en résidence': 'Ensemble de villas', 'Villas individuelles': 'Villas individuelles', 'Mixte': 'Mixte (appartements et villas)' };
+// Résidence d'appartements ou ensemble de villas : le type de bien décide, à défaut le nom (« VILLA … »)
+const resVilla = (r) => /villa/i.test(r?.type_bien || '') || /^VILLAS?\b/i.test(String(r?.nom || '').trim());
+// Menus : deux groupes « Résidences » puis « Villas »
+const optionsRes = (R, sel, lab = (r) => esc(r.nom)) => { const o = (r) => `<option value="${r.id}" ${r.id === sel ? 'selected' : ''}>${lab(r)}</option>`, a = R.filter(r => !resVilla(r)), v = R.filter(resVilla);
+  return a.length && v.length ? `<optgroup label="Résidences">${a.map(o).join('')}</optgroup><optgroup label="Villas">${v.map(o).join('')}</optgroup>` : R.map(o).join(''); };
+// Boutons : résidences d'abord, puis les villas après un séparateur
+const parType = (R, f) => { const a = R.filter(r => !resVilla(r)), v = R.filter(resVilla); return a.map(f).join('') + (a.length && v.length ? '<span class="chips-sep" aria-hidden="true">Villas</span>' : '') + v.map(f).join(''); };
 
 export async function renderAdmin(app, ong) {
   if (!state.profil?.is_admin) { app.innerHTML = '<div class="card">Accès réservé à ADRESS IMMOBILIER.</div>'; return; }
@@ -187,7 +195,7 @@ async function invitations(box) {
   <div class="card"><h3>Inviter un locataire</h3>
   <form id="fi" novalidate>
     <div class="grid2">
-      <div><label for="ir">Résidence</label><select id="ir">${R.map(r => `<option value="${r.id}">${esc(r.nom)}</option>`).join('')}</select></div>
+      <div><label for="ir">Résidence</label><select id="ir">${optionsRes(R)}</select></div>
       <div><label for="lgq">Logement</label><div class="combo" id="lgc"><input id="lgq" type="text" placeholder="Rechercher un logement, un locataire…" autocomplete="off" role="combobox" aria-expanded="false"><input type="hidden" id="lg"><div class="combo-list" role="listbox" hidden></div></div></div>
     </div>
     <div id="nvBox" hidden><div class="g3f"><div><label for="nb">Bloc</label><input id="nb" type="text" placeholder="A"></div><div><label for="ne">Étage</label><input id="ne" type="text" placeholder="RDJ"></div><div><label for="nap">Appartement</label><input id="nap" type="text" placeholder="A001"></div></div></div>
@@ -544,19 +552,19 @@ async function annuaire(box) {
   const dessiner = () => {
     annuaire._rid = rid; annuaire._f = filtre;
     const l = L.filter(x => x.residence_id === rid).sort(triLog);
-    const resA = R.find(r => r.id === rid); const villa = l.some(estVilla) || /villa/i.test(resA?.type_bien || '') || /villa/i.test(resA?.nom || '');
+    const resA = R.find(r => r.id === rid); const villa = l.some(estVilla) || resVilla(resA);
     const nb = { tous: l.length, pb: l.filter(x => problemes(x).length).length, libre: l.filter(x => (x.locataire || x.email) && ['libre', 'expire'].includes(etat(x))).length, vide: l.filter(x => !x.locataire && !x.email && !occupant.has(x.id)).length, code: l.filter(x => etat(x) === 'code').length, actif: l.filter(x => etat(x) === 'actif').length };
     if (filtre === 'pb' && !nb.pb) filtre = 'tous';
-    const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', 'Logements libres']];
+    const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', villa ? 'Villas libres' : 'Logements libres']];
     box.innerHTML = `
     <div class="card">
-      <div class="ann-top"><div><label for="ar" style="margin-top:0">Résidence</label><select id="ar">${R.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})</option>`).join('')}</select></div>
-      <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un logement</button><label class="btn xl" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
+      <div class="ann-top"><div><label for="ar" style="margin-top:0">Résidence</label><select id="ar">${optionsRes(R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select></div>
+      <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>${villa ? 'Ajouter une villa' : 'Ajouter un logement'}</button><label class="btn xl" for="xl" style="margin:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Importer un fichier Excel</label><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
     <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div ${villa ? 'hidden' : ''}><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div ${villa ? 'hidden' : ''}><label for="ae">Étage</label><input type="text" id="ae"></div><div><label for="aa">${villa ? 'Nom technique de la villa (ex. A1)' : 'Appartement (4 caractères max.)'}</label><input type="text" id="aa" placeholder="${villa ? 'A1' : 'A001'}"></div></div>
       <div class="grid2"><div><label for="an">Locataire</label><input type="text" id="an"></div><div><label for="am">E-mail</label><input id="am" type="email"></div></div>
       <div class="row" style="margin-top:12px"><button class="btn">Ajouter le logement</button><button type="button" class="btn ghost" id="faNo">Annuler</button></div></form></div>
-    <div class="ann-bar"><h2>${l.length} logement${l.length > 1 ? 's' : ''}</h2><input type="search" id="aq" placeholder="Rechercher un logement, un nom, un e-mail…" autocomplete="off"></div>
+    <div class="ann-bar"><h2>${l.length} ${villa ? 'villa' : 'logement'}${l.length > 1 ? 's' : ''}</h2><input type="search" id="aq" placeholder="Rechercher un logement, un nom, un e-mail…" autocomplete="off"></div>
     <div class="chips ann-f">${FILTRES.filter(([k]) => k === 'tous' || nb[k]).map(([k, t]) => `<button type="button" class="chip ${k === filtre ? 'on' : ''}${k === 'pb' ? ' pb' : ''}" data-f="${k}">${t} <span>${nb[k]}</span></button>`).join('')}</div>
     <div tabindex="0" style="overflow-x:auto"><table class="adm no-q"><thead><tr><th>Logement</th><th>Locataire</th><th>Accès</th><th></th></tr></thead><tbody id="atb"></tbody></table></div>
     <p class="muted center" id="avide" hidden>Aucun logement ne correspond.</p>
@@ -864,22 +872,23 @@ async function residences(box) {
   const nbL = (id) => L.filter(x => x.residence_id === id).length, nbO = (id) => L.filter(x => x.residence_id === id && x.locataire).length, nbM = (id) => P.filter(x => x.residence_id === id).length;
   const pb = (r) => { const t = []; if (!r.photo_path) t.push('Sans photo'); if (!r.description) t.push('Sans description'); if (r.visible && !r.lien_decouvrir) t.push('Sans lien « Découvrir »');
     if (!nbL(r.id)) t.push('Aucun logement dans Nos locataires : impossible d’inviter des locataires'); return t; };
-  box.innerHTML = `<div class="res-top"><span class="muted">${D.length} résidence${D.length > 1 ? 's' : ''}</span><button type="button" class="btn" id="newRes" aria-controls="resForm" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer une résidence</button></div>
-  <div class="card ann-add" id="resForm" hidden><h3>Nouvelle résidence</h3><form id="f">
+  const nV = D.filter(resVilla).length, nA = D.length - nV;
+  box.innerHTML = `<div class="res-top"><span class="muted">${nA} résidence${nA > 1 ? 's' : ''} · ${nV} ensemble${nV > 1 ? 's' : ''} de villas</span><button type="button" class="btn" id="newRes" aria-controls="resForm" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer une résidence</button></div>
+  <div class="card ann-add" id="resForm" hidden><h3>Nouvelle résidence ou ensemble de villas</h3><form id="f">
     <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Quartier</label><input id="qu" type="text"></div></div>
-    <div class="grid2"><div><label>Type de bien</label><select id="tb"><option value="">—</option>${TYPES_BIEN.map(t => `<option>${t}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
+    <div class="grid2"><div><label for="tb">Type *</label><select id="tb"><option value="">Choisir : résidence ou villas</option>${TYPES_BIEN.map(t => `<option value="${t}">${LIB_TYPE[t]}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
     <label>Description</label><textarea id="de"></textarea>
     <label>Lien « Découvrir »</label><input id="li" type="url" placeholder="https://">
     <label data-lf>Photo</label><input id="ph" type="file" accept="image/*">
     <div class="row" style="margin-top:12px"><button class="btn">Créer la résidence</button><button class="btn ghost" type="button" id="annul">Annuler</button></div></form></div>
-  <h2>Résidences</h2><div class="list no-q" id="rsd">${D.map(r => `<div class="card" data-id="${r.id}" data-f="${[r.visible ? 'visible' : 'masque', pb(r).length ? 'pb' : ''].join(' ')}" style="display:flex;gap:12px;align-items:flex-start">
+  <h2>Résidences et villas</h2><div class="list no-q" id="rsd">${D.map(r => `<div class="card" data-id="${r.id}" data-f="${[resVilla(r) ? 'villa' : 'appart', r.visible ? 'visible' : 'masque', pb(r).length ? 'pb' : ''].join(' ')}" style="display:flex;gap:12px;align-items:flex-start">
     <div class="ct-im" style="width:72px;height:54px;${r.photo_path ? `background-image:url('${esc(publicUrl(r.photo_path))}')` : ''}"></div>
-    <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
-    <div class="muted small">${nbL(r.id)} logements · ${nbO(r.id)} occupés · ${nbM(r.id)} membres du Club</div>${pb(r).map(alerte).join('')}
+    <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="type-b${resVilla(r) ? ' v' : ''}">${resVilla(r) ? 'Villas' : 'Résidence'}</span> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
+    <div class="muted small">${nbL(r.id)} ${resVilla(r) ? 'villa' : 'logement'}${nbL(r.id) > 1 ? 's' : ''} · ${nbO(r.id)} occupé${nbO(r.id) > 1 ? 's' : ''} · ${nbM(r.id)} membre${nbM(r.id) > 1 ? 's' : ''} du Club</div>${pb(r).map(alerte).join('')}
     <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button>
       <label class="btn sm ghost" style="margin:0">Photo<input type="file" accept="image/*" data-photo class="sr"></label>
       <button class="btn sm ghost" data-edit>Modifier</button><a class="btn sm soft" href="#/admin/annuaire" data-ann>Nos locataires</a><button class="btn sm ghost rouge" data-supr>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
-  if (D.length) filtres(box.querySelector('#rsd'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', 'Masquées']], 'residences', 'Rechercher une résidence…');
+  if (D.length) filtres(box.querySelector('#rsd'), [['appart', 'Résidences'], ['villa', 'Villas'], ['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', 'Masquées']], 'residences', 'Rechercher une résidence ou des villas…');
   const $ = (s) => box.querySelector(s);
   let edit = null;
   const ouvrir = (on) => { $('#resForm').hidden = !on; $('#newRes').setAttribute('aria-expanded', on); if (on) $('#no').focus(); };
@@ -887,6 +896,7 @@ async function residences(box) {
   $('#annul').onclick = () => ouvrir(false);
   $('#f').onsubmit = (e) => { e.preventDefault();
     const nom = $('#no').value.trim();
+    if (!$('#tb').value) { $('#tb').focus(); return toast('Choisissez le type : résidence d’appartements ou ensemble de villas.'); }
     if (!edit && D.some(r => norm(r.nom) === norm(nom))) return toast('Cette résidence existe déjà.');
     action(async () => {
     const f = $('#ph').files[0]; const photo_path = f ? await uploadPublic(f, 'residences') : null;
@@ -1003,7 +1013,7 @@ async function parametres(box) {
 // Une seule lecture commune : logements, comptes actifs, codes en attente → l'état de chaque logement
 async function base() {
   const [res, log, pro, inv] = await Promise.all([
-    sb.from('residences').select('id,nom').order('nom'),
+    sb.from('residences').select('id,nom,type_bien').order('nom'),
     sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email,type_logement').eq('actif', true),
     sb.from('profiles').select('id,nom_affichage,logement_id,statut,date_activation,date_fin_occupation').eq('statut', 'actif'),
     sb.from('invitations').select('code,logement_id,nom_affichage,email,expire_le,utilisee_par,utilisee_le,created_at,type_occupant,is_adress,is_admin').order('created_at', { ascending: false }).limit(2000)]);
@@ -1071,7 +1081,9 @@ async function jour(box) {
     : '<div class="card center pad"><b>Rien en attente.</b><p class="muted">Tous les locataires connus ont leur code ou leur compte. Pensez à importer la liste à jour quand des locataires arrivent.</p></div>'}
   <div class="j-bas">
     <section class="card j-adh" aria-labelledby="jadh"><div class="j-sh"><h3 id="jadh">Adhésion au Club par résidence</h3><span class="muted small">inscrits / logements occupés</span></div>
-      ${adh.length ? adh.map(a => `<a href="#/admin/plan" data-r="${a.r.id}"><b>${esc(a.r.nom)}</b><span class="jauge"><i style="width:${a.pct}%"></i></span><span class="j-v">${a.m} / ${a.o}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>`).join('') : '<p class="muted">Aucun locataire enregistré.</p>'}
+      ${adh.length ? (() => { const ligne = (a) => `<a href="#/admin/plan" data-r="${a.r.id}"><b>${esc(a.r.nom)}</b><span class="jauge"><i style="width:${a.pct}%"></i></span><span class="j-v">${a.m} / ${a.o}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>`;
+        const ap = adh.filter(a => !resVilla(a.r)), vi = adh.filter(a => resVilla(a.r));
+        return ap.length && vi.length ? `<p class="j-grp">Résidences</p>${ap.map(ligne).join('')}<p class="j-grp">Villas</p>${vi.map(ligne).join('')}` : adh.map(ligne).join(''); })() : '<p class="muted">Aucun locataire enregistré.</p>'}
       <p class="muted small">Touchez une résidence pour ouvrir son plan.</p></section>
     <section class="card j-fil" aria-labelledby="jfil"><h3 id="jfil">Ce qui s’est passé</h3>
       ${fil.length ? fil.map(e => `<div class="j-ev"><span class="j-av ${e.cls}" aria-hidden="true">${esc(e.ini)}</span><div><span><b>${esc(e.who)}</b> ${esc(e.what)}</span><span class="muted small">${ilYa(e.d)}</span></div></div>`).join('') : '<p class="muted">Rien pour l’instant.</p>'}</section>
@@ -1118,7 +1130,7 @@ async function plan(box) {
       const vil = !b && lb.every(estVilla);
       return `<section class="pl-b"><h3>${b ? 'Bloc ' + esc(b) : vil ? 'Villas' : 'Anciens codes'}</h3>${et.map(e => `<div class="pl-e${vil ? ' pl-vil' : ''}"><span class="pl-el">${vil ? '' : esc(e || '—')}</span><div class="pl-ts">${lb.filter(x => (x.etage || '') === e).sort(triLog).map(tuile).join('')}</div></div>`).join('')}</section>`; };
     box.innerHTML = `
-    <div class="pl-top"><div class="chips pl-res" role="tablist" aria-label="Résidence">${R.map(r => `<button type="button" role="tab" aria-selected="${r.id === rid}" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)}</button>`).join('')}</div>
+    <div class="pl-top"><div class="chips pl-res" role="tablist" aria-label="Résidence">${parType(R, r => `<button type="button" role="tab" aria-selected="${r.id === rid}" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)}</button>`)}</div>
       ${nb('inviter') ? `<button type="button" class="btn sm" id="plx">Inviter les ${nb('inviter')} de ${esc(nomRes.get(rid))}</button>` : ''}</div>
     <div class="pl-leg">${['inscrit', 'code', 'inviter', 'completer', 'libre'].map(e => `<span><i class="pl-sw ${e}"></i>${ETATS_LOG[e]} <b>${nb(e)}</b></span>`).join('')}</div>
     <div class="pl-wrap"><div class="pl-plan">${l.length ? blocs.map(bloc).join('') : '<div class="card center pad">Aucun logement : importez la liste dans <a href="#/admin/annuaire">Nos locataires</a>.</div>'}</div>
@@ -1197,7 +1209,7 @@ async function express(box) {
       <div class="chips x-mode" role="tablist" aria-label="Type d’envoi"><button type="button" role="tab" class="chip ${mode === 'nouveau' ? 'on' : ''}" aria-selected="${mode === 'nouveau'}" data-m="nouveau">À inviter <span>${listes.nouveau.length}</span></button><button type="button" role="tab" class="chip ${mode === 'relance' ? 'on' : ''}" aria-selected="${mode === 'relance'}" data-m="relance">À relancer <span>${listes.relance.length}</span></button></div>
       ${n ? `<div class="x-prog"><b>${env} envoyé${env > 1 ? 's' : ''} sur ${n}</b><span class="jauge"><i style="width:${Math.round(100 * env / n)}%"></i></span></div>` : ''}
     </div>
-    ${resAvec.length > 1 ? `<div class="chips ann-f x-res"><button type="button" class="chip ${!rid ? 'on' : ''}" data-r="">Toutes <span>${listes[mode].length}</span></button>${resAvec.map(r => `<button type="button" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)} <span>${resCount(r.id)}</span></button>`).join('')}</div>` : ''}
+    ${resAvec.length > 1 ? `<div class="chips ann-f x-res"><button type="button" class="chip ${!rid ? 'on' : ''}" data-r="">Toutes <span>${listes[mode].length}</span></button>${parType(resAvec, r => `<button type="button" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)} <span>${resCount(r.id)}</span></button>`)}</div>` : ''}
     ${!n ? `<div class="card center pad"><b>${mode === 'nouveau' ? 'Personne à inviter.' : 'Aucun code à relancer.'}</b><p class="muted">${mode === 'nouveau' ? 'Tous les locataires complets ont déjà un code ou un compte. Les fiches incomplètes se corrigent dans le <a href="#/admin/plan">plan des résidences</a>.' : 'Aucun code n’expire dans les 7 jours.'}</p></div>`
     : `<div class="x-wrap">
       <section class="card x-file" aria-label="File d’envoi"><ol>${f.map(v => { const s = fait.get(v.x.id) || (v.x.id === cur ? 'cours' : 'att'); return `<li><button type="button" class="x-it ${s}" data-l="${v.x.id}" ${v.x.id === cur ? 'aria-current="true"' : ''}><i aria-hidden="true">${s === 'envoye' ? '<svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>' : ''}</i><span><b>${esc(v.x.locataire || '')}</b><span class="muted small">${rid ? '' : esc(nomRes.get(v.x.residence_id) || '') + ' · '}${esc(v.x.code)}</span></span><em>${s === 'envoye' ? 'Envoyé' : s === 'passe' ? 'Passé' : s === 'cours' ? 'En cours' : 'À envoyer'}</em></button></li>`; }).join('')}</ol></section>

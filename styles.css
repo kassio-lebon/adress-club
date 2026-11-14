@@ -1184,3 +1184,9 @@ body.dlg-on{overflow:hidden}
 /* v84 · villas dans le plan (pas d'étage) */
 .pl-e.pl-vil{grid-template-columns:1fr}
 .pl-e.pl-vil .pl-el{display:none}
+/* v86 · résidences et villas distinguées */
+.chips-sep{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 4px 0 10px;border-left:1px solid var(--line-2);margin-left:4px;align-self:center}
+.type-b{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--sunken);color:var(--ink);vertical-align:2px}
+.type-b.v{background:var(--ink);color:#fff}
+.j-grp{margin:10px 0 2px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.j-grp:first-of-type{margin-top:0}
