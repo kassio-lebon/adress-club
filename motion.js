@@ -54,7 +54,8 @@ new MutationObserver(() => {
   if (pending) { const r = pending; pending = null; r(); }
 }).observe(app, { attributes: true, attributeFilter: ['class'] });
 
-const io = 'IntersectionObserver' in window ? new IntersectionObserver((list) => list.forEach(x => { if (x.isIntersecting) { x.target.classList.add('in'); io.unobserve(x.target); } }), { rootMargin: '0px 0px -8% 0px' }) : null;
+// éléments qui apparaissent ensemble au défilement : l'un après l'autre (80 ms d'écart)
+const io = 'IntersectionObserver' in window ? new IntersectionObserver((list) => { let k = 0; list.forEach(x => { if (x.isIntersecting) { x.target.style.transitionDelay = (k++ * 80) + 'ms'; x.target.classList.add('in'); io.unobserve(x.target); } }); }, { rootMargin: '0px 0px -8% 0px' }) : null;
 
 const vus = new Set();
 function photos() {
