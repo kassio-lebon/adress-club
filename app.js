@@ -3,7 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 export const SUPABASE_URL = 'https://xvevjlovjpeqfpzfihrj.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_oPj4LrfV0uvN95MmpTPl8A_x5XLxVcj';
-const RECUP = /type=recovery/.test(location.hash);
+let RECUP = /type=recovery/.test(location.hash); // lien « mot de passe oublié » : oublié dès que le nouveau mot de passe est enregistré
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
 export const CATEGORIES = ['Meubles','Électroménager','Décoration','Enfants et bébé','Vêtements et accessoires','Électronique','Sport et loisirs','Maison et jardin','Autre'];
@@ -330,7 +330,9 @@ function nouveauMdp() {
     $('#gon').disabled = true;
     const { error } = await sb.auth.updateUser({ password: a });
     if (error) { er.textContent = errMsg(error); er.hidden = false; $('#gon').disabled = false; return; }
-    state.recup = false; toast('Mot de passe enregistré.'); await chargerProfil(); location.hash = '#/'; router();
+    state.recup = false; RECUP = false; // sinon l'écran « nouveau mot de passe » revient en boucle
+    toast('Mot de passe enregistré.'); await chargerProfil();
+    if (location.hash && location.hash !== '#/') location.hash = '#/'; else router();
   };
 }
 // Android hors Chrome (Firefox, Brave, Opera, Samsung…) : l'installation en 1 clic n'existe que dans Chrome → bouton pour y ouvrir l'appli
@@ -961,7 +963,7 @@ async function flip() {
   const couv = (f) => f.image_path ? `<img src="${img(f)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="fl-vide">Flip Immo</span>';
   const mois = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : '';
   const [a, ...autres] = l;
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos flip</h1>
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos flips</h1>
   ${a ? `<a class="fl-une" data-f="${a.id}" href="${esc(href(a))}"${ext(a)}>${a.image_path ? `<span class="fl-bg" style="background-image:url('${img(a)}')"></span>` : ''}
       <div class="fl-c">${couv(a)}</div>
       <div class="fl-t"><span class="fl-k">À la une</span><h2>${titreLignes(a.titre)}${a.numero ? ' – n° ' + esc(a.numero) : ''}</h2>${a.texte ? `<p>${esc(a.texte)}</p>` : ''}<span class="btn">Lire le magazine</span></div></a>
