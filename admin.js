@@ -46,12 +46,12 @@ const AIDE = {
   residences: ['Les résidences d’appartements ADRESS : leur fiche sur l’accueil des résidents et le nombre de logements suivis. Les villas ont leur propre rubrique « Villas ».', [
     'Nouvelle résidence : bouton rouge « Créer une résidence », puis choisissez le type.',
     'Ensuite, ajoutez ses logements dans Nos locataires (import Excel ou « Ajouter un logement »).',
-    '« Photo » change la photo, « Masquer » la cache aux résidents sans rien perdre.',
+    '« Photos » : jusqu’à 5 photos, la première est la principale. « Masquer » la cache aux résidents sans rien perdre.',
     '« Supprimer » efface la résidence et ses logements, définitivement (double confirmation).']],
   villas: ['Les ensembles de villas ADRESS (LUMIERE, HERMES…), séparés des résidences : chaque ensemble a sa fiche et ses villas.', [
     'Le plus simple : importez le fichier Excel des villas dans Nos locataires. Chaque nom de villa devient un ensemble ici, tout seul.',
     'Ou bien : bouton rouge « Créer un ensemble de villas », puis ajoutez ses villas dans Nos locataires.',
-    '« Photo » change la photo, « Masquer » le cache aux résidents sans rien perdre.',
+    '« Photos » : jusqu’à 5 photos, la première est la principale. « Masquer » le cache aux résidents sans rien perdre.',
     '« Supprimer » efface l’ensemble et ses villas, définitivement (double confirmation).']],
   contenus: ['Les actualités et magazines (Flip Immo) affichés aux résidents.', [
     'Publiez avec le formulaire en haut : type, titre, image et, pour un Flip Immo, le lien du flipbook.',
@@ -1053,7 +1053,7 @@ async function residences(box, villa = false) {
     <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="type-b${resVilla(r) ? ' v' : ''}">${resVilla(r) ? 'Villas' : 'Résidence'}</span> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
     <div class="muted small">${nbL(r.id)} ${resVilla(r) ? 'villa' : 'logement'}${nbL(r.id) > 1 ? 's' : ''} · ${nbO(r.id)} occupé${nbO(r.id) > 1 ? 's' : ''} · ${nbM(r.id)} membre${nbM(r.id) > 1 ? 's' : ''} du Club</div>${pb(r).map(alerte).join('')}
     <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button>
-      <button class="btn sm ghost" data-edit>Photos (${[r.photo_path, ...(r.photos || [])].filter(Boolean).length}/5)</button>
+      <button class="btn sm ghost" data-edit>Photos (${((n) => n > 5 ? n : n + '/5')([r.photo_path, ...(r.photos || [])].filter(Boolean).length)})</button>
       <label class="btn sm ghost" style="margin:0" title="MP4 de préférence, 50 Mo maximum">${r.video_path ? 'Changer la vidéo' : '+ Vidéo'}<input type="file" accept="video/mp4,video/webm,video/quicktime" data-video class="sr"></label>${r.video_path ? '<button class="btn sm ghost" data-novid>Retirer la vidéo</button>' : ''}
       <button class="btn sm ghost" data-edit>Modifier</button><a class="btn sm soft" href="#/admin/annuaire" data-ann>Nos locataires</a><button class="btn sm ghost rouge" data-supr>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#rsd'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', villa ? 'Masqués' : 'Masquées']], villa ? 'villas' : 'residences', villa ? 'Rechercher un ensemble de villas…' : 'Rechercher une résidence…');
@@ -1069,7 +1069,7 @@ async function residences(box, villa = false) {
     $('#phg').querySelectorAll('[data-x]').forEach(b => b.onclick = () => { PH.splice(+b.dataset.x, 1); dessinerPh(); });
     $('#phg').querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const k = +b.dataset.up; if (k) { PH.unshift(PH.splice(k, 1)[0]); dessinerPh(); } });
   };
-  $('#ph').onchange = () => { const f = [...$('#ph').files]; $('#ph').value = ''; const place = MAXP - PH.length;
+  $('#ph').onchange = () => { const f = [...$('#ph').files]; $('#ph').value = ''; const place = Math.max(0, MAXP - PH.length);
     f.slice(0, place).forEach(x => PH.push({ file: x, url: URL.createObjectURL(x) }));
     if (f.length > place) toast(`5 photos maximum : ${f.length - place} photo(s) non ajoutée(s).`); dessinerPh(); };
   dessinerPh();
@@ -1108,7 +1108,7 @@ async function residences(box, villa = false) {
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
     const r = D.find(x => x.id === rid(b)); if (!r) return; edit = r;
     $('#no').value = r.nom || ''; $('#qu').value = r.quartier || ''; $('#tb').value = r.type_bien || ''; $('#or').value = r.ordre ?? 100; $('#de').value = r.description || ''; $('#li').value = r.lien_decouvrir || ''; $('#ph').value = '';
-    PH = [...new Set([r.photo_path, ...(r.photos || [])].filter(Boolean))].slice(0, MAXP).map(p => ({ path: p, url: publicUrl(p) })); dessinerPh();
+    PH = [...new Set([r.photo_path, ...(r.photos || [])].filter(Boolean))].map(p => ({ path: p, url: publicUrl(p) })); dessinerPh();
     modeEdition(box, 'Modifier « ' + r.nom + ' »');
   });
 }
