@@ -1692,3 +1692,17 @@ input[type=search],.combo input[type=text]{background-image:url("data:image/svg+
 .rayon-h h2,.cat-h h2{font-family:Newsreader,Georgia,serif;font-weight:400;font-size:24px;letter-spacing:-.01em}
 .rayon-n{background:none;padding:0;font-size:13px;font-weight:500}
 .drop svg.pi{color:var(--ink)}
+
+/* v111 : recherche de locataire dans le plan, fiche à modifier, sélection groupée des annonces */
+.pl-q{max-width:520px;margin:0 0 14px}
+.dlg-f label{display:block;margin:12px 0 6px;font-size:13px;font-weight:600;color:var(--ink)}
+.dlg-f label:first-child{margin-top:0}
+.dlg-f input,.dlg-f select{width:100%}
+.ann-t .c-sel{width:38px;padding-right:0}
+.ann-t .c-sel input,.sel-a{width:18px;height:18px;margin:0;accent-color:var(--ink);cursor:pointer}
+.sel-bar{position:sticky;top:64px;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;margin:0 0 12px;box-shadow:0 10px 26px -12px rgba(17,18,20,.5)}
+.sel-bar b{margin-right:auto;font-size:14px}
+.sel-bar .btn.ghost{background:#fff;color:var(--ink);border-color:#fff}
+.sel-bar .lnk{color:#fff;opacity:.8}
+.sel-bar[hidden]{display:none}
+.j-qbox input[type=search]{background:transparent!important;padding:0!important}

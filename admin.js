@@ -482,7 +482,7 @@ function dialogue({ titre, corps = '', ok = 'Confirmer', annuler = 'Annuler', da
     const fin = (v) => { bg.remove(); document.body.classList.remove('dlg-on'); removeEventListener('keydown', clav, true); prev?.focus?.(); res(v); };
     const clav = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); fin(false); }
-      if (e.key === 'Tab') { const f = [...bg.querySelectorAll('button:not([disabled]),input')]; const i = f.indexOf(document.activeElement); e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus(); } };
+      if (e.key === 'Tab') { const f = [...bg.querySelectorAll('button:not([disabled]),input,select')]; const i = f.indexOf(document.activeElement); e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus(); } };
     addEventListener('keydown', clav, true);
     bg.querySelectorAll('[data-r]').forEach(b => b.onclick = () => fin(b.dataset.r === '1' ? true : b.dataset.r === 'x' ? 'x' : false));
     bg.onclick = (e) => { if (e.target === bg) fin(false); };
@@ -947,11 +947,28 @@ async function annonces(box) {
   const tags = (a) => { const t = []; const d = dans(a.date_expiration);
     if (a.retiree_par_adress) t.push('retiree'); else if (['disponible', 'reserve'].includes(a.statut)) { t.push('ligne'); if (a.statut === 'reserve') t.push('reserve'); if (d != null && d <= 7) t.push('bientot'); } else t.push('close');
     if (a.signalee) t.push('signalee'); if (a.is_adress) t.push('adress'); return t.join(' '); };
-  box.innerHTML = `<div tabindex="0" style="overflow-x:auto" id="anns"><table class="adm no-q ann-t"><thead><tr><th></th><th>Annonce</th><th>Statut</th><th>Expire</th><th></th></tr></thead><tbody>
-  ${D.map(a => { const d = dans(a.date_expiration), ouverte = !a.retiree_par_adress && ['disponible', 'reserve'].includes(a.statut); return `<tr data-id="${a.id}" data-f="${tags(a)}"><td class="c-ph">${imgAnn(ph.get((a.photos || [])[0]), a.id, a.titre)}</td><td class="c-t"><a href="#/annonce/${a.id}" class="t-lien"><b>${esc(a.titre)}</b></a>${a.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${a.type === 'don' ? 'Don' : fcfa(a.prix_fcfa)} · publiée le ${dateFr(a.date_publication)}</div>${a.signalee ? alerte('Signalée : à traiter dans Modération') : ''}</td>
+  box.innerHTML = `<div class="sel-bar" id="selb" hidden role="region" aria-label="Annonces sélectionnées"><b id="seln"></b><button type="button" class="btn sm danger" id="selr">Retirer du Market</button><button type="button" class="btn sm ghost" id="selo">Rétablir</button><button type="button" class="lnk" id="selx">Tout désélectionner</button></div>
+  <div tabindex="0" style="overflow-x:auto" id="anns"><table class="adm no-q ann-t"><thead><tr><th class="c-sel"><input type="checkbox" id="selt" aria-label="Tout sélectionner (annonces affichées)" title="Tout sélectionner"></th><th></th><th>Annonce</th><th>Statut</th><th>Expire</th><th></th></tr></thead><tbody>
+  ${D.map(a => { const d = dans(a.date_expiration), ouverte = !a.retiree_par_adress && ['disponible', 'reserve'].includes(a.statut); return `<tr data-id="${a.id}" data-f="${tags(a)}"><td class="c-sel"><input type="checkbox" class="sel-a" data-k="${a.retiree_par_adress ? 'retiree' : ouverte ? 'ouverte' : 'close'}" aria-label="Sélectionner ${esc(a.titre)}"></td><td class="c-ph">${imgAnn(ph.get((a.photos || [])[0]), a.id, a.titre)}</td><td class="c-t"><a href="#/annonce/${a.id}" class="t-lien"><b>${esc(a.titre)}</b></a>${a.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${a.type === 'don' ? 'Don' : fcfa(a.prix_fcfa)} · publiée le ${dateFr(a.date_publication)}</div>${a.signalee ? alerte('Signalée : à traiter dans Modération') : ''}</td>
     <td><span class="st-l ${ouverte ? 'actif' : ''}">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUT_ANN[a.statut] || esc(a.statut)}</span></td><td>${dateFr(a.date_expiration)}${ouverte && d != null ? `<div class="muted small">${d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`}</div>` : ''}</td>
     <td>${a.retiree_par_adress ? '<button class="btn sm ghost" data-r="0">Rétablir</button>' : ouverte ? '<button class="btn sm danger" data-r="1">Retirer</button>' : ''}</td></tr>`; }).join('')}</tbody></table></div>`;
   filtres(box.querySelector('#anns'), [['ligne', 'En ligne'], ['reserve', 'Réservées'], ['bientot', 'Expirent ≤ 7 j'], ['signalee', 'Signalées', 1], ['close', 'Clôturées'], ['retiree', 'Retirées par ADRESS'], ['adress', 'ADRESS']], 'annonces', 'Rechercher une annonce…');
+  // Sélection : « Tout sélectionner » ne prend que les annonces affichées (filtre et recherche compris)
+  const $ = (s) => box.querySelector(s), cases = () => [...box.querySelectorAll('.sel-a')].filter(c => !c.closest('tr').hidden);
+  const choisies = () => cases().filter(c => c.checked);
+  const maj = () => { const v = cases(), s = choisies(), nR = s.filter(c => c.dataset.k === 'ouverte').length, nO = s.filter(c => c.dataset.k === 'retiree').length;
+    $('#selt').checked = !!v.length && s.length === v.length; $('#selt').indeterminate = !!s.length && s.length < v.length;
+    $('#selb').hidden = !s.length; $('#seln').textContent = plur(s.length, 'annonce sélectionnée', 'annonces sélectionnées');
+    $('#selr').hidden = !nR; $('#selr').textContent = `Retirer du Market (${nR})`; $('#selo').hidden = !nO; $('#selo').textContent = `Rétablir (${nO})`; };
+  $('#selt').onchange = () => { cases().forEach(c => c.checked = $('#selt').checked); maj(); };
+  box.addEventListener('change', (e) => { if (e.target.classList.contains('sel-a')) maj(); });
+  box.addEventListener('input', () => setTimeout(maj, 0)); box.addEventListener('click', (e) => { if (e.target.closest('.flt')) setTimeout(maj, 0); });
+  $('#selx').onclick = () => { box.querySelectorAll('.sel-a').forEach(c => c.checked = false); maj(); };
+  const groupe = async (k, retirer) => { const ids = choisies().filter(c => c.dataset.k === k).map(c => c.closest('tr').dataset.id); if (!ids.length) return;
+    if (!(await dialogue({ titre: retirer ? `Retirer ${plur(ids.length, 'annonce')} du Market ?` : `Rétablir ${plur(ids.length, 'annonce')} ?`, corps: `<p>${retirer ? 'Elles ne seront plus visibles des résidents. Vous pourrez les rétablir à tout moment.' : 'Elles seront de nouveau visibles sur le Market.'}</p>`, ok: retirer ? 'Retirer' : 'Rétablir', danger: retirer }))) return;
+    action(async () => { let ko = 0; for (const id of ids) { const { error } = await sb.rpc('admin_retirer_annonce', { p_id: id, p_retirer: retirer }); if (error) ko++; } if (ko) throw new Error(`${ko} annonce(s) n’ont pas pu être traitées. Réessayez.`); }, retirer ? `${plur(ids.length, 'annonce retirée', 'annonces retirées')} du Market.` : `${plur(ids.length, 'annonce rétablie', 'annonces rétablies')}.`); };
+  $('#selr').onclick = () => groupe('ouverte', true); $('#selo').onclick = () => groupe('retiree', false);
+  maj();
   box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => (b.dataset.r === '0' || confirm('Retirer cette annonce du Market ?')) && action(async () => check(await sb.rpc('admin_retirer_annonce', { p_id: b.closest('tr').dataset.id, p_retirer: b.dataset.r === '1' }))));
 }
 
@@ -959,6 +976,8 @@ async function annonces(box) {
 async function contenus(box) {
   const { data } = await sb.from('contenus').select('*').order('date_parution', { ascending: false });
   const D = data || [], auj = new Date().toISOString().slice(0, 10);
+  // Le Flip à la une côté résidents = le plus récent par date de parution
+  const flipsV = D.filter(c => c.type === 'Flip Immo' && c.visible), uneFlip = flipsV[0]?.id;
   const pb = (c) => { const r = []; if (!c.image_path) r.push('Sans image : la carte s’affiche vide');
     if (c.type === 'Flip Immo' && !c.lien) r.push('Flip Immo sans lien : les résidents ne peuvent pas l’ouvrir');
     if (c.lien && !/^https?:\/\//i.test(c.lien)) r.push('Lien invalide (doit commencer par https://)'); return r; };
@@ -974,7 +993,7 @@ async function contenus(box) {
   <h2>Contenus</h2><div class="list no-q" id="cts">${D.map(c => `<div class="card" data-id="${c.id}" data-f="${tags(c)}" style="display:flex;gap:12px">
     <div class="ct-im" style="${c.image_path ? `background-image:url('${esc(publicUrl(c.image_path))}')` : ''}"></div>
     <div style="flex:1;min-width:0"><b>${esc(c.titre)}</b><div class="muted small">${esc(c.type)} · ${(c.date_parution || '') > auj ? 'parution le ' : ''}${dateFr(c.date_parution)} · ${c.visible ? 'visible' : 'masqué'}</div>${pb(c).map(alerte).join('')}
-    <div class="row" style="margin-top:6px">${c.lien ? `<a class="btn sm soft" href="${esc(c.lien)}" target="_blank" rel="noopener">Ouvrir le lien</a>` : ''}<button class="btn sm ghost" data-v="${c.visible ? 0 : 1}">${c.visible ? 'Masquer' : 'Afficher'}</button><button class="btn sm ghost" data-edit>Modifier</button><button class="btn sm danger" data-d>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucun contenu.</div>'}</div>`;
+    <div class="row" style="margin-top:6px">${c.lien ? `<a class="btn sm soft" href="${esc(c.lien)}" target="_blank" rel="noopener">Ouvrir le lien</a>` : ''}${c.type === 'Flip Immo' && c.visible ? (c.id === uneFlip ? '<span class="badge">À la une</span>' : '<button class="btn sm soft" data-une>Mettre à la une</button>') : ''}<button class="btn sm ghost" data-v="${c.visible ? 0 : 1}">${c.visible ? 'Masquer' : 'Afficher'}</button><button class="btn sm ghost" data-edit>Modifier</button><button class="btn sm danger" data-d>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucun contenu.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#cts'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', 'Masqués'], ['futur', 'À paraître'], ['flip', 'Flip Immo'], ['actu', 'Actualités']], 'contenus', 'Rechercher un contenu…');
   const $ = (s) => box.querySelector(s);
   let edit = null;
@@ -995,6 +1014,10 @@ async function contenus(box) {
     $('#ty').value = c.type; $('#dp').value = (c.date_parution || '').slice(0, 10); $('#ti').value = c.titre || ''; $('#tx').value = c.texte || ''; $('#li').value = c.lien || ''; $('#nu').value = c.numero || ''; $('#im').value = '';
     modeEdition(box, 'Modifier « ' + c.titre + ' »', 'Image / couverture (laisser vide pour garder l’actuelle)');
   });
+  box.querySelectorAll('[data-une]').forEach(b => b.onclick = () => { const id = b.closest('[data-id]').dataset.id;
+    const max = flipsV.filter(c => c.id !== id).map(c => (c.date_parution || '').slice(0, 10)).sort().pop() || '';
+    const d = max >= auj ? new Date(new Date(max).getTime() + 864e5).toISOString().slice(0, 10) : auj;
+    action(async () => check(await sb.from('contenus').update({ date_parution: d }).eq('id', id)), 'Ce Flip est maintenant à la une.'); });
   box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => action(async () => check(await sb.from('contenus').update({ visible: b.dataset.v === '1' }).eq('id', b.closest('[data-id]').dataset.id))));
   box.querySelectorAll('[data-d]').forEach(b => b.onclick = () => confirm('Supprimer définitivement ce contenu ? (« Masquer » le retire sans le perdre)') && action(async () => check(await sb.from('contenus').delete().eq('id', b.closest('[data-id]').dataset.id)), 'Supprimé.'));
 }
@@ -1279,6 +1302,7 @@ async function plan(box) {
       return `<section class="pl-b"><h3>${b ? 'Bloc ' + esc(b) : vil ? 'Villas' : 'Anciens codes'}</h3>${et.map(e => `<div class="pl-e${vil ? ' pl-vil' : ''}"><span class="pl-el">${vil ? '' : esc(e || '—')}</span><div class="pl-ts">${lb.filter(x => (x.etage || '') === e).sort(triLog).map(tuile).join('')}</div></div>`).join('')}</section>`; };
     const tR = typeDe(R.find(r => r.id === rid)), deux = R.some(resVilla) && R.some(r => !resVilla(r));
     box.innerHTML = `
+    <div class="j-q pl-q"><label class="j-qbox" for="plq"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M228.24,219.76l-51.38-51.38a86.15,86.15,0,1,0-8.48,8.48l51.38,51.38a6,6,0,0,0,8.48-8.48ZM38,112a74,74,0,1,1,74,74A74.09,74.09,0,0,1,38,112Z"/></svg><input id="plq" type="search" placeholder="Retrouver un locataire : nom ou e-mail" aria-label="Retrouver un locataire par son nom ou son e-mail, dans toutes les résidences et villas" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="plqr"></label><div class="j-qr" id="plqr" role="listbox" hidden></div></div>
     ${deux ? choixType(tR, R.filter(r => !resVilla(r)).length, R.filter(resVilla).length) : ''}
     <div class="pl-top"><div class="chips pl-res" role="tablist" aria-label="${tR === 'vil' ? 'Ensemble de villas' : 'Résidence'}">${parType(deux ? R.filter(r => typeDe(r) === tR) : R, r => `<button type="button" role="tab" aria-selected="${r.id === rid}" class="chip ${r.id === rid ? 'on' : ''}" data-r="${r.id}">${esc(r.nom)}</button>`)}</div>
       ${nb('inviter') ? `<button type="button" class="btn sm" id="plx">Inviter les ${nb('inviter')} de ${esc(nomRes.get(rid))}</button>` : ''}</div>
@@ -1289,7 +1313,25 @@ async function plan(box) {
     box.querySelectorAll('.tsw [data-t]').forEach(b => b.onclick = () => { if (b.dataset.t === tR) return; const T = R.filter(r => typeDe(r) === b.dataset.t); rid = (T.find(r => L.some(x => x.residence_id === r.id)) || T[0]).id; sel = null; dessiner(); });
     box.querySelectorAll('.pl-t').forEach(b => b.onclick = () => { sel = b.dataset.l; box.querySelectorAll('.pl-t').forEach(t => { t.classList.toggle('sel', t === b); t.setAttribute('aria-pressed', t === b); }); fiche(true); });
     const x = box.querySelector('#plx'); if (x) x.onclick = () => { express._mode = 'nouveau'; express._rid = rid; location.hash = '#/admin/express'; };
+    chercher();
     if (sel) fiche(false);
+  };
+  // Recherche dans toutes les résidences et villas : le locataire garde son e-mail même s'il change de logement
+  const mailCompte = (c) => c ? (I.find(v => v.utilisee_par === c.id)?.email || '') : '';
+  const chercher = () => {
+    const q = box.querySelector('#plq'), out = box.querySelector('#plqr');
+    const idx = L.map(x => { const c = compte.get(x.id); return { x, cle: norm([x.locataire, x.email, c?.nom_affichage, mailCompte(c), x.code].join(' ')) }; });
+    const fermer = () => { out.hidden = true; q.setAttribute('aria-expanded', 'false'); };
+    const ouvrir = (a) => { rid = a.dataset.rr; sel = a.dataset.l; dessiner(); fiche(true); };
+    q.oninput = () => {
+      const t = norm(q.value).split(/\s+/).filter(Boolean); if (!t.length) return fermer();
+      const v = idx.filter(o => t.every(w => o.cle.includes(w))).slice(0, 10);
+      out.innerHTML = v.length ? v.map(({ x }) => { const e = etat(x), c = compte.get(x.id), m = x.email || mailCompte(c); return `<a href="#/admin/plan" role="option" data-l="${x.id}" data-rr="${x.residence_id}"><span><b>${esc(c?.nom_affichage || x.locataire || 'Libre')}</b>${m ? ` <span class="muted">${esc(m)}</span>` : ''}<span class="j-qn">${esc(nomRes.get(x.residence_id) || '')} · ${esc(x.code)}</span></span><span class="pl-pill ${e}">${ETATS_LOG[e]}</span></a>`; }).join('') : '<p class="muted small">Aucun locataire avec ce nom ou cet e-mail.</p>';
+      out.hidden = false; q.setAttribute('aria-expanded', 'true');
+      out.querySelectorAll('[data-l]').forEach(a => a.onmousedown = (ev) => { ev.preventDefault(); ouvrir(a); });
+    };
+    q.onkeydown = (e) => { if (e.key === 'Escape') fermer(); if (e.key === 'Enter') { const a = out.querySelector('[data-l]'); if (a) { e.preventDefault(); ouvrir(a); } } };
+    q.onblur = () => setTimeout(fermer, 150);
   };
   const fiche = (defiler) => {
     plan._sel = sel;
@@ -1310,6 +1352,7 @@ async function plan(box) {
         <div class="pl-act">
           ${c ? '<a class="btn sm soft block" href="#/admin/comptes">Voir dans Comptes</a>' : `<button class="btn block" id="plgo">${i ? 'Renvoyer le code par WhatsApp' : 'Enregistrer et inviter par WhatsApp'}</button>`}
           <button type="button" class="btn sm ghost block" id="plsave">Enregistrer</button>
+          ${e !== 'libre' ? '<button type="button" class="btn sm soft block" id="plmod">Modifier les informations du locataire</button>' : ''}
           ${e !== 'libre' ? '<button type="button" class="btn sm ghost rouge block" id="pllib">Libérer le logement</button>' : ''}
         </div></form>`;
     const $ = (s) => f.querySelector(s), err = (m) => { $('#plerr').textContent = m; $('#plerr').hidden = !m; };
@@ -1328,7 +1371,40 @@ async function plan(box) {
       catch (ex) { if (w) w.close(); go.disabled = false; err(errMsg(ex)); } };
     else $('#plform').onsubmit = (ev) => ev.preventDefault();
     const lib = $('#pllib'); if (lib) lib.onclick = () => retirerLocataire(x, { compte: c ? (c.nom_affichage || 'ce résident') : null, codeEnAttente: !!i });
+    const mod = $('#plmod'); if (mod) mod.onclick = () => modifierLocataire(x, c, i);
     if (defiler && matchMedia('(max-width: 899px)').matches) f.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+  // Modifier le nom, l'e-mail, le nom affiché du compte, ou déménager le locataire vers un logement libre
+  const modifierLocataire = async (x, c, i) => {
+    const libres = L.filter(y => y.id !== x.id && etat(y) === 'libre').sort((a, b) => (nomRes.get(a.residence_id) || '').localeCompare(nomRes.get(b.residence_id) || '') || triLog(a, b));
+    const groupes = R.filter(r => libres.some(y => y.residence_id === r.id)).map(r => `<optgroup label="${esc(r.nom)}">${libres.filter(y => y.residence_id === r.id).map(y => `<option value="${y.id}">${esc(y.code)}</option>`).join('')}</optgroup>`).join('');
+    const attente = dialogue({ titre: 'Modifier les informations du locataire', ok: 'Enregistrer', corps: `<div class="dlg-f">
+      <label for="mdn">Nom du locataire</label><input id="mdn" type="text" value="${esc(x.locataire || '')}" placeholder="Prénom et nom">
+      <label for="mdm">E-mail</label><input id="mdm" type="email" value="${esc(x.email || mailCompte(c))}" placeholder="prenom.nom@exemple.com">
+      ${c ? `<label for="mda">Nom affiché dans le Club</label><input id="mda" type="text" maxlength="40" value="${esc(c.nom_affichage || '')}">` : ''}
+      <label for="mdl">Logement</label><select id="mdl"><option value="${x.id}">${esc(nomRes.get(x.residence_id) || '')} · ${esc(x.code)} (actuel)</option>${groupes}</select>
+      <p class="muted small" style="margin:6px 0 0">Il déménage ? Choisissez son nouveau logement (seuls les logements libres sont proposés). L’ancien logement redevient libre${c ? ' et son compte le suit, sans nouvelle inscription' : i ? ' ; son code en attente est annulé, il faudra lui renvoyer une invitation' : ''}.</p>
+      ${c ? '<p class="muted small" style="margin:6px 0 0">L’adresse avec laquelle il se connecte ne change pas ici.</p>' : ''}
+      <p class="err small" id="mderr" hidden></p></div>` });
+    const bg = [...document.querySelectorAll('.dlg-bg')].pop(), g = (s) => bg.querySelector(s);
+    setTimeout(() => g('#mdn')?.focus(), 40);
+    if (!(await attente)) return;
+    const v = { locataire: g('#mdn').value.trim() || null, email: g('#mdm').value.trim().toLowerCase() || null };
+    const nomA = c ? g('#mda').value.trim() : '', dest = L.find(y => y.id === g('#mdl').value) || x;
+    if (!v.locataire && !v.email) return toast('Indiquez au moins le nom ou l’e-mail. Pour vider le logement, utilisez « Libérer le logement ».');
+    if (v.email && !EMAIL_OK(v.email)) return toast('Cette adresse e-mail n’est pas valide (pas d’accent ni d’espace).');
+    try {
+      if (dest.id !== x.id) {
+        check(await sb.from('logements').update({ locataire: null, email: null }).eq('id', x.id));
+        try {
+          check(await sb.from('logements').update(v).eq('id', dest.id));
+          if (c) check(await sb.from('profiles').update({ logement_id: dest.id, residence_id: dest.residence_id }).eq('id', c.id));
+        } catch (ex) { await sb.from('logements').update({ locataire: x.locataire, email: x.email }).eq('id', x.id); await sb.from('logements').update({ locataire: null, email: null }).eq('id', dest.id); throw ex; }
+      } else if (v.locataire !== (x.locataire || null) || v.email !== (x.email || null)) check(await sb.from('logements').update(v).eq('id', x.id));
+      if (c && nomA && nomA !== (c.nom_affichage || '')) check(await sb.from('profiles').update({ nom_affichage: nomA }).eq('id', c.id));
+      plan._rid = dest.residence_id; plan._sel = dest.id;
+      toast(dest.id !== x.id ? `Déménagement enregistré : ${dest.code}.` : 'Informations enregistrées.'); rerender();
+    } catch (ex) { toast(errMsg(ex)); }
   };
   dessiner();
 }

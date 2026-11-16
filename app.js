@@ -35,6 +35,8 @@ export const publicUrl = (path) => !path ? '' : /^https?:\/\//.test(path) ? path
 function prix(a) { return a.type === 'don' ? 'GRATUIT' : fcfa(a.prix_fcfa); }
 const qs = () => new URLSearchParams((location.hash.split('?')[1]) || '');
 const estFlip = (u) => /^https:\/\/([a-z0-9-]+\.)?heyzine\.com\//i.test(u || '');
+// Titre long : retour à la ligne après « ! » ou « ? » quand une autre phrase suit
+const titreLignes = (t) => esc(t).replace(/(\s?[!?])\s+(?=\S)/g, '$1<br>');
 const lienFlip = (u, t) => estFlip(u) ? '#/lire?' + new URLSearchParams({ u, t: t || '' }).toString() : u;
 // Liens saisis dans l'Espace ADRESS : seuls http(s), e-mail et téléphone sont acceptés
 const sur = (u) => /^(https?:|mailto:|tel:)/i.test(String(u || '').trim()) ? String(u).trim() : '#';
@@ -959,10 +961,10 @@ async function flip() {
   const couv = (f) => f.image_path ? `<img src="${img(f)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="fl-vide">Flip Immo</span>';
   const mois = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : '';
   const [a, ...autres] = l;
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Le Flip Immo</h1>
+  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Nos flip</h1>
   ${a ? `<a class="fl-une" data-f="${a.id}" href="${esc(href(a))}"${ext(a)}>${a.image_path ? `<span class="fl-bg" style="background-image:url('${img(a)}')"></span>` : ''}
       <div class="fl-c">${couv(a)}</div>
-      <div class="fl-t"><span class="fl-k">À la une</span><h2>${esc(a.titre)}${a.numero ? ' – n° ' + esc(a.numero) : ''}</h2>${a.texte ? `<p>${esc(a.texte)}</p>` : ''}<span class="btn">Lire le magazine</span></div></a>
+      <div class="fl-t"><span class="fl-k">À la une</span><h2>${titreLignes(a.titre)}${a.numero ? ' – n° ' + esc(a.numero) : ''}</h2>${a.texte ? `<p>${esc(a.texte)}</p>` : ''}<span class="btn">Lire le magazine</span></div></a>
     ${autres.length ? `<h2 class="fl-h">Les autres numéros</h2><div class="fl-grid">${autres.map(f => `<a class="card fl-it" data-f="${f.id}" href="${esc(href(f))}"${ext(f)}><div class="fl-c">${couv(f)}</div><div class="fl-it-t"><b>${esc(f.titre)}</b><small>${mois(f.date_parution)}</small><span class="fl-lire">Lire ›</span></div></a>`).join('')}</div>` : ''}`
   : '<div class="card center pad" style="margin-top:12px">Le prochain numéro arrive bientôt.</div>'}`;
   app.querySelectorAll('[data-f]').forEach(x => x.addEventListener('click', () => track('clic_flip', x.dataset.f)));
@@ -993,7 +995,7 @@ async function bonnesAdresses() {
 function lire() {
   const p = qs(), u = p.get('u') || '', t = p.get('t') || 'Flipbook';
   if (!estFlip(u)) { location.hash = '#/'; return; }
-  app.innerHTML = `<a class="back" href="javascript:history.back()">‹ Retour</a><h1>${esc(t)}</h1>
+  app.innerHTML = `<a class="back" href="javascript:history.back()">‹ Retour</a><h1>${titreLignes(t)}</h1>
   <div class="flip"><iframe src="${esc(u)}" title="${esc(t)}" allow="fullscreen" allowfullscreen loading="lazy"></iframe></div>
   <a class="btn ghost block" style="margin-top:10px" href="${esc(u)}" target="_blank" rel="noopener">Ouvrir en plein écran</a>`;
 }
