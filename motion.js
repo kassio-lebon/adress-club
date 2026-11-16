@@ -12,18 +12,19 @@ let pending = null, shared = false, vignette = null, parClic = false; // vignett
 let seen = false; try { seen = sessionStorage.getItem('acl-intro') === 'off'; } catch (_) {}
 let intro = null; const t0 = Date.now();
 if (!reduce && !seen) {
-  intro = document.createElement('div'); intro.className = 'intro intro2';
-  intro.innerHTML = '<div class="intro-stage"><img class="nl" src="logo-adress.png" alt="ADRESS IMMOBILIER"><div class="intro-in"><i></i><span>CLUB</span></div></div>';
+  // v118 : le logo se dévoile de gauche à droite, le trait rouge se trace, « CLUB » arrive lettre par lettre, puis un reflet balaie le logo
+  intro = document.createElement('div'); intro.className = 'intro intro2 intro3';
+  intro.innerHTML = '<div class="intro-stage"><div class="nl-w"><img class="nl" src="logo-adress.png" alt="ADRESS IMMOBILIER"><em class="nl-sh" aria-hidden="true"></em></div><div class="intro-in"><i></i><span class="cl" aria-label="CLUB">' + 'CLUB'.split('').map((c, k) => '<b style="--k:' + k + '" aria-hidden="true">' + c + '</b>').join('') + '</span></div></div>';
   document.body.appendChild(intro);
   // impact ressenti : légère vibration quand les deux traits se croisent
-  setTimeout(() => { try { if (matchMedia('(pointer: coarse)').matches && navigator.vibrate) navigator.vibrate([14, 60, 22]); } catch (_) {} }, 600);
+  setTimeout(() => { try { if (matchMedia('(pointer: coarse)').matches && navigator.vibrate) navigator.vibrate([14, 60, 22]); } catch (_) {} }, 1050);
 }
 const closeIntro = () => {
   if (!intro) return; const el = intro; intro = null;
-  // l'intro s'efface dès que le premier écran est prêt (au plus tôt 1,3 s, le temps que le logo se dessine)
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 600); }, Math.max(0, 1300 - (Date.now() - t0)));
+  // l'intro s'efface dès que le premier écran est prêt (au plus tôt 2,6 s, le temps que toute l'animation se joue)
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 750); }, Math.max(0, 2600 - (Date.now() - t0)));
 };
-setTimeout(closeIntro, 3000);
+setTimeout(closeIntro, 4200);
 
 // ---------- transitions entre écrans (View Transitions API) ----------
 document.addEventListener('click', (e) => {
