@@ -6,7 +6,7 @@ export const SUPABASE_KEY = 'sb_publishable_oPj4LrfV0uvN95MmpTPl8A_x5XLxVcj';
 let RECUP = /type=recovery/.test(location.hash); // lien « mot de passe oublié » : oublié dès que le nouveau mot de passe est enregistré
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
-export const CATEGORIES = ['Meubles','Électroménager','Décoration','Enfants et bébé','Vêtements et accessoires','Électronique','Sport et loisirs','Maison et jardin','Autre'];
+export const CATEGORIES = ['Mobilier', 'Électroménager', 'Décoration', 'Électronique & High-tech', 'Enfants & Bébés', 'Maison & Jardin', 'Mode & Accessoires'];
 export const ETATS = ['Neuf','Très bon état','Bon état','Usagé','À réparer'];
 export const FILTRES_BP = ['Rideaux et décoration','Aménagement et revêtements'];
 const STATUTS = { disponible:'Disponible', reserve:'Réservé', vendu:'Vendu', don_effectue:'Don effectué', retire:'Retiré', expire:'Expiré' };
@@ -151,6 +151,8 @@ async function router() {
   const [name, param] = path.split('/');
   document.getElementById('top').hidden = !actif();
   document.getElementById('nav').hidden = !actif();
+  // Espace ADRESS : la barre du haut change (plus de menu résident) pour ne pas confondre les deux menus
+  document.body.classList.toggle('mode-admin', name === 'admin' && !!state.profil?.is_admin);
   const sect = ({ '': 'accueil', annonce: 'market', modifier: 'mes-annonces' })[name] ?? name;
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === sect));
   window.scrollTo(0, 0);

@@ -88,7 +88,8 @@ function decorate() {
   if (g && shared) g.style.viewTransitionName = 'photo';
   // la vignette reste affichée sous la grande photo le temps qu'elle charge : pas de flou, pas de trou
   if (g && vignette && location.hash === vignette[0]) { g.style.backgroundImage = vignette[1]; g.classList.add('de-vignette', 'ld'); g.closest('.detail')?.classList.add('depuis-vignette'); }
-  const hero = app.querySelector('.hero');
+  // emblème ADRESS animé : sur le bandeau d'accueil (depuis la v105, à côté du « Bonjour »)
+  const hero = app.querySelector('.hero, .accueil-b .salut');
   if (hero && !hero.querySelector('.mark-anim')) hero.insertAdjacentHTML('beforeend', markSvg('mark-anim'));
   app.querySelectorAll('.fc-cover').forEach(c => { if (!c.querySelector('.mark-anim')) c.insertAdjacentHTML('beforeend', markSvg('mark-anim sm')); });
   // chargement progressif des photos (flou → net)

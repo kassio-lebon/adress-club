@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="styles.css?v=111">
+<link rel="stylesheet" href="styles.css?v=113">
 </head>
 <body>
 <header class="top" id="top" hidden>
@@ -33,6 +33,7 @@
     <a href="#/bonnes-adresses" data-nav="bonnes-adresses">Bons plans</a>
     <a href="#/publier" class="btn sm" data-nav="publier">+ Publier</a>
   </nav>
+  <div class="top-admin"><span class="adm-badge">Espace ADRESS</span><a href="#/" class="btn sm ghost adm-quit"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M118,216a6,6,0,0,1-6,6H48a6,6,0,0,1-6-6V40a6,6,0,0,1,6-6h64a6,6,0,0,1,0,12H54V210h58A6,6,0,0,1,118,216Zm110.24-92.24-40-40a6,6,0,0,0-8.48,8.48L209.51,122H112a6,6,0,0,0,0,12h97.51l-29.75,29.76a6,6,0,1,0,8.48,8.48l40-40A6,6,0,0,0,228.24,123.76Z"/></svg><span class="q-l">Retour à l’application</span><span class="q-c">Retour</span></a></div>
   <div class="top-actions">
     <a href="#/notifications" class="icon-btn" aria-label="Notifications"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M220.07,176.94C214.41,167.2,206,139.73,206,104a78,78,0,1,0-156,0c0,35.74-8.42,63.2-14.08,72.94A14,14,0,0,0,48,198H90.48a38,38,0,0,0,75,0H208a14,14,0,0,0,12.06-21.06ZM128,218a26,26,0,0,1-25.29-20h50.58A26,26,0,0,1,128,218Zm81.71-33a1.9,1.9,0,0,1-1.7,1H48a1.9,1.9,0,0,1-1.7-1,2,2,0,0,1,0-2C53.87,170,62,139.69,62,104a66,66,0,1,1,132,0c0,35.68,8.14,65.95,15.71,79A2,2,0,0,1,209.71,185Z"/></svg><span class="dot" id="notifDot" hidden></span></a>
     <a href="#/profil" class="icon-btn" aria-label="Mon compte"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M229.19,213c-15.81-27.32-40.63-46.49-69.47-54.62a70,70,0,1,0-63.44,0C67.44,166.5,42.62,185.67,26.81,213a6,6,0,1,0,10.38,6C56.4,185.81,90.34,166,128,166s71.6,19.81,90.81,53a6,6,0,1,0,10.380-6ZM70,96a58,58,0,1,1,58,58A58.07,58.07,0,0,1,70,96Z"/></svg></a>
@@ -48,7 +49,7 @@
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
 <script type="module" src="app.js"></script>
-<script type="module" src="motion.js?v=109"></script>
+<script type="module" src="motion.js?v=113"></script>
 <script>setTimeout(function(){var a=document.getElementById("app");if(a&&a.querySelector(".splash")){a.innerHTML='<div class="card center pad" style="margin-top:20vh"><b>Le chargement prend plus de temps que prévu</b><p class="muted">Vérifiez votre connexion Internet puis réessayez.</p><button class="btn" onclick="location.reload()">Réessayer</button></div>';}},15000);</script>
 </body>
 </html>

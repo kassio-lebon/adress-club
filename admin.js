@@ -1,13 +1,14 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
 import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, FILTRES_BP, compress, barreRecherche } from './app.js';
 
-// Navigation en 4 groupes (au lieu de 11 onglets à plat) : on choisit d'abord le domaine, puis l'écran
+// Navigation en 5 tuiles (icône + texte) : on choisit d'abord le domaine, puis l'écran
 const GROUPES = [
-  ['Aujourd’hui', [['jour', 'Aujourd’hui']]],
-  ['Locataires', [['plan', 'Plan résidences et villas'], ['residences', 'Résidences'], ['villas', 'Villas'], ['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']]],
-  ['Le Market', [['annonces', 'Annonces'], ['moderation', 'Signalements']]],
-  ['Vitrine', [['contenus', 'Actualités'], ['partenaires', 'Bons plans']]],
-  ['Pilotage', [['stats', 'Indicateurs'], ['avis', 'Avis'], ['parametres', 'Paramètres']]]];
+  ['Accueil', [['jour', 'Aujourd’hui']], 'acc'],
+  ['Résidents', [['annuaire', 'Nos locataires'], ['express', 'Invitation express'], ['invitations', 'Invitations'], ['comptes', 'Comptes']], 'res'],
+  ['Market', [['annonces', 'Annonces'], ['moderation', 'Signalements']], 'mk'],
+  ['Résidences', [['plan', 'Plan résidences et villas'], ['residences', 'Résidences'], ['villas', 'Villas']], 'bat'],
+  ['Gestion', [['contenus', 'Actualités'], ['partenaires', 'Bons plans'], ['stats', 'Indicateurs'], ['avis', 'Avis'], ['parametres', 'Paramètres']], 'ges']];
+const ICO_ADM = {"acc": "<svg class=\"pi\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path d=\"M217.9,110.1l-80-80a14,14,0,0,0-19.8,0l-80,80A13.92,13.92,0,0,0,34,120v96a6,6,0,0,0,6,6h64a6,6,0,0,0,6-6V158h36v58a6,6,0,0,0,6,6h64a6,6,0,0,0,6-6V120A13.92,13.92,0,0,0,217.9,110.1ZM210,210H158V152a6,6,0,0,0-6-6H104a6,6,0,0,0-6,6v58H46V120a2,2,0,0,1,.58-1.42l80-80a2,2,0,0,1,2.84,0l80,80A2,2,0,0,1,210,120Z\"/></svg>", "res": "<svg class=\"pi\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path d=\"M112.6,158.43a58,58,0,1,0-57.2,0A93.83,93.83,0,0,0,5.21,196.72a6,6,0,0,0,10.05,6.56,82,82,0,0,1,137.48,0,6,6,0,0,0,10-6.56A93.83,93.83,0,0,0,112.6,158.43ZM38,108a46,46,0,1,1,46,46A46.06,46.06,0,0,1,38,108Zm211,97a6,6,0,0,1-8.3-1.74A81.8,81.8,0,0,0,172,166a6,6,0,0,1,0-12,46,46,0,1,0-17.08-88.73,6,6,0,1,1-4.46-11.14,58,58,0,0,1,50.14,104.3,93.83,93.83,0,0,1,50.19,38.29A6,6,0,0,1,249,205Z\"/></svg>", "mk": "<svg class=\"pi\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path d=\"M237.9,198.36l-14.25-120a14.06,14.06,0,0,0-14-12.36H174V64a46,46,0,0,0-92,0v2H46.33a14.06,14.06,0,0,0-14,12.36l-14.25,120a14,14,0,0,0,14,15.64H223.92a14,14,0,0,0,14-15.64ZM94,64a34,34,0,0,1,68,0v2H94ZM225.5,201.3a2.07,2.07,0,0,1-1.58.7H32.08a2.07,2.07,0,0,1-1.58-.7,1.92,1.92,0,0,1-.49-1.53l14.26-120A2,2,0,0,1,46.33,78H82v26a6,6,0,0,0,12,0V78h68v26a6,6,0,0,0,12,0V78h35.67a2,2,0,0,1,2.06,1.77l14.26,120A1.92,1.92,0,0,1,225.5,201.3Z\"/></svg>", "bat": "<svg class=\"pi\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path d=\"M240,210H222V96a14,14,0,0,0-14-14H142V32a14,14,0,0,0-21.77-11.64l-80,53.33A14,14,0,0,0,34,85.34V210H16a6,6,0,0,0,0,12H240a6,6,0,0,0,0-12ZM208,94a2,2,0,0,1,2,2V210H142V94ZM46,85.34a2,2,0,0,1,.89-1.66l80-53.34A2,2,0,0,1,130,32V210H46ZM110,112v16a6,6,0,0,1-12,0V112a6,6,0,0,1,12,0Zm-32,0v16a6,6,0,0,1-12,0V112a6,6,0,0,1,12,0Zm0,56v16a6,6,0,0,1-12,0V168a6,6,0,0,1,12,0Zm32,0v16a6,6,0,0,1-12,0V168a6,6,0,0,1,12,0Z\"/></svg>", "ges": "<svg class=\"pi\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path d=\"M128,82a46,46,0,1,0,46,46A46.06,46.06,0,0,0,128,82Zm0,80a34,34,0,1,1,34-34A34,34,0,0,1,128,162Zm108-54.4a6,6,0,0,0-2.92-4L202.64,86.22l-.42-.71L202.1,51.2A6,6,0,0,0,200,46.64a110.12,110.12,0,0,0-36.07-20.31,6,6,0,0,0-4.84.45L128.46,43.86h-1L96.91,26.76a6,6,0,0,0-4.86-.44A109.92,109.92,0,0,0,56,46.68a6,6,0,0,0-2.12,4.55l-.16,34.34c-.14.23-.28.47-.41.71L22.91,103.57A6,6,0,0,0,20,107.62a104.81,104.81,0,0,0,0,40.78,6,6,0,0,0,2.92,4l30.42,17.33.42.71.12,34.31A6,6,0,0,0,56,209.36a110.12,110.12,0,0,0,36.07,20.31,6,6,0,0,0,4.84-.45l30.61-17.08h1l30.56,17.1A6.09,6.09,0,0,0,162,230a5.83,5.83,0,0,0,1.93-.32,109.92,109.92,0,0,0,36-20.36,6,6,0,0,0,2.12-4.55l.16-34.34c.14-.23.28-.47.41-.71l30.42-17.29a6,6,0,0,0,2.92-4.05A104.81,104.81,0,0,0,236,107.6Zm-11.25,35.79L195.32,160.1a6.07,6.07,0,0,0-2.28,2.3c-.59,1-1.21,2.11-1.86,3.14a6,6,0,0,0-.91,3.16l-.16,33.21a98.15,98.15,0,0,1-27.52,15.53L133,200.88a6,6,0,0,0-2.93-.77h-.14c-1.24,0-2.5,0-3.74,0a6,6,0,0,0-3.07.76L93.45,217.43a98,98,0,0,1-27.56-15.49l-.12-33.17a6,6,0,0,0-.91-3.16c-.64-1-1.27-2.08-1.86-3.14a6,6,0,0,0-2.27-2.3L31.3,143.4a93,93,0,0,1,0-30.79L60.68,95.9A6.07,6.07,0,0,0,63,93.6c.59-1,1.21-2.11,1.86-3.14a6,6,0,0,0,.91-3.16l.16-33.21A98.15,98.15,0,0,1,93.41,38.56L123,55.12a5.81,5.81,0,0,0,3.07.76c1.24,0,2.5,0,3.74,0a6,6,0,0,0,3.07-.76l29.65-16.56a98,98,0,0,1,27.56,15.49l.12,33.17a6,6,0,0,0,.91,3.16c.64,1,1.27,2.08,1.86,3.14a6,6,0,0,0,2.27,2.3L224.7,112.6A93,93,0,0,1,224.73,143.39Z\"/></svg>"};
 // Aide de chaque écran : une phrase « à quoi ça sert » et le pas-à-pas, toujours visibles (étapes numérotées courtes)
 const AIDE = {
   plan: ['Chaque résidence ou ensemble de villas vu comme un plan : un carré par logement, sa couleur dit où en est le locataire.', [
@@ -88,8 +89,8 @@ export async function renderAdmin(app, ong) {
   const g = GROUPES.find(([, o]) => o.some(([k]) => k === ong)) || GROUPES[0];
   const titre = g[1].find(([k]) => k === ong)?.[1] || '';
   const [but, etapes] = AIDE[ong] || ['', []];
-  app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Espace ADRESS</h1>
-  <nav class="adm-nav"><div class="adm-g">${GROUPES.map(([n, o]) => `<a class="${n === g[0] ? 'on' : ''}" href="#/admin/${o[0][0]}">${n}</a>`).join('')}</div>
+  app.innerHTML = `<h1 class="adm-h">Espace ADRESS</h1>
+  <nav class="adm-nav" aria-label="Espace ADRESS"><div class="adm-g">${GROUPES.map(([n, o, i]) => `<a class="${n === g[0] ? 'on' : ''}" href="#/admin/${o[0][0]}"${n === g[0] ? ' aria-current="page"' : ''}>${ICO_ADM[i]}<span>${n}</span></a>`).join('')}</div>
   ${g[1].length > 1 ? `<div class="tabs chips adm-s">${g[1].map(([k, l]) => `<a class="chip ${k === ong ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div>` : ''}</nav>
   ${but ? `<section class="aide" aria-label="Comment faire"><p class="aide-but"><b>${esc(titre)}</b> ${esc(but)}</p>${etapes.length ? `<button type="button" class="aide-ouvrir" aria-expanded="false">Comment faire ? <span>${etapes.length} étapes</span></button><ol class="aide-et">${etapes.map(e => `<li>${insec(esc(e))}</li>`).join('')}</ol>` : ''}</section>` : ''}
   <div id="adm"></div>`;
@@ -595,9 +596,13 @@ function listeEtages(inp, extra = []) {
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const chargerXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, ko) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = () => ok(window.XLSX); s.onerror = () => ko(new Error('Lecture Excel indisponible (réseau).')); document.head.appendChild(s); });
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+// Photo(s) du bien choisi, à côté de la liste (la principale en grand, les autres en vignettes)
+const photosBien = (r) => { const p = [...new Set([r?.photo_path, ...(r?.photos || [])].filter(Boolean))];
+  return p.length ? `<div class="bien-ph"><img src="${esc(publicUrl(p[0]))}" alt="${esc(r.nom)}" loading="lazy">${p.length > 1 ? `<div>${p.slice(1, 5).map(x => `<img src="${esc(publicUrl(x))}" alt="" loading="lazy">`).join('')}</div>` : ''}</div>`
+    : `<a class="bien-ph vide" href="#/admin/${resVilla(r) ? 'villas' : 'residences'}">Pas encore de photo · en ajouter</a>`; };
 async function annuaire(box) {
   const [res, log, occ, inv] = await Promise.all([
-    sb.from('residences').select('id,nom,type_bien').order('nom'),
+    sb.from('residences').select('id,nom,type_bien,photo_path,photos').order('nom'),
     sb.from('logements').select('id,code,residence_id,bloc,etage,appartement,locataire,email,actif,type_logement').eq('actif', true).order('code'),
     sb.from('profiles').select('logement_id,nom_affichage').eq('statut', 'actif').not('logement_id', 'is', null),
     sb.from('invitations').select('logement_id,expire_le,utilisee_par,created_at').is('utilisee_par', null).order('created_at', { ascending: false })]);
@@ -642,7 +647,7 @@ async function annuaire(box) {
     const FILTRES = [['tous', 'Tous'], ['pb', 'À corriger'], ['libre', 'À inviter'], ['code', 'Code envoyé'], ['actif', 'Comptes actifs'], ['vide', villa ? 'Villas libres' : 'Logements libres']];
     box.innerHTML = `
     <div class="card">
-      <div class="ann-top"><div>${deuxTypes ? choixType(typeDe(resA), R.filter(r => !resVilla(r)).length, R.filter(resVilla).length) : ''}<label for="ar" style="margin-top:${deuxTypes ? '12px' : '0'}">${resVilla(resA) ? 'Ensemble de villas' : 'Résidence'}</label><select id="ar">${optionsRes(deuxTypes ? R.filter(r => typeDe(r) === typeDe(resA)) : R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select></div>
+      <div class="ann-top"><div>${deuxTypes ? choixType(typeDe(resA), R.filter(r => !resVilla(r)).length, R.filter(resVilla).length) : ''}<label for="ar" style="margin-top:${deuxTypes ? '12px' : '0'}">${resVilla(resA) ? 'Ensemble de villas' : 'Résidence'}</label><select id="ar">${optionsRes(deuxTypes ? R.filter(r => typeDe(r) === typeDe(resA)) : R, rid, r => `${esc(r.nom)} (${L.filter(x => x.residence_id === r.id).length})`)}</select>${photosBien(resA)}</div>
       <div class="ann-btns"><button type="button" class="btn" id="addLog" aria-expanded="false" aria-controls="faBox"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M222,128a6,6,0,0,1-6,6H134v82a6,6,0,0,1-12,0V134H40a6,6,0,0,1,0-12h82V40a6,6,0,0,1,12,0v82h82A6,6,0,0,1,222,128Z"/></svg>${villa ? 'Ajouter une villa' : 'Ajouter un logement'}</button><button type="button" class="btn xl" id="xlGo" aria-expanded="false" aria-controls="imp" style="margin:0"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true" width="18" height="18"><path d="M224,50H32a6,6,0,0,0-6,6V192a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V56A6,6,0,0,0,224,50ZM38,110H82v36H38Zm56,0H218v36H94ZM218,62V98H38V62ZM38,192V158H82v36H40A2,2,0,0,1,38,192Zm178,2H94V158H218v34A2,2,0,0,1,216,194Z"/></svg>Importer un fichier Excel</button><input id="xl" type="file" accept=".xlsx,.xls,.csv" class="sr"></div></div>
       <div id="imp"></div></div>
     <div class="card ann-add" id="faBox" hidden><h3>Nouveau logement</h3><form id="fa" novalidate style="margin-top:6px"><div class="g3f"><div ${villa ? 'hidden' : ''}><label for="ab">Bloc</label><input type="text" id="ab" placeholder="A"></div><div ${villa ? 'hidden' : ''}><label for="ae">Étage</label><input type="text" id="ae"></div><div><label for="aa">${villa ? 'Nom technique de la villa (ex. A1)' : 'Appartement (4 caractères max.)'}</label><input type="text" id="aa" placeholder="${villa ? 'A1' : 'A001'}"></div></div>
@@ -1040,14 +1045,15 @@ async function residences(box, villa = false) {
     <div class="grid2"><div><label for="tb">Type *</label><select id="tb">${TYP.length > 1 ? '<option value="">Choisir le type</option>' : ''}${TYP.map(t => `<option value="${t}">${LIB_TYPE[t]}</option>`).join('')}</select></div><div><label>Ordre d'affichage</label><input id="or" type="number" value="100"></div></div>
     <label>Description</label><textarea id="de"></textarea>
     <label>Lien « Découvrir »</label><input id="li" type="url" placeholder="https://">
-    <label data-lf>Photo</label><input id="ph" type="file" accept="image/*">
+    <label>Photos <span class="muted small">(5 maximum · la première est la photo principale, touchez-en une pour la mettre en premier)</span></label>
+    <div class="ph-g" id="phg"></div><input id="ph" type="file" accept="image/*" multiple class="sr">
     <div class="row" style="margin-top:12px"><button class="btn">${villa ? 'Créer l’ensemble' : 'Créer la résidence'}</button><button class="btn ghost" type="button" id="annul">Annuler</button></div></form></div>
   <h2>${villa ? 'Ensembles de villas' : 'Résidences'}</h2><div class="list no-q" id="rsd">${D.map(r => `<div class="card" data-id="${r.id}" data-f="${[resVilla(r) ? 'villa' : 'appart', r.visible ? 'visible' : 'masque', pb(r).length ? 'pb' : ''].join(' ')}" style="display:flex;gap:12px;align-items:flex-start">
     <div class="ct-im" style="width:72px;height:54px;${r.photo_path ? `background-image:url('${esc(publicUrl(r.photo_path))}')` : ''}"></div>
     <div style="flex:1;min-width:0"><b>${esc(r.nom)}</b> <span class="type-b${resVilla(r) ? ' v' : ''}">${resVilla(r) ? 'Villas' : 'Résidence'}</span> <span class="muted small">${esc(r.quartier || '')} · ordre ${r.ordre} · ${r.visible ? 'visible' : 'masquée'}</span>
     <div class="muted small">${nbL(r.id)} ${resVilla(r) ? 'villa' : 'logement'}${nbL(r.id) > 1 ? 's' : ''} · ${nbO(r.id)} occupé${nbO(r.id) > 1 ? 's' : ''} · ${nbM(r.id)} membre${nbM(r.id) > 1 ? 's' : ''} du Club</div>${pb(r).map(alerte).join('')}
     <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-v="${r.visible ? 0 : 1}">${r.visible ? 'Masquer' : 'Afficher'}</button>
-      <label class="btn sm ghost" style="margin:0">Photo<input type="file" accept="image/*" data-photo class="sr"></label>
+      <button class="btn sm ghost" data-edit>Photos (${[r.photo_path, ...(r.photos || [])].filter(Boolean).length}/5)</button>
       <label class="btn sm ghost" style="margin:0" title="MP4 de préférence, 50 Mo maximum">${r.video_path ? 'Changer la vidéo' : '+ Vidéo'}<input type="file" accept="video/mp4,video/webm,video/quicktime" data-video class="sr"></label>${r.video_path ? '<button class="btn sm ghost" data-novid>Retirer la vidéo</button>' : ''}
       <button class="btn sm ghost" data-edit>Modifier</button><a class="btn sm soft" href="#/admin/annuaire" data-ann>Nos locataires</a><button class="btn sm ghost rouge" data-supr>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucune résidence.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#rsd'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', villa ? 'Masqués' : 'Masquées']], villa ? 'villas' : 'residences', villa ? 'Rechercher un ensemble de villas…' : 'Rechercher une résidence…');
@@ -1055,16 +1061,30 @@ async function residences(box, villa = false) {
   let edit = null;
   const ouvrir = (on) => { $('#resForm').hidden = !on; $('#newRes').setAttribute('aria-expanded', on); if (on) $('#no').focus(); };
   $('#newRes').onclick = () => ouvrir($('#resForm').hidden);
+  // Jusqu'à 5 photos : la première devient la photo principale (photo_path), les autres vont dans « photos »
+  const MAXP = 5; let PH = [];
+  const dessinerPh = () => {
+    $('#phg').innerHTML = PH.map((p, k) => `<div class="ph-t${k ? '' : ' un'}" data-k="${k}"><button type="button" class="ph-im" data-up="${k}" style="background-image:url('${esc(p.url)}')" aria-label="${k ? 'Mettre cette photo en premier' : 'Photo principale'}">${k ? '' : '<span>Principale</span>'}</button><button type="button" class="ph-x" data-x="${k}" aria-label="Retirer cette photo">×</button></div>`).join('')
+      + (PH.length < MAXP ? `<label for="ph" class="ph-add"><b>+</b><span>Ajouter${PH.length ? '' : ' des photos'}</span><small>${PH.length}/${MAXP}</small></label>` : '');
+    $('#phg').querySelectorAll('[data-x]').forEach(b => b.onclick = () => { PH.splice(+b.dataset.x, 1); dessinerPh(); });
+    $('#phg').querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const k = +b.dataset.up; if (k) { PH.unshift(PH.splice(k, 1)[0]); dessinerPh(); } });
+  };
+  $('#ph').onchange = () => { const f = [...$('#ph').files]; $('#ph').value = ''; const place = MAXP - PH.length;
+    f.slice(0, place).forEach(x => PH.push({ file: x, url: URL.createObjectURL(x) }));
+    if (f.length > place) toast(`5 photos maximum : ${f.length - place} photo(s) non ajoutée(s).`); dessinerPh(); };
+  dessinerPh();
   $('#annul').onclick = () => ouvrir(false);
   $('#f').onsubmit = (e) => { e.preventDefault();
     const nom = $('#no').value.trim();
     if (!$('#tb').value) { $('#tb').focus(); return toast('Choisissez le type.'); }
     if (!edit && T.some(r => norm(r.nom) === norm(nom))) return toast(`Ce nom existe déjà${T.some(r => norm(r.nom) === norm(nom) && resVilla(r) !== villa) ? (villa ? ' dans Résidences' : ' dans Villas') : ''}.`);
     action(async () => {
-    const f = $('#ph').files[0]; const photo_path = f ? await uploadPublic(f, 'residences') : null;
-    const v = { nom, quartier: $('#qu').value.trim() || null, type_bien: $('#tb').value || null, ordre: +$('#or').value || 100, description: $('#de').value.trim() || null, lien_decouvrir: $('#li').value.trim() || null };
-    if (edit) { if (photo_path) v.photo_path = photo_path; check(await sb.from('residences').update(v).eq('id', edit.id)); }
-    else check(await sb.from('residences').insert({ ...v, photo_path }));
+    if (PH.some(p => p.file)) toast('Envoi des photos…');
+    const paths = []; for (const p of PH) paths.push(p.file ? await uploadPublic(p.file, 'residences') : p.path);
+    const v = { nom, quartier: $('#qu').value.trim() || null, type_bien: $('#tb').value || null, ordre: +$('#or').value || 100, description: $('#de').value.trim() || null, lien_decouvrir: $('#li').value.trim() || null,
+      photo_path: paths[0] || null, photos: paths.slice(1) };
+    if (edit) check(await sb.from('residences').update(v).eq('id', edit.id));
+    else check(await sb.from('residences').insert(v));
   }, edit ? 'Modifications enregistrées.' : villa ? 'Ensemble de villas ajouté.' : 'Résidence ajoutée.'); };
   box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => action(async () => check(await sb.from('residences').update({ visible: b.dataset.v === '1' }).eq('id', b.closest('[data-id]').dataset.id))));
   const rid = (el) => el.closest('[data-id]').dataset.id;
@@ -1085,11 +1105,11 @@ async function residences(box, villa = false) {
       const { error } = await sb.storage.from('videos').upload(path, f, { contentType: f.type || 'video/mp4' }); if (error) throw error;
       check(await sb.from('residences').update({ video_path: sb.storage.from('videos').getPublicUrl(path).data.publicUrl }).eq('id', rid(i))); }, 'Vidéo en ligne : les résidents la voient sur la fiche.'); });
   box.querySelectorAll('[data-novid]').forEach(b => b.onclick = () => action(async () => check(await sb.from('residences').update({ video_path: null }).eq('id', rid(b))), 'Vidéo retirée.'));
-  box.querySelectorAll('[data-photo]').forEach(i => i.onchange = () => i.files[0] && action(async () => { toast('Envoi de la photo…'); const photo_path = await uploadPublic(i.files[0], 'residences'); check(await sb.from('residences').update({ photo_path }).eq('id', rid(i))); }, 'Photo mise à jour.'));
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
     const r = D.find(x => x.id === rid(b)); if (!r) return; edit = r;
     $('#no').value = r.nom || ''; $('#qu').value = r.quartier || ''; $('#tb').value = r.type_bien || ''; $('#or').value = r.ordre ?? 100; $('#de').value = r.description || ''; $('#li').value = r.lien_decouvrir || ''; $('#ph').value = '';
-    modeEdition(box, 'Modifier « ' + r.nom + ' »', 'Photo principale (laisser vide pour garder l’actuelle)');
+    PH = [...new Set([r.photo_path, ...(r.photos || [])].filter(Boolean))].slice(0, MAXP).map(p => ({ path: p, url: publicUrl(p) })); dessinerPh();
+    modeEdition(box, 'Modifier « ' + r.nom + ' »');
   });
 }
 
@@ -1424,6 +1444,26 @@ async function express(box) {
   let cur = null;
   const file = () => listes[mode].filter(o => rid ? o.x.residence_id === rid : deTx(o));
   const prochain = () => { const f = file(); cur = (f.find(o => !fait.has(o.x.id)) || null)?.x.id ?? null; };
+  // Recherche dans toutes les résidences et villas (nom ou e-mail) : ouvre le message du locataire, ou sa fiche s'il n'est pas à inviter
+  const mailC = (c) => c ? (I.find(v => v.utilisee_par === c.id)?.email || '') : '';
+  const chercherX = () => {
+    const q = box.querySelector('#xq'), out = box.querySelector('#xqr');
+    const idx = L.map(x => { const c = compte.get(x.id); return { x, cle: norm([x.locataire, x.email, c?.nom_affichage, mailC(c), x.code].join(' ')) }; });
+    const fermer = () => { out.hidden = true; q.setAttribute('aria-expanded', 'false'); };
+    const ouvrir = (a) => { const id = a.dataset.l, m = listes.nouveau.some(v => v.x.id === id) ? 'nouveau' : listes.relance.some(v => v.x.id === id) ? 'relance' : null;
+      if (!m) { plan._rid = a.dataset.rr; plan._sel = id; location.hash = '#/admin/plan'; return; }
+      mode = m; rid = null; tx = 'tout'; cur = id; fait.delete(id); dessiner(); box.querySelector('.x-cur')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+    q.oninput = () => {
+      const t = norm(q.value).split(/\s+/).filter(Boolean); if (!t.length) return fermer();
+      const v = idx.filter(o => t.every(w => o.cle.includes(w))).slice(0, 10);
+      out.innerHTML = v.length ? v.map(({ x }) => { const e = etat(x), c = compte.get(x.id), m = x.email || mailC(c), dans = listes.nouveau.some(y => y.x.id === x.id) || listes.relance.some(y => y.x.id === x.id);
+        return `<a href="#/admin/express" role="option" data-l="${x.id}" data-rr="${x.residence_id}"><span><b>${esc(c?.nom_affichage || x.locataire || 'Libre')}</b>${m ? ` <span class="muted">${esc(m)}</span>` : ''}<span class="j-qn">${esc(nomRes.get(x.residence_id) || '')} · ${esc(x.code)}${dans ? '' : ' · ouvrir sa fiche'}</span></span><span class="pl-pill ${e}">${ETATS_LOG[e]}</span></a>`; }).join('') : '<p class="muted small">Aucun locataire avec ce nom ou cet e-mail.</p>';
+      out.hidden = false; q.setAttribute('aria-expanded', 'true');
+      out.querySelectorAll('[data-l]').forEach(a => a.onmousedown = (ev) => { ev.preventDefault(); ouvrir(a); });
+    };
+    q.onkeydown = (e) => { if (e.key === 'Escape') fermer(); if (e.key === 'Enter') { const a = out.querySelector('[data-l]'); if (a) { e.preventDefault(); ouvrir(a); } } };
+    q.onblur = () => setTimeout(fermer, 150);
+  };
   const dessiner = () => {
     express._mode = mode; express._rid = rid; express._t = tx;
     const f = file(), n = f.length, env = f.filter(o => fait.get(o.x.id) === 'envoye').length;
@@ -1435,6 +1475,7 @@ async function express(box) {
     const nT = (t) => listes[mode].filter(v => typeDe(resDe.get(v.x.residence_id)) === t).length, resX = resAvec.filter(r => tx === 'tout' || typeDe(r) === tx);
     const apercu = o ? msgInvit(o.inv || { nom_affichage: o.x.locataire, email: o.x.email, code: '••••••••', expire_le: new Date(Date.now() + 30 * J_MS) }) : '';
     box.innerHTML = `
+    <div class="j-q x-q"><label class="j-qbox" for="xq"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M228.24,219.76l-51.38-51.38a86.15,86.15,0,1,0-8.48,8.48l51.38,51.38a6,6,0,0,0,8.48-8.48ZM38,112a74,74,0,1,1,74,74A74.09,74.09,0,0,1,38,112Z"/></svg><input id="xq" type="search" placeholder="Retrouver un locataire : nom ou e-mail" aria-label="Retrouver un locataire par son nom ou son e-mail, dans toutes les résidences et villas" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="xqr"></label><div class="j-qr" id="xqr" role="listbox" hidden></div></div>
     <div class="x-top">
       <div class="chips x-mode" role="tablist" aria-label="Type d’envoi"><button type="button" role="tab" class="chip ${mode === 'nouveau' ? 'on' : ''}" aria-selected="${mode === 'nouveau'}" data-m="nouveau">À inviter <span>${listes.nouveau.length}</span></button><button type="button" role="tab" class="chip ${mode === 'relance' ? 'on' : ''}" aria-selected="${mode === 'relance'}" data-m="relance">À relancer <span>${listes.relance.length}</span></button></div>
       ${n ? `<div class="x-prog"><b>${env} envoyé${env > 1 ? 's' : ''} sur ${n}</b><span class="jauge"><i style="width:${Math.round(100 * env / n)}%"></i></span></div>` : ''}
@@ -1458,6 +1499,7 @@ async function express(box) {
     box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { rid = b.dataset.r || null; cur = null; dessiner(); });
     box.querySelectorAll('.tsw [data-t]').forEach(b => b.onclick = () => { tx = b.dataset.t; rid = null; cur = null; dessiner(); });
     box.querySelectorAll('.x-it').forEach(b => b.onclick = () => { cur = b.dataset.l; dessiner(); });
+    chercherX();
     if (!o) return;
     const obtenir = async () => { if (!o.inv) { o.inv = await creerInvit(o.x); code.set(o.x.id, o.inv); I.unshift(o.inv); } return o.inv; };
     const suivant = (etatFin) => { fait.set(o.x.id, etatFin); cur = null; dessiner(); box.querySelector('.x-cur')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
