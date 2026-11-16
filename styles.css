@@ -1761,3 +1761,7 @@ h1.adm-h{font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.06em
 .pl-info dt{color:var(--muted);font-size:12.5px;font-weight:600;padding-top:1px}
 .pl-info dd{margin:0;font-weight:600;word-break:break-word}
 .sel-bar .dlg-rouge{background:var(--red);color:#fff;border-color:var(--red)}
+/* v117 : « Les autres numéros » tous de la même taille (couverture 3:4, cartes de même hauteur) */
+.fl-grid{align-items:stretch}
+.fl-grid .fl-c{aspect-ratio:3/4;background:var(--sunken)}
+.fl-grid .fl-c img{width:100%;height:100%;object-fit:cover;object-position:top center}
