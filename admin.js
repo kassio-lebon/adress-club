@@ -978,7 +978,7 @@ async function annonces(box) {
     const titres = ids.map(id => D.find(a => a.id === id)?.titre).filter(Boolean);
     const attente = dialogue({ titre: `Supprimer définitivement ${plur(ids.length, 'annonce')} ?`, danger: true, ok: 'Supprimer définitivement',
       corps: `<p>${esc(titres.slice(0, 5).join(', '))}${titres.length > 5 ? ` et ${titres.length - 5} autre(s)` : ''}.</p><p><b>Action irréversible</b> : l’annonce, ses photos, les demandes et les favoris sont effacés. Pour la cacher sans rien perdre, utilisez plutôt « Retirer du Market ».</p><p>Chaque vendeur reçoit une notification « Annonce supprimée ».</p><div class="dlg-f"><label for="dmo">Motif envoyé au vendeur (facultatif)</label><input id="dmo" type="text" maxlength="160" placeholder="Ex. : annonce non conforme au règlement"></div>`,
-      saisie: { label: 'Tapez SUPPRIMER pour confirmer', attendu: 'SUPPRIMER' } });
+      saisie: { label: 'Tapez SUP pour confirmer', attendu: 'SUP' } });
     const bg = [...document.querySelectorAll('.dlg-bg')].pop(); if (!(await attente)) return;
     const motif = bg.querySelector('#dmo').value.trim();
     action(async () => { const r = check(await sb.rpc('admin_supprimer_annonces', { p_ids: ids, p_motif: motif || null }));
