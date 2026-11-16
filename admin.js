@@ -952,7 +952,7 @@ async function annonces(box) {
   const tags = (a) => { const t = []; const d = dans(a.date_expiration);
     if (a.retiree_par_adress) t.push('retiree'); else if (['disponible', 'reserve'].includes(a.statut)) { t.push('ligne'); if (a.statut === 'reserve') t.push('reserve'); if (d != null && d <= 7) t.push('bientot'); } else t.push('close');
     if (a.signalee) t.push('signalee'); if (a.is_adress) t.push('adress'); return t.join(' '); };
-  box.innerHTML = `<div class="sel-bar" id="selb" hidden role="region" aria-label="Annonces sélectionnées"><b id="seln"></b><button type="button" class="btn sm danger" id="selr">Retirer du Market</button><button type="button" class="btn sm ghost" id="selo">Rétablir</button><button type="button" class="lnk" id="selx">Tout désélectionner</button></div>
+  box.innerHTML = `<div class="sel-bar" id="selb" hidden role="region" aria-label="Annonces sélectionnées"><b id="seln"></b><button type="button" class="btn sm danger" id="selr">Retirer du Market</button><button type="button" class="btn sm ghost" id="selo">Rétablir</button><button type="button" class="btn sm dlg-rouge" id="seld">Supprimer définitivement</button><button type="button" class="lnk" id="selx">Tout désélectionner</button></div>
   <div tabindex="0" style="overflow-x:auto" id="anns"><table class="adm no-q ann-t"><thead><tr><th class="c-sel"><input type="checkbox" id="selt" aria-label="Tout sélectionner (annonces affichées)" title="Tout sélectionner"></th><th></th><th>Annonce</th><th>Statut</th><th>Expire</th><th></th></tr></thead><tbody>
   ${D.map(a => { const d = dans(a.date_expiration), ouverte = !a.retiree_par_adress && ['disponible', 'reserve'].includes(a.statut); return `<tr data-id="${a.id}" data-f="${tags(a)}"><td class="c-sel"><input type="checkbox" class="sel-a" data-k="${a.retiree_par_adress ? 'retiree' : ouverte ? 'ouverte' : 'close'}" aria-label="Sélectionner ${esc(a.titre)}"></td><td class="c-ph">${imgAnn(ph.get((a.photos || [])[0]), a.id, a.titre)}</td><td class="c-t"><a href="#/annonce/${a.id}" class="t-lien"><b>${esc(a.titre)}</b></a>${a.is_adress ? ' <span class="badge soft">ADRESS</span>' : ''}<div class="muted small">${a.type === 'don' ? 'Don' : fcfa(a.prix_fcfa)} · publiée le ${dateFr(a.date_publication)}</div>${a.signalee ? alerte('Signalée : à traiter dans Modération') : ''}</td>
     <td><span class="st-l ${ouverte ? 'actif' : ''}">${a.retiree_par_adress ? 'Retirée par ADRESS' : STATUT_ANN[a.statut] || esc(a.statut)}</span></td><td>${dateFr(a.date_expiration)}${ouverte && d != null ? `<div class="muted small">${d < 0 ? 'dépassée' : d === 0 ? 'aujourd’hui' : `dans ${d} j`}</div>` : ''}</td>
@@ -964,7 +964,7 @@ async function annonces(box) {
   const maj = () => { const v = cases(), s = choisies(), nR = s.filter(c => c.dataset.k === 'ouverte').length, nO = s.filter(c => c.dataset.k === 'retiree').length;
     $('#selt').checked = !!v.length && s.length === v.length; $('#selt').indeterminate = !!s.length && s.length < v.length;
     $('#selb').hidden = !s.length; $('#seln').textContent = plur(s.length, 'annonce sélectionnée', 'annonces sélectionnées');
-    $('#selr').hidden = !nR; $('#selr').textContent = `Retirer du Market (${nR})`; $('#selo').hidden = !nO; $('#selo').textContent = `Rétablir (${nO})`; };
+    $('#selr').hidden = !nR; $('#selr').textContent = `Retirer du Market (${nR})`; $('#selo').hidden = !nO; $('#selo').textContent = `Rétablir (${nO})`; $('#seld').textContent = `Supprimer définitivement (${s.length})`; };
   $('#selt').onchange = () => { cases().forEach(c => c.checked = $('#selt').checked); maj(); };
   box.addEventListener('change', (e) => { if (e.target.classList.contains('sel-a')) maj(); });
   box.addEventListener('input', () => setTimeout(maj, 0)); box.addEventListener('click', (e) => { if (e.target.closest('.flt')) setTimeout(maj, 0); });
@@ -973,6 +973,18 @@ async function annonces(box) {
     if (!(await dialogue({ titre: retirer ? `Retirer ${plur(ids.length, 'annonce')} du Market ?` : `Rétablir ${plur(ids.length, 'annonce')} ?`, corps: `<p>${retirer ? 'Elles ne seront plus visibles des résidents. Vous pourrez les rétablir à tout moment.' : 'Elles seront de nouveau visibles sur le Market.'}</p>`, ok: retirer ? 'Retirer' : 'Rétablir', danger: retirer }))) return;
     action(async () => { let ko = 0; for (const id of ids) { const { error } = await sb.rpc('admin_retirer_annonce', { p_id: id, p_retirer: retirer }); if (error) ko++; } if (ko) throw new Error(`${ko} annonce(s) n’ont pas pu être traitées. Réessayez.`); }, retirer ? `${plur(ids.length, 'annonce retirée', 'annonces retirées')} du Market.` : `${plur(ids.length, 'annonce rétablie', 'annonces rétablies')}.`); };
   $('#selr').onclick = () => groupe('ouverte', true); $('#selo').onclick = () => groupe('retiree', false);
+  // Suppression définitive : annonce, photos, demandes et favoris effacés ; le vendeur reçoit une notification (avec le motif)
+  $('#seld').onclick = async () => { const ids = choisies().map(c => c.closest('tr').dataset.id); if (!ids.length) return;
+    const titres = ids.map(id => D.find(a => a.id === id)?.titre).filter(Boolean);
+    const attente = dialogue({ titre: `Supprimer définitivement ${plur(ids.length, 'annonce')} ?`, danger: true, ok: 'Supprimer définitivement',
+      corps: `<p>${esc(titres.slice(0, 5).join(', '))}${titres.length > 5 ? ` et ${titres.length - 5} autre(s)` : ''}.</p><p><b>Action irréversible</b> : l’annonce, ses photos, les demandes et les favoris sont effacés. Pour la cacher sans rien perdre, utilisez plutôt « Retirer du Market ».</p><p>Chaque vendeur reçoit une notification « Annonce supprimée ».</p><div class="dlg-f"><label for="dmo">Motif envoyé au vendeur (facultatif)</label><input id="dmo" type="text" maxlength="160" placeholder="Ex. : annonce non conforme au règlement"></div>`,
+      saisie: { label: 'Tapez SUPPRIMER pour confirmer', attendu: 'SUPPRIMER' } });
+    const bg = [...document.querySelectorAll('.dlg-bg')].pop(); if (!(await attente)) return;
+    const motif = bg.querySelector('#dmo').value.trim();
+    action(async () => { const r = check(await sb.rpc('admin_supprimer_annonces', { p_ids: ids, p_motif: motif || null }));
+      const ph = (r?.photos || []).filter(Boolean), t = ph.flatMap(p => [p, p.replace(/\.jpg$/, '_t.jpg')]);
+      if (t.length) await sb.storage.from('annonces').remove([...new Set(t)]).catch(() => {}); },
+      `${plur(ids.length, 'annonce supprimée', 'annonces supprimées')} définitivement · vendeur(s) prévenu(s).`); };
   maj();
   box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => (b.dataset.r === '0' || confirm('Retirer cette annonce du Market ?')) && action(async () => check(await sb.rpc('admin_retirer_annonce', { p_id: b.closest('tr').dataset.id, p_retirer: b.dataset.r === '1' }))));
 }
@@ -1363,15 +1375,16 @@ async function plan(box) {
     f.innerHTML = `<div class="pl-fh"><div><span class="muted small">${esc(nomRes.get(x.residence_id) || '')}</span><h3>${esc(x.code)}</h3></div><span class="pl-pill ${e}">${ETATS_LOG[e]}</span></div>
       ${c ? `<p class="pl-ok">Compte actif de <b>${esc(c.nom_affichage || '')}</b>${c.date_activation ? ` depuis le ${dateFr(c.date_activation)}` : ''}.</p>` : ''}
       <form id="plform" novalidate>
-        <label for="pln">Locataire</label><input id="pln" type="text" value="${esc(x.locataire || '')}" placeholder="Prénom et nom" ${!x.locataire && e !== 'libre' ? 'aria-invalid="true"' : ''}>
-        <label for="plm">E-mail (pour se connecter)</label><input id="plm" type="email" value="${esc(x.email || '')}" placeholder="prenom.nom@exemple.com" ${(!x.email && e !== 'libre') || mailKo ? 'aria-invalid="true"' : ''}>
+        ${c ? `<dl class="pl-info"><dt>Locataire</dt><dd>${esc(x.locataire || c.nom_affichage || '—')}</dd>${x.locataire && c.nom_affichage && norm(x.locataire) !== norm(c.nom_affichage) ? `<dt>Nom affiché dans le Club</dt><dd>${esc(c.nom_affichage)}</dd>` : ''}<dt>E-mail</dt><dd>${esc(x.email || mailCompte(c) || 'non renseigné')}</dd></dl><p class="muted small" style="margin:6px 0 0">Déjà inscrit : pour changer ces informations, touchez « Modifier les informations du locataire ».</p>`
+        : `<label for="pln">Locataire</label><input id="pln" type="text" value="${esc(x.locataire || '')}" placeholder="Prénom et nom" ${!x.locataire && e !== 'libre' ? 'aria-invalid="true"' : ''}>
+        <label for="plm">E-mail (pour se connecter)</label><input id="plm" type="email" value="${esc(x.email || '')}" placeholder="prenom.nom@exemple.com" ${(!x.email && e !== 'libre') || mailKo ? 'aria-invalid="true"' : ''}>`}
         ${e === 'libre' || c ? '' : !x.locataire && !x.email ? '' : !x.email ? '<p class="a-pb">E-mail manquant : sans lui, le locataire ne peut pas créer son compte.</p>' : mailKo ? `<p class="a-pb">E-mail mal écrit (accent ou espace)${fixMail(x.email) ? ` · <button type="button" class="lnk" id="plfix">Corriger en ${esc(fixMail(x.email))}</button>` : ''}</p>` : ''}
         <p class="err small" id="plerr" hidden></p>
         ${ancienCode(x) ? '<p class="a-pb">Ancien code : rattachez ce compte au bon appartement dans Comptes › Logement.</p>' : ''}
-        <ol class="pl-tl">${etape(!!(x.locataire || c), 'Dans la liste', x.locataire ? esc(x.locataire) : 'nom à saisir')}${etape(!!(envoye || c), 'Code envoyé', envoye ? `${esc(envoye.code)} · ${c ? 'utilisé' : 'valable jusqu’au ' + dateFr(envoye.expire_le)}` : '')}${etape(!!c, 'Inscrit au Club', c?.date_activation ? 'le ' + dateFr(c.date_activation) : '')}</ol>
+        <ol class="pl-tl">${etape(!!(x.locataire || c), 'Dans la liste', x.locataire ? esc(x.locataire) : c ? esc(c.nom_affichage || '') : 'nom à saisir')}${etape(!!(envoye || c), 'Code envoyé', envoye ? `${esc(envoye.code)} · ${c ? 'utilisé' : 'valable jusqu’au ' + dateFr(envoye.expire_le)}` : '')}${etape(!!c, 'Inscrit au Club', c?.date_activation ? 'le ' + dateFr(c.date_activation) : '')}</ol>
         <div class="pl-act">
           ${c ? '<a class="btn sm soft block" href="#/admin/comptes">Voir dans Comptes</a>' : `<button class="btn block" id="plgo">${i ? 'Renvoyer le code par WhatsApp' : 'Enregistrer et inviter par WhatsApp'}</button>`}
-          <button type="button" class="btn sm ghost block" id="plsave">Enregistrer</button>
+          ${c ? '' : '<button type="button" class="btn sm ghost block" id="plsave">Enregistrer</button>'}
           ${e !== 'libre' ? '<button type="button" class="btn sm soft block" id="plmod">Modifier les informations du locataire</button>' : ''}
           ${e !== 'libre' ? '<button type="button" class="btn sm ghost rouge block" id="pllib">Libérer le logement</button>' : ''}
         </div></form>`;
@@ -1381,7 +1394,7 @@ async function plan(box) {
     const sauver = async () => { const v = lire();
       if (v.email && !EMAIL_OK(v.email)) throw new Error('Cette adresse e-mail n’est pas valide (pas d’accent ni d’espace).');
       if (v.locataire !== (x.locataire || null) || v.email !== (x.email || null)) { check(await sb.from('logements').update(v).eq('id', x.id)); Object.assign(x, v); } };
-    $('#plsave').onclick = async () => { err(''); try { await sauver(); toast('Fiche enregistrée.'); dessiner(); } catch (ex) { err(errMsg(ex)); } };
+    if ($('#plsave')) $('#plsave').onclick = async () => { err(''); try { await sauver(); toast('Fiche enregistrée.'); dessiner(); } catch (ex) { err(errMsg(ex)); } };
     const go = $('#plgo'); if (go) $('#plform').onsubmit = async (ev) => {
       ev.preventDefault(); err(''); const v = lire();
       if (!v.locataire) return err('Saisissez le nom du locataire.');
@@ -1399,7 +1412,7 @@ async function plan(box) {
     const libres = L.filter(y => y.id !== x.id && etat(y) === 'libre').sort((a, b) => (nomRes.get(a.residence_id) || '').localeCompare(nomRes.get(b.residence_id) || '') || triLog(a, b));
     const groupes = R.filter(r => libres.some(y => y.residence_id === r.id)).map(r => `<optgroup label="${esc(r.nom)}">${libres.filter(y => y.residence_id === r.id).map(y => `<option value="${y.id}">${esc(y.code)}</option>`).join('')}</optgroup>`).join('');
     const attente = dialogue({ titre: 'Modifier les informations du locataire', ok: 'Enregistrer', corps: `<div class="dlg-f">
-      <label for="mdn">Nom du locataire</label><input id="mdn" type="text" value="${esc(x.locataire || '')}" placeholder="Prénom et nom">
+      <label for="mdn">Nom du locataire</label><input id="mdn" type="text" value="${esc(x.locataire || c?.nom_affichage || '')}" placeholder="Prénom et nom">
       <label for="mdm">E-mail</label><input id="mdm" type="email" value="${esc(x.email || mailCompte(c))}" placeholder="prenom.nom@exemple.com">
       ${c ? `<label for="mda">Nom affiché dans le Club</label><input id="mda" type="text" maxlength="40" value="${esc(c.nom_affichage || '')}">` : ''}
       <label for="mdl">Logement</label><select id="mdl"><option value="${x.id}">${esc(nomRes.get(x.residence_id) || '')} · ${esc(x.code)} (actuel)</option>${groupes}</select>

@@ -1756,3 +1756,8 @@ h1.adm-h{font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.06em
 .bien-ph>div{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .bien-ph>div img{width:62px;height:47px;object-fit:cover;border-radius:8px;background:var(--sunken)}
 .bien-ph.vide{display:inline-block;font-size:13px;color:var(--muted);text-decoration:underline}
+/* v116 : fiche d'un locataire déjà inscrit (lecture seule) */
+.pl-info{margin:10px 0 0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px}
+.pl-info dt{color:var(--muted);font-size:12.5px;font-weight:600;padding-top:1px}
+.pl-info dd{margin:0;font-weight:600;word-break:break-word}
+.sel-bar .dlg-rouge{background:var(--red);color:#fff;border-color:var(--red)}
