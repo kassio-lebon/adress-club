@@ -1780,3 +1780,11 @@ h1.adm-h{font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.06em
 .intro.intro3.out{opacity:0;visibility:hidden;transition:opacity .6s ease .1s,visibility .7s}
 .intro3.out .nl-w{transform:translateY(-10px) scale(1.04);opacity:0;transition:transform .6s cubic-bezier(.7,0,.3,1),opacity .5s ease}
 .intro3.out .intro-in{transform:translateY(8px);opacity:0;transition:transform .5s ease,opacity .4s ease}
+/* v120 : accueil sur téléphone — « Bonjour » plus petit, nom de la résidence en entier sous le prénom */
+.accueil-b .salut{flex-direction:column;align-items:flex-start;justify-content:center;gap:6px}
+.accueil-b .salut>span{white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+@media (max-width:599px){
+  .accueil-b .salut{padding-right:80px;min-height:72px;margin:10px 2px 14px}
+  .accueil-b .salut h1{font-size:26px;line-height:1.15}
+  .accueil-b .salut>span{font-size:10.5px;letter-spacing:.1em}
+}
