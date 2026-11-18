@@ -4,6 +4,12 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 export const SUPABASE_URL = 'https://xvevjlovjpeqfpzfihrj.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_oPj4LrfV0uvN95MmpTPl8A_x5XLxVcj';
 let RECUP = /type=recovery/.test(location.hash); // lien « mot de passe oublié » : oublié dès que le nouveau mot de passe est enregistré
+// Lien reçu par e-mail au format « ?token_hash=…&type=recovery » : vérifié par l'appli elle-même au démarrage
+// (robuste : rien ne se perd en route, et un antivirus qui « teste » le lien ne le consomme pas)
+const QP = new URLSearchParams(location.search), TH = QP.get('token_hash'), TT = QP.get('type');
+if (TT === 'recovery') RECUP = true;
+let LIEN_KO = /error_code=otp_expired|error=access_denied/.test(location.hash);
+if (LIEN_KO) try { history.replaceState(null, '', location.pathname + '#/'); } catch (_) {}
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
 export const CATEGORIES = ['Mobilier', 'Électroménager', 'Décoration', 'Électronique & High-tech', 'Enfants & Bébés', 'Maison & Jardin', 'Mode & Accessoires'];
@@ -198,6 +204,7 @@ function connexion() {
   </form>
   <p class="muted center" style="margin-top:14px">Accès réservé aux résidents. Un compte par logement, activé par ADRESS IMMOBILIER.</p>
   ${estInstallee() ? '' : '<p class="center" style="margin-top:6px"><button class="linkbtn" type="button" id="inst">' + ic('tel') + 'Installer l’application sur mon téléphone</button></p>'}</div>`;
+  if (LIEN_KO) { const e0 = app.querySelector('#err'); e0.textContent = 'Ce lien n’est plus valable (il a déjà servi ou a expiré). Cliquez sur « Mot de passe oublié ? » pour en recevoir un nouveau.'; e0.hidden = false; LIEN_KO = false; }
   const ib = app.querySelector('#inst'); if (ib) ib.onclick = installer;
   let mode = 'login';
   app.querySelectorAll('[data-m]').forEach(c => c.onclick = () => {
@@ -1152,6 +1159,11 @@ if ('serviceWorker' in navigator) {
   }).catch(() => {});
 }
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });
+if (TH && TT) {
+  const { error } = await sb.auth.verifyOtp({ token_hash: TH, type: TT });
+  if (error) { LIEN_KO = true; RECUP = false; }
+  try { history.replaceState(null, '', location.pathname + '#/'); } catch (_) {}
+}
 await chargerProfil();
 router();
 setInterval(majCompteurs, 60000);
