@@ -4,9 +4,10 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 export const SUPABASE_URL = 'https://xvevjlovjpeqfpzfihrj.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_oPj4LrfV0uvN95MmpTPl8A_x5XLxVcj';
 let RECUP = /type=recovery/.test(location.hash); // lien « mot de passe oublié » : oublié dès que le nouveau mot de passe est enregistré
-// Lien reçu par e-mail au format « ?token_hash=…&type=recovery » : vérifié par l'appli elle-même au démarrage
-// (robuste : rien ne se perd en route, et un antivirus qui « teste » le lien ne le consomme pas)
+// Lien reçu par e-mail au format « ?token_hash=…&type=recovery ». Le lien n'est utilisé qu'au moment où le résident
+// enregistre son nouveau mot de passe : les robots de messagerie (Gmail…) qui ouvrent le lien pour le vérifier ne le consomment pas.
 const QP = new URLSearchParams(location.search), TH = QP.get('token_hash'), TT = QP.get('type');
+let RECUP_TH = TH && TT === 'recovery' ? TH : null;
 if (TT === 'recovery') RECUP = true;
 let LIEN_KO = /error_code=otp_expired|error=access_denied/.test(location.hash);
 if (LIEN_KO) try { history.replaceState(null, '', location.pathname + '#/'); } catch (_) {}
@@ -162,6 +163,7 @@ async function router() {
   const sect = ({ '': 'accueil', annonce: 'market', modifier: 'mes-annonces' })[name] ?? name;
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === sect));
   window.scrollTo(0, 0);
+  if (RECUP_TH) return nouveauMdp();
   if (!state.session) return connexion();
   if (state.recup || RECUP) { state.recup = true; return nouveauMdp(); }
   if (state.profilKo) return horsLigne();
@@ -336,8 +338,12 @@ function nouveauMdp() {
     e.preventDefault(); const er = $('#ern'), a = $('#n1').value, b = $('#n2').value; er.hidden = true;
     if (a.length < 8) { er.textContent = '8 caractères minimum.'; er.hidden = false; return; }
     if (a !== b) { er.textContent = 'Les deux mots de passe ne sont pas identiques.'; er.hidden = false; return; }
-    $('#gon').disabled = true;
-    const { error } = await sb.auth.updateUser({ password: a });
+    $('#gon').disabled = true; state.mdpEnCours = true;
+    if (RECUP_TH) { // le lien de l'e-mail n'est utilisé que maintenant
+      const { error: ev } = await sb.auth.verifyOtp({ token_hash: RECUP_TH, type: 'recovery' }); RECUP_TH = null;
+      if (ev) { state.mdpEnCours = false; state.recup = false; RECUP = false; LIEN_KO = true; return router(); }
+    }
+    const { error } = await sb.auth.updateUser({ password: a }); state.mdpEnCours = false;
     if (error) { er.textContent = errMsg(error); er.hidden = false; $('#gon').disabled = false; return; }
     state.recup = false; RECUP = false; // sinon l'écran « nouveau mot de passe » revient en boucle
     toast('Mot de passe enregistré.'); await chargerProfil();
@@ -1143,7 +1149,7 @@ window.addEventListener('acl-photo-ko', (e) => {
   if (!vu) return; sauverSig();
   if (!state.reessai || Date.now() - state.reessai > 60000) { state.reessai = Date.now(); clearTimeout(state.reessaiT); state.reessaiT = setTimeout(router, 400); }
 });
-sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } if (ev === 'PASSWORD_RECOVERY') { state.recup = true; setTimeout(router, 0); } });
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { state.session = null; state.profil = null; } if (ev === 'PASSWORD_RECOVERY') { state.recup = true; if (!state.mdpEnCours) setTimeout(router, 0); } });
 // Mise à jour automatique : dès qu'une nouvelle version est publiée, l'application la récupère et se recharge une fois
 if ('serviceWorker' in navigator) {
   const avait = !!navigator.serviceWorker.controller; let fait = false;
@@ -1160,8 +1166,7 @@ if ('serviceWorker' in navigator) {
 }
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', scrollY > 4), { passive: true });
 if (TH && TT) {
-  const { error } = await sb.auth.verifyOtp({ token_hash: TH, type: TT });
-  if (error) { LIEN_KO = true; RECUP = false; }
+  if (!RECUP_TH) { const { error } = await sb.auth.verifyOtp({ token_hash: TH, type: TT }); if (error) LIEN_KO = true; }
   try { history.replaceState(null, '', location.pathname + '#/'); } catch (_) {}
 }
 await chargerProfil();
