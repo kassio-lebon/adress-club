@@ -432,6 +432,16 @@ html{touch-action:manipulation}
 .bp-logo{width:64px;height:64px;flex:none;border-radius:12px;background:var(--sunken) center/contain no-repeat}
 .bp-txt{flex:1;min-width:0}
 .bp-txt p{margin:4px 0 0;font-size:14px;color:var(--ink-2)}
+/* Photos d'un bon plan : bande sous la fiche, défilement au doigt */
+.bp{flex-wrap:wrap}
+.bp-ph{flex:1 1 100%;display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.bp-im{flex:none;width:132px;height:96px;border:0;padding:0;border-radius:10px;background:var(--sunken) center/cover no-repeat;scroll-snap-align:start;cursor:zoom-in}
+@media (min-width:700px){.bp-im{width:160px;height:116px}}
+/* Accueil : la tuile « Nouveautés » clignote pour attirer l'œil */
+.petit.clign{position:relative;animation:clign 1.6s ease-in-out infinite}
+.petit.clign::after{content:'Nouveau';position:absolute;top:10px;right:12px;font-size:11px;font-weight:700;color:#fff;background:var(--red);border-radius:999px;padding:2px 8px}
+@keyframes clign{0%,100%{box-shadow:0 0 0 0 rgba(212,16,29,0);border-color:var(--line)}50%{box-shadow:0 0 0 4px rgba(212,16,29,.18);border-color:var(--red)}}
+@media (prefers-reduced-motion:reduce){.petit.clign{animation:none;border-color:var(--red)}}
 .flipcard{display:grid;grid-template-columns:118px 1fr;gap:18px;align-items:center;padding:16px;border-radius:var(--r-lg);background:var(--ink);color:#fff;text-decoration:none;overflow:hidden;transition:transform .3s var(--ease)}
 .fc-cover{position:relative;aspect-ratio:3/4;border-radius:8px;overflow:hidden;background:linear-gradient(160deg,#30323a,#16171a) center/cover;display:flex;align-items:flex-end;padding:10px;
   box-shadow:0 12px 26px -10px rgba(0,0,0,.7);transform:rotate(-3deg);transition:transform .5s var(--ease)}
