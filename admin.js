@@ -1004,32 +1004,49 @@ async function contenus(box) {
     <label>Titre *</label><input id="ti" type="text" required>
     <label>Texte</label><textarea id="tx"></textarea>
     <div class="grid2"><div><label>Lien (flipbook, page…)</label><input id="li" type="url" placeholder="https://"></div><div><label>N° (Flip Immo)</label><input id="nu" type="text"></div></div>
-    <label data-lf>Image / couverture</label><input id="im" type="file" accept="image/*">
+    <label data-lf>Images <span class="muted small">(5 maximum · la première sert de couverture, touchez-en une pour la mettre en premier)</span></label>
+    <div class="ph-g" id="cpg"></div><input id="cim" type="file" accept="image/*" multiple class="sr">
     <p class="err" id="ferr" hidden></p>
     <button class="btn block" style="margin-top:12px">Publier</button><button class="btn ghost block" type="button" id="annul" hidden style="margin-top:8px">Annuler</button></form></div>
   <h2>Contenus</h2><div class="list no-q" id="cts">${D.map(c => `<div class="card" data-id="${c.id}" data-f="${tags(c)}" style="display:flex;gap:12px">
-    <div class="ct-im" style="${c.image_path ? `background-image:url('${esc(publicUrl(c.image_path))}')` : ''}"></div>
+    <div class="ct-im" style="position:relative;${c.image_path ? `background-image:url('${esc(publicUrl(c.image_path))}')` : ''}">${(c.photos || []).length ? `<span class="badge" style="position:absolute;right:4px;bottom:4px">${1 + c.photos.length} images</span>` : ''}</div>
     <div style="flex:1;min-width:0"><b>${esc(c.titre)}</b><div class="muted small">${esc(c.type)} · ${(c.date_parution || '') > auj ? 'parution le ' : ''}${dateFr(c.date_parution)} · ${c.visible ? 'visible' : 'masqué'}</div>${pb(c).map(alerte).join('')}
     <div class="row" style="margin-top:6px">${c.lien ? `<a class="btn sm soft" href="${esc(c.lien)}" target="_blank" rel="noopener">Ouvrir le lien</a>` : ''}${c.type === 'Flip Immo' && c.visible ? (c.id === uneFlip ? '<span class="badge">À la une</span>' : '<button class="btn sm soft" data-une>Mettre à la une</button>') : ''}<button class="btn sm ghost" data-v="${c.visible ? 0 : 1}">${c.visible ? 'Masquer' : 'Afficher'}</button><button class="btn sm ghost" data-edit>Modifier</button><button class="btn sm danger" data-d>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucun contenu.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#cts'), [['pb', 'À compléter', 1], ['visible', 'Visibles'], ['masque', 'Masqués'], ['futur', 'À paraître'], ['flip', 'Flip Immo'], ['actu', 'Actualités']], 'contenus', 'Rechercher un contenu…');
   const $ = (s) => box.querySelector(s);
   let edit = null;
   const ferr = (m) => { $('#ferr').textContent = m; $('#ferr').hidden = !m; };
+  // Jusqu'à 5 images par contenu : la première est la couverture (image_path), les autres vont dans photos
+  const MAXC = 5; let CP = [];
+  const imgsC = (c) => [...new Set([c.image_path, ...(c.photos || [])].filter(Boolean))];
+  const dessinerCp = () => {
+    $('#cpg').innerHTML = CP.map((p, k) => `<div class="ph-t${k ? '' : ' un'}"><button type="button" class="ph-im" data-up="${k}" style="background-image:url('${esc(p.url)}')" aria-label="${k ? 'Mettre cette image en premier' : 'Image de couverture'}">${k ? '' : '<span>Couverture</span>'}</button><button type="button" class="ph-x" data-x="${k}" aria-label="Retirer cette image">×</button></div>`).join('')
+      + (CP.length < MAXC ? `<label for="cim" class="ph-add"><b>+</b><span>Ajouter${CP.length ? '' : ' des images'}</span><small>${CP.length}/${MAXC}</small></label>` : '');
+    $('#cpg').querySelectorAll('[data-x]').forEach(b => b.onclick = () => { CP.splice(+b.dataset.x, 1); dessinerCp(); });
+    $('#cpg').querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const k = +b.dataset.up; if (k) { CP.unshift(CP.splice(k, 1)[0]); dessinerCp(); } });
+  };
+  $('#cim').onchange = () => { const f = [...$('#cim').files]; $('#cim').value = ''; const place = Math.max(0, MAXC - CP.length);
+    f.slice(0, place).forEach(x => CP.push({ file: x, url: URL.createObjectURL(x) }));
+    if (f.length > place) toast(`5 images maximum : ${f.length - place} image(s) non ajoutée(s).`); dessinerCp(); };
+  dessinerCp();
   $('#f').onsubmit = (e) => { e.preventDefault(); ferr('');
     const lien = $('#li').value.trim();
     if (lien && !/^https?:\/\//i.test(lien)) return ferr('Le lien doit commencer par https://');
     if ($('#ty').value === 'Flip Immo' && !lien) return ferr('Un Flip Immo a besoin du lien du flipbook.');
-    if (!edit && !$('#im').files[0] && !confirm('Publier sans image ? La carte s’affichera sans visuel.')) return;
+    if (!CP.length && !confirm('Publier sans image ? La carte s’affichera sans visuel.')) return;
     action(async () => {
-    const f = $('#im').files[0]; const image_path = f ? await uploadPublic(f, 'contenus') : null;
-    const v = { type: $('#ty').value, titre: $('#ti').value.trim(), texte: $('#tx').value.trim() || null, lien: lien || null, numero: $('#nu').value.trim() || null, date_parution: $('#dp').value };
-    if (edit) { if (image_path) v.image_path = image_path; check(await sb.from('contenus').update(v).eq('id', edit.id)); }
-    else check(await sb.from('contenus').insert({ ...v, image_path }));
+    if (CP.some(p => p.file)) toast('Envoi des images…');
+    const paths = []; for (const p of CP) paths.push(p.file ? await uploadPublic(p.file, 'contenus') : p.path);
+    const v = { type: $('#ty').value, titre: $('#ti').value.trim(), texte: $('#tx').value.trim() || null, lien: lien || null, numero: $('#nu').value.trim() || null, date_parution: $('#dp').value,
+      image_path: paths[0] || null, photos: paths.slice(1) };
+    if (edit) check(await sb.from('contenus').update(v).eq('id', edit.id));
+    else check(await sb.from('contenus').insert(v));
   }, edit ? 'Modifications enregistrées.' : 'Contenu publié.'); };
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
     const c = D.find(x => x.id === b.closest('[data-id]').dataset.id); if (!c) return; edit = c;
-    $('#ty').value = c.type; $('#dp').value = (c.date_parution || '').slice(0, 10); $('#ti').value = c.titre || ''; $('#tx').value = c.texte || ''; $('#li').value = c.lien || ''; $('#nu').value = c.numero || ''; $('#im').value = '';
-    modeEdition(box, 'Modifier « ' + c.titre + ' »', 'Image / couverture (laisser vide pour garder l’actuelle)');
+    $('#ty').value = c.type; $('#dp').value = (c.date_parution || '').slice(0, 10); $('#ti').value = c.titre || ''; $('#tx').value = c.texte || ''; $('#li').value = c.lien || ''; $('#nu').value = c.numero || '';
+    CP = imgsC(c).map(p => ({ path: p, url: publicUrl(p) })); dessinerCp();
+    modeEdition(box, 'Modifier « ' + c.titre + ' »');
   });
   box.querySelectorAll('[data-une]').forEach(b => b.onclick = () => { const id = b.closest('[data-id]').dataset.id;
     const max = flipsV.filter(c => c.id !== id).map(c => (c.date_parution || '').slice(0, 10)).sort().pop() || '';
