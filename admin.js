@@ -1096,7 +1096,7 @@ async function residences(box, villa = false) {
     const v = { nom, quartier: $('#qu').value.trim() || null, type_bien: $('#tb').value || null, ordre: +$('#or').value || 100, description: $('#de').value.trim() || null, lien_decouvrir: $('#li').value.trim() || null,
       photo_path: paths[0] || null, photos: paths.slice(1) };
     if (edit) check(await sb.from('residences').update(v).eq('id', edit.id));
-    else check(await sb.from('residences').insert(v));
+    else check(await sb.from('residences').insert({ ...v, visible: true })); // une nouvelle résidence se voit tout de suite chez les locataires (« Masquer » pour la cacher)
   }, edit ? 'Modifications enregistrées.' : villa ? 'Ensemble de villas ajouté.' : 'Résidence ajoutée.'); };
   box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => action(async () => check(await sb.from('residences').update({ visible: b.dataset.v === '1' }).eq('id', b.closest('[data-id]').dataset.id))));
   const rid = (el) => el.closest('[data-id]').dataset.id;
