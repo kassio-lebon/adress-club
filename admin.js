@@ -1,5 +1,5 @@
 // ADRESS CLUB — espace de gestion ADRESS (réservé aux comptes is_admin)
-import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, FILTRES_BP, compress, barreRecherche } from './app.js';
+import { sb, state, esc, toast, errMsg, dateFr, fcfa, publicUrl, FILTRES_BP, categoriesBP, compress, barreRecherche } from './app.js';
 
 // Navigation en 5 tuiles (icône + texte) : on choisit d'abord le domaine, puis l'écran
 const GROUPES = [
@@ -1146,6 +1146,7 @@ async function residences(box, villa = false) {
 async function partenaires(box) {
   const { data } = await sb.from('partenaires').select('*').order('ordre');
   const D = data || [];
+  const CATS = categoriesBP(D.map(p => p.categorie));
   const enLigne = (p) => p.valide_par_adress && p.visible;
   const pb = (p) => { const t = []; if (!p.lien) t.push('Sans lien : les résidents ne peuvent pas le contacter');
     else if (p.type_lien === 'WhatsApp' && !/wa\.me|whatsapp|^\+?\d[\d\s]{7,}$/i.test(p.lien)) t.push('Lien WhatsApp invalide (ex : https://wa.me/2250700000000)');
@@ -1153,7 +1154,7 @@ async function partenaires(box) {
     if (!p.logo_path) t.push('Sans logo'); return t; };
   const etat = (p) => enLigne(p) ? 'Visible par les résidents' : !p.valide_par_adress ? 'À valider' : 'Validé mais masqué';
   box.innerHTML = `<div class="card"><h3>Ajouter un bon plan</h3><form id="f">
-    <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label>Catégorie *</label><select id="ca">${FILTRES_BP.map(c => `<option>${c}</option>`).join('')}</select></div></div>
+    <div class="grid2"><div><label>Nom *</label><input id="no" type="text" required></div><div><label for="ca">Catégorie *</label><select id="ca">${CATS.map(c => `<option>${esc(c)}</option>`).join('')}<option value="__new">+ Nouvelle catégorie…</option></select><input id="can" type="text" maxlength="60" placeholder="Nom de la nouvelle catégorie (ex. Traiteurs)" hidden style="margin-top:8px"></div></div>
     <label>Description (200 car. max)</label><input id="de" type="text" maxlength="200">
     <div class="grid2"><div><label>Lien</label><input id="li" type="text" placeholder="https://… ou https://wa.me/225…"></div><div><label>Type de lien</label><select id="tl"><option>Site web</option><option>WhatsApp</option><option>Flipbook</option></select></div></div>
     <label data-lf>Logo</label><input id="lo" type="file" accept="image/*">
@@ -1169,13 +1170,18 @@ async function partenaires(box) {
   if (D.length) filtres(box.querySelector('#pts'), [['pb', 'À compléter', 1], ['avalider', 'À valider'], ['ligne', 'Visibles'], ['masque', 'Masqués']], 'partenaires', 'Rechercher un partenaire, une catégorie…');
   const $ = (s) => box.querySelector(s); const id = (el) => el.closest('[data-id]').dataset.id;
   let edit = null;
+  $('#ca').onchange = () => { const n = $('#ca').value === '__new'; $('#can').hidden = !n; if (n) $('#can').focus(); };
   $('#f').onsubmit = (e) => { e.preventDefault();
     let lien = $('#li').value.trim();
     if (lien && $('#tl').value === 'WhatsApp' && /^\+?\d[\d\s]{7,}$/.test(lien)) { let n = lien.replace(/\D/g, ''); if (n.length === 10) n = '225' + n; lien = 'https://wa.me/' + n; }
     if (lien && !/^https?:\/\//i.test(lien)) return toast('Le lien doit commencer par https:// (ou être un numéro WhatsApp).');
+    // Nouvelle catégorie saisie : majuscule au début, et réutilise une catégorie existante écrite autrement (« traiteurs » = « Traiteurs »)
+    let categorie = $('#ca').value;
+    if (categorie === '__new') { const t = $('#can').value.trim().replace(/\s+/g, ' '); if (t.length < 2) { $('#can').focus(); return toast('Écrivez le nom de la nouvelle catégorie.'); }
+      categorie = CATS.find(c => c.toLowerCase() === t.toLowerCase()) || t.charAt(0).toUpperCase() + t.slice(1); }
     action(async () => {
     const f = $('#lo').files[0]; const logo_path = f ? await uploadPublic(f, 'partenaires') : null;
-    const v = { nom: $('#no').value.trim(), categorie: $('#ca').value, description: $('#de').value.trim() || null, lien: lien || null, type_lien: $('#tl').value };
+    const v = { nom: $('#no').value.trim(), categorie, description: $('#de').value.trim() || null, lien: lien || null, type_lien: $('#tl').value };
     if (edit) { if (logo_path) v.logo_path = logo_path; check(await sb.from('partenaires').update(v).eq('id', edit.id)); }
     else check(await sb.from('partenaires').insert({ ...v, logo_path }));
   }, edit ? 'Modifications enregistrées.' : 'Partenaire ajouté.'); };
