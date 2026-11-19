@@ -1165,7 +1165,7 @@ async function partenaires(box) {
       <button class="btn sm ${p.valide_par_adress ? 'soft' : 'ghost'}" data-k="valide_par_adress" data-v="${p.valide_par_adress ? 0 : 1}">${p.valide_par_adress ? 'Retirer la validation' : 'Valider'}</button>
       <button class="btn sm ${p.visible ? 'soft' : 'ghost'}" data-k="visible" data-v="${p.visible ? 0 : 1}">${p.visible ? 'Masquer' : 'Rendre visible'}</button>
       <label class="btn sm ghost" style="margin:0">Logo<input type="file" accept="image/*" data-logo class="sr"></label>
-      <button class="btn sm ghost" data-edit>Modifier</button></div></div></div>`).join('') || '<div class="card center pad">Aucun partenaire.</div>'}</div>`;
+      <button class="btn sm ghost" data-edit>Modifier</button><button class="btn sm ghost rouge" data-sup>Supprimer</button></div></div></div>`).join('') || '<div class="card center pad">Aucun partenaire.</div>'}</div>`;
   if (D.length) filtres(box.querySelector('#pts'), [['pb', 'À compléter', 1], ['avalider', 'À valider'], ['ligne', 'Visibles'], ['masque', 'Masqués']], 'partenaires', 'Rechercher un partenaire, une catégorie…');
   const $ = (s) => box.querySelector(s); const id = (el) => el.closest('[data-id]').dataset.id;
   let edit = null;
@@ -1186,6 +1186,11 @@ async function partenaires(box) {
   });
   box.querySelectorAll('[data-k]').forEach(b => b.onclick = () => action(async () => check(await sb.from('partenaires').update({ [b.dataset.k]: b.dataset.v === '1' }).eq('id', id(b)))));
   box.querySelectorAll('[data-logo]').forEach(i => i.onchange = () => i.files[0] && action(async () => { const logo_path = await uploadPublic(i.files[0], 'partenaires'); check(await sb.from('partenaires').update({ logo_path }).eq('id', id(i))); }, 'Logo mis à jour.'));
+  // Supprimer un partenaire : définitif, après confirmation (« Masquer » le retire sans le perdre)
+  box.querySelectorAll('[data-sup]').forEach(b => b.onclick = async () => { const p = D.find(x => x.id === id(b)); if (!p) return;
+    if (!(await dialogue({ titre: `Supprimer « ${p.nom} » ?`, ok: 'Supprimer le partenaire', danger: true,
+      corps: '<p>Le partenaire disparaît définitivement des Bons plans et de cette liste. Cette action ne peut pas être annulée.</p><p class="muted small">Pour le retirer seulement un temps, utilisez plutôt « Masquer ».</p>' }))) return;
+    action(async () => { const r = check(await sb.from('partenaires').delete().eq('id', p.id).select('id')); if (!r || !r.length) throw new Error('Suppression refusée : réessayez ou vérifiez vos droits.'); }, `${p.nom} supprimé.`); });
 }
 
 // ---------- Avis (§8) ----------
