@@ -964,9 +964,12 @@ async function nouveautes() {
   const { data } = await sb.from('contenus').select('*').eq('visible', true).neq('type', 'Flip Immo').order('date_parution', { ascending: false });
   app.innerHTML = `<a class="back" href="#/">‹ Accueil</a><h1>Les nouveautés</h1><p class="muted">Nouvelles résidences, programmes à venir et actualités ADRESS</p>
   <div class="list" style="margin-top:12px">${(data || []).map(c => `<div class="card item">
-    ${c.image_path ? `<div class="ph" style="aspect-ratio:16/9;background-image:url('${esc(publicUrl(c.image_path))}')"></div>` : ''}
+    ${(() => { const im = [...new Set([c.image_path, ...(c.photos || [])].filter(Boolean))].map(publicUrl); return im.length > 1
+      ? `<div class="rs" style="aspect-ratio:16/9" data-imgs="${esc(JSON.stringify(im))}" role="img" aria-label="Images : ${esc(c.titre)}"><div class="rs-bars">${im.map(() => '<i><b></b></i>').join('')}</div><span class="rs-n">1 / ${im.length}</span></div>`
+      : im.length ? `<div class="ph" style="aspect-ratio:16/9;background-image:url('${esc(im[0])}')"></div>` : ''; })()}
     <div class="bd" style="padding:14px"><div class="muted small">${esc(c.type)} · ${dateFr(c.date_parution)}</div><h3>${esc(c.titre)}</h3>
     ${c.texte ? `<p style="white-space:pre-line">${esc(c.texte)}</p>` : ''}${c.lien ? `<a class="lien-fl" href="${esc(sur(c.lien))}" target="_blank" rel="noopener">En savoir plus ${ICO.arrow}</a>` : ''}</div></div>`).join('') || '<div class="card center pad">Aucune nouveauté pour le moment.</div>'}</div>`;
+  app.querySelectorAll('.rs').forEach(diaporama);
 }
 async function flip() {
   // Le numéro à la une en grand (fond flouté de sa couverture), les autres en étagère
