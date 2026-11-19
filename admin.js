@@ -1158,10 +1158,12 @@ async function partenaires(box) {
     <label>Description (200 car. max)</label><input id="de" type="text" maxlength="200">
     <div class="grid2"><div><label>Lien</label><input id="li" type="text" placeholder="https://… ou https://wa.me/225…"></div><div><label>Type de lien</label><select id="tl"><option>Site web</option><option>WhatsApp</option><option>Flipbook</option></select></div></div>
     <label data-lf>Logo</label><input id="lo" type="file" accept="image/*">
+    <label>Photos <span class="muted small">(5 maximum : boutique, réalisations, produits… touchez-en une pour la mettre en premier)</span></label>
+    <div class="ph-g" id="bpg"></div><input id="bpi" type="file" accept="image/*" multiple class="sr">
     <button class="btn block" style="margin-top:12px">Ajouter</button><button class="btn ghost block" type="button" id="annul" hidden style="margin-top:8px">Annuler</button></form></div>
   <h2>Partenaires</h2><div class="list no-q" id="pts">${D.map(p => `<div class="card" data-id="${p.id}" data-f="${[enLigne(p) ? 'ligne' : '', !p.valide_par_adress ? 'avalider' : '', p.valide_par_adress && !p.visible ? 'masque' : '', pb(p).length ? 'pb' : ''].filter(Boolean).join(' ')}" style="display:flex;gap:12px;align-items:flex-start">
     <div class="ct-im" style="width:52px;height:52px;background-size:contain;${p.logo_path ? `background-image:url('${esc(publicUrl(p.logo_path))}')` : ''}"></div>
-    <div style="flex:1;min-width:0"><div class="row" style="justify-content:space-between;align-items:baseline"><b>${esc(p.nom)}</b><span class="st-l ${enLigne(p) ? 'actif' : ''}">${etat(p)}</span></div><div class="muted small">${esc(p.categorie)}${p.lien ? ' · ' + esc(p.type_lien || 'lien') : ''}</div>${pb(p).map(alerte).join('')}
+    <div style="flex:1;min-width:0"><div class="row" style="justify-content:space-between;align-items:baseline"><b>${esc(p.nom)}</b><span class="st-l ${enLigne(p) ? 'actif' : ''}">${etat(p)}</span></div><div class="muted small">${esc(p.categorie)}${p.lien ? ' · ' + esc(p.type_lien || 'lien') : ''}${(p.photos || []).length ? ' · ' + p.photos.length + ' photo' + (p.photos.length > 1 ? 's' : '') : ''}</div>${pb(p).map(alerte).join('')}
     <div class="row" style="margin-top:6px">
       <button class="btn sm ${p.valide_par_adress ? 'soft' : 'ghost'}" data-k="valide_par_adress" data-v="${p.valide_par_adress ? 0 : 1}">${p.valide_par_adress ? 'Retirer la validation' : 'Valider'}</button>
       <button class="btn sm ${p.visible ? 'soft' : 'ghost'}" data-k="visible" data-v="${p.visible ? 0 : 1}">${p.visible ? 'Masquer' : 'Rendre visible'}</button>
@@ -1171,6 +1173,18 @@ async function partenaires(box) {
   const $ = (s) => box.querySelector(s); const id = (el) => el.closest('[data-id]').dataset.id;
   let edit = null;
   $('#ca').onchange = () => { const n = $('#ca').value === '__new'; $('#can').hidden = !n; if (n) $('#can').focus(); };
+  // Jusqu'à 5 photos par partenaire, en plus du logo
+  const MAXB = 5; let BP = [];
+  const dessinerBp = () => {
+    $('#bpg').innerHTML = BP.map((p, k) => `<div class="ph-t${k ? '' : ' un'}"><button type="button" class="ph-im" data-up="${k}" style="background-image:url('${esc(p.url)}')" aria-label="${k ? 'Mettre cette photo en premier' : 'Première photo'}">${k ? '' : '<span>1re</span>'}</button><button type="button" class="ph-x" data-x="${k}" aria-label="Retirer cette photo">×</button></div>`).join('')
+      + (BP.length < MAXB ? `<label for="bpi" class="ph-add"><b>+</b><span>Ajouter${BP.length ? '' : ' des photos'}</span><small>${BP.length}/${MAXB}</small></label>` : '');
+    $('#bpg').querySelectorAll('[data-x]').forEach(b => b.onclick = () => { BP.splice(+b.dataset.x, 1); dessinerBp(); });
+    $('#bpg').querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const k = +b.dataset.up; if (k) { BP.unshift(BP.splice(k, 1)[0]); dessinerBp(); } });
+  };
+  $('#bpi').onchange = () => { const f = [...$('#bpi').files]; $('#bpi').value = ''; const place = Math.max(0, MAXB - BP.length);
+    f.slice(0, place).forEach(x => BP.push({ file: x, url: URL.createObjectURL(x) }));
+    if (f.length > place) toast(`5 photos maximum : ${f.length - place} photo(s) non ajoutée(s).`); dessinerBp(); };
+  dessinerBp();
   $('#f').onsubmit = (e) => { e.preventDefault();
     let lien = $('#li').value.trim();
     if (lien && $('#tl').value === 'WhatsApp' && /^\+?\d[\d\s]{7,}$/.test(lien)) { let n = lien.replace(/\D/g, ''); if (n.length === 10) n = '225' + n; lien = 'https://wa.me/' + n; }
@@ -1181,13 +1195,16 @@ async function partenaires(box) {
       categorie = CATS.find(c => c.toLowerCase() === t.toLowerCase()) || t.charAt(0).toUpperCase() + t.slice(1); }
     action(async () => {
     const f = $('#lo').files[0]; const logo_path = f ? await uploadPublic(f, 'partenaires') : null;
-    const v = { nom: $('#no').value.trim(), categorie, description: $('#de').value.trim() || null, lien: lien || null, type_lien: $('#tl').value };
+    if (BP.some(p => p.file)) toast('Envoi des photos…');
+    const photos = []; for (const p of BP) photos.push(p.file ? await uploadPublic(p.file, 'partenaires') : p.path);
+    const v = { nom: $('#no').value.trim(), categorie, description: $('#de').value.trim() || null, lien: lien || null, type_lien: $('#tl').value, photos };
     if (edit) { if (logo_path) v.logo_path = logo_path; check(await sb.from('partenaires').update(v).eq('id', edit.id)); }
     else check(await sb.from('partenaires').insert({ ...v, logo_path }));
   }, edit ? 'Modifications enregistrées.' : 'Partenaire ajouté.'); };
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
     const p = D.find(x => x.id === id(b)); if (!p) return; edit = p;
     $('#no').value = p.nom || ''; if (![...$('#ca').options].some(o => o.value === p.categorie)) $('#ca').insertAdjacentHTML('beforeend', `<option>${esc(p.categorie)}</option>`); $('#ca').value = p.categorie; $('#de').value = p.description || ''; $('#li').value = p.lien || ''; $('#tl').value = p.type_lien || 'Site web'; $('#lo').value = '';
+    BP = (p.photos || []).map(x => ({ path: x, url: publicUrl(x) })); dessinerBp();
     modeEdition(box, 'Modifier « ' + p.nom + ' »', 'Logo (laisser vide pour garder l’actuel)');
   });
   box.querySelectorAll('[data-k]').forEach(b => b.onclick = () => action(async () => check(await sb.from('partenaires').update({ [b.dataset.k]: b.dataset.v === '1' }).eq('id', id(b)))));
