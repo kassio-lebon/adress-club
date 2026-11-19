@@ -482,7 +482,7 @@ async function accueil() {
     + '</nav><nav class="petits" aria-label="Accès rapides">'
     + petit('#/mes-annonces', 'Mes annonces', nl ? pl(nl, 'demande') : 'Vos objets', nl)
     + petit('#/bonnes-adresses', 'Bons plans', 'Abidjan')
-    + petit('#/nouveautes', 'Nouveautés', 'Programmes')
+    + petit('#/nouveautes', 'Nouveautés', 'Programmes').replace('class="petit', 'class="petit clign')
     + '</nav>'
     + '<section><div class="sec-h"><h2>Cette semaine au Market</h2>' + ((recents || []).length > 2 ? '<span class="sn"><button type="button" class="sn-b" data-sn="-1" aria-label="Annonces précédentes"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z"/></svg></button><button type="button" class="sn-b" data-sn="1" aria-label="Annonces suivantes"><svg class="pi" viewBox="0 0 256 256" aria-hidden="true"><path d="M180.24,132.24l-80,80a6,6,0,0,1-8.48-8.48L167.51,128,91.76,52.24a6,6,0,0,1,8.48-8.48l80,80A6,6,0,0,1,180.24,132.24Z"/></svg></button></span>' : '') + '<a href="#/market">Tout voir</a></div>'
     + ((recents || []).length ? '<div class="strip defile">' + recents.map((a, i) => '<a class="mini" href="#/annonce/' + a.id + '"><div class="ph" style="background-image:url(\'' + esc(urls[i]) + '\')"></div><div class="t">' + esc(casse(a.titre)) + '</div><div class="p">' + prix(a) + '</div></a>').join('') + '</div>'
@@ -1001,7 +1001,9 @@ async function bonnesAdresses() {
   const ligne = (p) => '<div class="card bp">'
     + '<div class="bp-logo"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '></div>'
     + '<div class="bp-txt"><b>' + esc(casse(p.nom)) + '</b><div class="muted small">' + esc(p.categorie) + '</div>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>'
-    + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(sur(p.lien)) + '" target="_blank" rel="noopener">Découvrir</a>' : '') + '</div>';
+    + (p.lien ? '<a class="btn sm ghost" data-p="' + p.id + '" href="' + esc(sur(p.lien)) + '" target="_blank" rel="noopener">Découvrir</a>' : '')
+    // Photos du partenaire (5 max) : bande qui défile au doigt, un toucher agrandit
+    + ((p.photos || []).length ? '<div class="bp-ph">' + p.photos.map(x => '<button type="button" class="bp-im" data-zoom="' + esc(publicUrl(x)) + '" style="background-image:url(\'' + esc(publicUrl(x)) + '\')" aria-label="Agrandir la photo de ' + esc(casse(p.nom)) + '"></button>').join('') + '</div>' : '') + '</div>';
   const flipCard = (p) => '<a class="flipcard" data-p="' + p.id + '" href="' + esc(lienFlip(p.lien, p.nom)) + '">'
     + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><em>' + esc(casse(p.nom)) + '</em></span>'
     + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(casse(p.nom)) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
@@ -1012,6 +1014,11 @@ async function bonnesAdresses() {
     + (!adresses.length && !flips.length ? '<div class="card center pad">Aucun bon plan dans cette catégorie pour le moment.</div>' : '')
     + '<p class="muted small center" style="margin-top:22px">Sélection éditoriale d’ADRESS IMMOBILIER, sans paiement intégré ni commission.</p>';
   app.querySelectorAll('[data-p]').forEach(a => a.addEventListener('click', () => track('clic_partenaire', a.dataset.p)));
+  // Photo agrandie en plein écran (toucher ou Échap pour fermer)
+  app.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => { const d = document.createElement('div'); d.className = 'lv in'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+    d.innerHTML = '<img src="' + esc(b.dataset.zoom) + '" alt="" style="max-width:100%;max-height:100%;border-radius:14px;object-fit:contain">';
+    const fermer = () => { d.remove(); removeEventListener('keydown', k, true); }; const k = (e) => { if (e.key === 'Escape') fermer(); };
+    d.onclick = fermer; addEventListener('keydown', k, true); document.body.appendChild(d); });
 }
 
 // ---------- Lecteur de flipbook Heyzine (Flip Immo, catalogues partenaires) ----------
