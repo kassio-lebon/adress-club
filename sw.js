@@ -1,6 +1,6 @@
 // ADRESS CLUB — service worker : l'interface fonctionne hors ligne, les données restent toujours en direct.
-const CACHE = 'acl-v123';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'admin.js', 'visite.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png?v=2', 'logo-dark.png?v=1', 'motion.js', 'trouve.js?v=123'];
+const CACHE = 'acl-v124';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'admin.js', 'visite.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png?v=2', 'logo-dark.png?v=1', 'motion.js', 'son.js', 'trouve.js?v=123'];
 // À chaque version publiée, CHANGER CACHE (acl-vNN) : c'est ce qui fait télécharger la nouvelle version aux téléphones.
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE && x !== 'acl-img' && x !== 'acl-lib').map(x => caches.delete(x)))).then(() => self.clients.claim())); });
