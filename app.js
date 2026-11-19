@@ -15,7 +15,10 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSess
 
 export const CATEGORIES = ['Mobilier', 'Électroménager', 'Décoration', 'Électronique & High-tech', 'Enfants & Bébés', 'Maison & Jardin', 'Mode & Accessoires'];
 export const ETATS = ['Neuf','Très bon état','Bon état','Usagé','À réparer'];
-export const FILTRES_BP = ['Rideaux et décoration','Aménagement et revêtements'];
+// Catégories proposées par défaut pour les bons plans ; l'Espace ADRESS peut en créer d'autres librement
+export const FILTRES_BP = ['Rideaux et décoration','Aménagement et revêtements','Mobilier et literie','Électroménager','Boutiques et inspirations','Plomberie et électricité','Ménage et entretien','Déménagement','Sécurité et domotique','Jardin et piscine','Restaurants et traiteurs','Courses et livraison','Santé et pharmacie','Beauté et bien-être','Sport et loisirs','Enfants et éducation','Auto et transport','Banque et assurance','Informatique et téléphonie','Services administratifs'];
+// Liste affichée : catégories par défaut d'abord, puis celles créées par ADRESS (ordre alphabétique)
+export const categoriesBP = (extra = []) => { const vu = new Set(FILTRES_BP.map(c => c.toLowerCase())); const plus = [...new Set(extra.filter(Boolean).map(c => String(c).trim()))].filter(c => c && !vu.has(c.toLowerCase())).sort((a, b) => a.localeCompare(b, 'fr')); return [...FILTRES_BP, ...plus]; };
 const STATUTS = { disponible:'Disponible', reserve:'Réservé', vendu:'Vendu', don_effectue:'Don effectué', retire:'Retiré', expire:'Expiré' };
 
 export const state = { session: null, profil: null, params: {}, compteurs: { demandes_non_lues: 0, notifications_non_lues: 0 } };
@@ -991,10 +994,10 @@ async function flip() {
 }
 async function bonnesAdresses() {
   const cat = qs().get('cat') || '';
-  let req = sb.from('partenaires').select('*').eq('visible', true).eq('valide_par_adress', true).order('ordre');
-  if (cat) req = req.eq('categorie', cat);
-  const { data } = await req;
-  const tous = data || [], flips = cat ? [] : tous.filter(p => estFlip(p.lien)), adresses = tous.filter(p => !estFlip(p.lien));
+  const { data } = await sb.from('partenaires').select('*').eq('visible', true).eq('valide_par_adress', true).order('ordre');
+  // Puces : seulement les catégories qui ont au moins un bon plan (catégories par défaut et catégories créées par ADRESS)
+  const CATS = categoriesBP((data || []).map(p => p.categorie)).filter(c => (data || []).some(p => p.categorie === c));
+  const tous = (data || []).filter(p => !cat || p.categorie === cat), flips = cat ? [] : tous.filter(p => estFlip(p.lien)), adresses = tous.filter(p => !estFlip(p.lien));
   const ligne = (p) => '<div class="card bp">'
     + '<div class="bp-logo"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '></div>'
     + '<div class="bp-txt"><b>' + esc(casse(p.nom)) + '</b><div class="muted small">' + esc(p.categorie) + '</div>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>'
@@ -1003,9 +1006,9 @@ async function bonnesAdresses() {
     + '<span class="fc-cover"' + (p.logo_path ? ' style="background-image:url(\'' + esc(publicUrl(p.logo_path)) + '\')"' : '') + '><em>' + esc(casse(p.nom)) + '</em></span>'
     + '<span class="fc-txt"><small>Carnet d’Abidjan</small><b>' + esc(casse(p.nom)) + '</b>' + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '<u>Feuilleter ' + ICO.arrow + '</u></span></a>';
   app.innerHTML = '<a class="back" href="#/">‹ Accueil</a><h1>Les bons plans</h1><p class="muted">La sélection ADRESS pour vivre Abidjan</p>'
-    + '<div class="chips"><a class="chip ' + (!cat ? 'on' : '') + '" href="#/bonnes-adresses">Tout</a>' + FILTRES_BP.map(c => '<a class="chip ' + (cat === c ? 'on' : '') + '" href="#/bonnes-adresses?cat=' + encodeURIComponent(c) + '">' + c + '</a>').join('') + '</div>'
+    + '<div class="chips"><a class="chip ' + (!cat ? 'on' : '') + '" href="#/bonnes-adresses">Tout</a>' + CATS.map(c => '<a class="chip ' + (cat === c ? 'on' : '') + '" href="#/bonnes-adresses?cat=' + encodeURIComponent(c) + '">' + esc(c) + '</a>').join('') + '</div>'
     + (flips.length ? '<section><h2>À feuilleter</h2><div class="list">' + flips.map(flipCard).join('') + '</div></section>' : '')
-    + (cat ? [cat] : FILTRES_BP).map(c => { const l = adresses.filter(p => p.categorie === c); return l.length ? '<section><h2>' + esc(c) + '</h2><div class="list">' + l.map(ligne).join('') + '</div></section>' : ''; }).join('')
+    + (cat ? [cat] : CATS).map(c => { const l = adresses.filter(p => p.categorie === c); return l.length ? '<section><h2>' + esc(c) + '</h2><div class="list">' + l.map(ligne).join('') + '</div></section>' : ''; }).join('')
     + (!adresses.length && !flips.length ? '<div class="card center pad">Aucun bon plan dans cette catégorie pour le moment.</div>' : '')
     + '<p class="muted small center" style="margin-top:22px">Sélection éditoriale d’ADRESS IMMOBILIER, sans paiement intégré ni commission.</p>';
   app.querySelectorAll('[data-p]').forEach(a => a.addEventListener('click', () => track('clic_partenaire', a.dataset.p)));
